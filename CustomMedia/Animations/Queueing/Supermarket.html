@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+<body onload="start()">
+    <table style="position:absolute;top:5px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Average service time</td> 
+            <td> <input style="position:relative;top:3px;width:50px;" type="number"  id="ServiceTime" value="2" step="0.25" min="0.3"></td>
+        </tr>
+        
+        
+        <tr>
+            <td> Display speed </td> 
+            <td> <input style="width:70px;"  type="range" id="speed" value="50"></td>
+        </tr>
+    </table>
+    
+    <script src="../SharedResources/d3.min.js"></script>
+    <script>
+    var displaycontainer = {}, customers = {}, servers = {}, queues = [];
+
+    displaycontainer.width = Math.min(900, window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth-20),
+            displaycontainer.height = Math.min(700, window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight-20),
+            displaycontainer.speed = 1000;
+    displaycontainer.timeTonewCustomer=1;
+    displaycontainer.serviceTimeAVG=2;
+    customers.picWidth = displaycontainer.width/10;
+    customers.picHeight = customers.picWidth/8*6,
+            customers.maxNr = 50,
+            customers.p = [],
+            customers.activeAllTime=0;
+    
+    servers.nr = 4,
+            servers.maxQueueLength = 8,
+            servers.picWidth = displaycontainer.width/10,
+            servers.picHeight = servers.picWidth/8*6,
+            servers.p = [],
+            servers.displayPosition = [];
+
+    var enterPosition = [displaycontainer.width / 2 - customers.picWidth / 2, displaycontainer.height - customers.picHeight],
+            arrivalPosition = [displaycontainer.width / 2 - customers.picWidth / 2, displaycontainer.height * 2 / 3 - customers.picHeight];
+
+    function start( )
+    {
+        createObjects();
+        document.getElementById("ServiceTime").value = displaycontainer.serviceTimeAVG ;
+        document.getElementById("speed").value = displaycontainer.speed/10;
+        
+        activateCustomers();
+    }
+
+
+    function createObjects() {
+        displaycontainer.svg = d3.select("body").append("svg").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+        var showitems = [];
+        for (var n = 0; n < customers.maxNr; n++)
+        {
+            var c = {name: n, kind: "customer", x: 0, y: 0, status: -1};
+            customers.p.push(c);
+            showitems.push(c);
+        }
+
+
+        for (var n = 0; n < servers.nr; n++)
+        {
+            var q = {};
+            q.name = n;
+            q.waitingCustomers = [];
+            q.displayPosition = [];
+            var posx = (n + 0.5) * displaycontainer.width / (servers.nr) - (servers.picWidth+customers.picWidth)/2+servers.picWidth;
+            for (var s = 0; s < servers.maxQueueLength; s++)
+            {
+                var pos = [posx, customers.picHeight * (s + 1.5)];
+                q.displayPosition.push(pos);
+            }
+            queues.push(q);
+
+            var c = {name: n, kind: "server", x: (n + 0.5) * displaycontainer.width / (servers.nr) - (servers.picWidth+customers.picWidth)/2 , y: customers.picHeight * 1.5, queue: q};
+            q.server = c;
+            servers.p.push(c);
+            showitems.push(c);
+        }
+
+        displaycontainer.node = displaycontainer.svg.selectAll(".node").data(showitems);
+        displaycontainer.node.enter().append("image").attr("class", function (d) {
+            return "node " + c.kind + d.name;
+        }).attr("xlink:href", function (d) {
+            if (d.kind === "customer"){
+                var r=Math.floor(Math.random()*6)+1;
+                return "images/Shopper"+r+".png";
+                }
+            else
+                return "images/Cashregister.png"
+        }).attr("width", function (d) {
+            if (d.kind === "customer")
+                return customers.picWidth + "px";
+            else
+                return servers.picWidth + "px"
+        }).attr("height", function (d) {
+           if (d.kind === "customer")
+                return customers.picHeight + "px";
+           else
+                return servers.picHeight + "px"
+        })
+        .attr("x", function (d) {
+                    return d.x
+        }).attr("y", function (d) {
+            return d.y
+        }).style("visibility", function (d) {
+            if (d.kind === "customer")
+                return "hidden";
+            else
+                return "visible"
+        });
+        displaycontainer.customers = [];
+        for (var n = 0; n < customers.maxNr; n++)
+        {
+            displaycontainer.customers.push(displaycontainer.svg.selectAll(".node").filter(function (d) {
+                if (d.kind === "customer" && d.name === n)
+                    return d;
+            }));
+        }
+    }
+
+    function activateCustomers() {
+        activateOneCustomer();
+        customers.activeAllTime++;
+        if(customers.activeAllTime<7){
+            setTimeout(function () {
+                activateCustomers();
+            }, 100 );
+        } else {
+            setTimeout(function () {
+                activateCustomers();
+            }, displaycontainer.speed *displaycontainer.timeTonewCustomer);
+        }
+    }
+
+    function activateOneCustomer() {
+        var customerNumber = getFirstInactiveCustomer();
+        if (customerNumber !== -1) {
+            customers.p[customerNumber].status = 0;// entered and going to the arriving area
+            displaycontainer.customers[customerNumber].attr("x", enterPosition[0]+ displaycontainer.width*(Math.random()-0.5)/2).attr("y", enterPosition[1]).style("visibility", "visible");
+            moveToQueue(customerNumber);
+        }
+    }
+
+    function moveToQueue(customerNumber) {
+        var targetqueue = getQueueNr();
+        if (targetqueue === -1) {
+            deactivateCustomer(customerNumber);
+        } else {
+            customers.p[customerNumber].status = 1;// going to queue
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed)
+                    .attr("x", queues[targetqueue].displayPosition[queues[targetqueue].waitingCustomers.length][0])
+                    .attr("y", queues[targetqueue].displayPosition[queues[targetqueue].waitingCustomers.length][1]);
+            queues[targetqueue].waitingCustomers.push(customers.p[customerNumber]);
+            setTimeout(function () {
+                arriveInQueuePosition(customerNumber, targetqueue);
+            }, displaycontainer.speed + 100);
+        }
+    }
+
+    function arriveInQueuePosition(customerNumber, targetqueue) {
+        if (customers.p[customerNumber].status === 1) {// has the customer just arrived
+            customers.p[customerNumber].status = 2;// yes, now you are waiting in the queue.
+        } else {
+            console.log("The customer was already waiting here.");
+        }
+
+        if (queues[targetqueue].waitingCustomers[0].name === customerNumber) {
+            startServing(customerNumber, targetqueue);
+        }
+    }
+
+    function startServing(customerNumber, targetqueue) {
+        if (queues[targetqueue].waitingCustomers[0].name !== customerNumber) {
+            console.log("To serve not first in queue.");
+        } else {
+            customers.p[customerNumber].status = 3;// is being servered
+            var seriveTime=getPoison(displaycontainer.serviceTimeAVG)+displaycontainer.serviceTimeAVG/3*getSTNormal();
+            setTimeout(function () {
+                endServedCostomer(customerNumber, targetqueue);
+            }, displaycontainer.speed*seriveTime);
+        }
+    }
+
+
+    function endServedCostomer(customerNumber, targetqueue) {
+        if (queues[targetqueue].waitingCustomers.length > 0) {
+            var served = queues[targetqueue].waitingCustomers.shift();
+            if (served.status !== 3)
+                console.log("Customer was not in status to be served.");
+            if (served.name !== customerNumber) {
+                console.log("Customer that should have been served was not the first in line.");
+            } else {
+                // move the served customer out.
+                served.status = -2;// leaving
+                displaycontainer.customers[served.name].transition().duration(displaycontainer.speed).attr("y", -customers.picHeight);
+                setTimeout(function () {
+                    deactivateCustomer(served.name);
+                }, displaycontainer.speed + 11);
+
+                for (i = 0; i < queues[targetqueue].waitingCustomers.length; i++) {
+                    //if(queues[targetqueue].waitingCustomers[i].status===2)
+                    displaycontainer.customers[queues[targetqueue].waitingCustomers[i].name].transition().duration(displaycontainer.speed)
+                            .attr("x", queues[targetqueue].displayPosition[i][0])
+                            .attr("y", queues[targetqueue].displayPosition[i][1]);
+                }
+                if (queues[targetqueue].waitingCustomers.length > 0) {
+                    if (queues[targetqueue].waitingCustomers[0].status === 2)
+                        setTimeout(function () {
+                            startServing(queues[targetqueue].waitingCustomers[0].name, targetqueue);
+                        }, displaycontainer.speed);
+                }
+            }
+        } else {
+            console.log("Tried to take element for empty queue.");
+        }
+    }
+
+
+
+    function deactivateCustomer(customerNumber) {
+        displaycontainer.customers[customerNumber].style("visibility", "hidden");
+        setTimeout(function () {
+            customers.p[customerNumber].status = -1;
+        }, 200);
+    }
+
+    function getFirstInactiveCustomer() {
+        for (i = 0; i < customers.maxNr; i++)
+            if (customers.p[i].status === -1)
+                return i;
+        return -1;
+    }
+
+    function getQueueNr() {
+        var minimalLength = servers.maxQueueLength + 1;
+        for (i = 0; i < servers.nr; i++)
+            minimalLength = Math.min(minimalLength, queues[i].waitingCustomers.length);
+        if (minimalLength < servers.maxQueueLength) {
+            var canidates = [];
+            for (i = 0; i < servers.nr; i++) {
+                if (minimalLength === queues[i].waitingCustomers.length)
+                    canidates.push(i);
+            }
+            return canidates[Math.floor(Math.random() * canidates.length)];
+        }
+        return -1;
+    }
+
+
+    function getExponential(lambda)
+    {
+        return -1 * Math.log(Math.random()) / lambda;
+    }
+
+    function getPoison(lambda)
+    {
+        var L=Math.exp(-lambda);
+        var k=0,p=1;
+        do{
+            k++;
+            p=p*Math.random();
+        } while (p>L)
+        return k-1;
+    }
+
+    // Standard Normal variate using Box-Muller transform.
+    function getSTNormal() {
+        var u = 1 - Math.random(); // Subtraction to flip [0, 1) to (0, 1].
+        var v = 1 - Math.random();
+        return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+    }
+    
+    
+    d3.select("input[id=ServiceTime]").on("change", function () {
+        if (this.value < 0)
+            alert("The average time does not make sense.");
+        else {
+            displaycontainer.serviceTimeAVG = Number(this.value);
+        }
+    });
+    
+    
+    d3.select("input[id=speed]").on("change", function () {
+        if (this.value < 0) {
+            alert("The speed should be a positive number.");
+        }
+        else {
+            displaycontainer.speed = Math.max(50, this.value * 10);
+        }
+    });
+    
+    </script>
+
+    

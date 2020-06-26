@@ -1,0 +1,201 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+    <script src="../SharedResources/GraphAlgorithmLibaryFitzner.js"></script>
+    <script src="../SharedResources/VisualFunctionFitzner.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Erdös-Rényi Graph
+    </h2>
+    <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Nr. of vertices</td> 
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="nrNodes" value="400"></td>
+        </tr>
+        <tr>
+            <td> Lambda (&lambda;) </td>
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="lambda" value="4" step="0.05"></td>
+        </tr>
+        <tr>
+            <td> Edge probability </td>
+            <td>    <input style="position:relative;top:3px;width:70px;" type="number" id="prob" value="0.02" step="0.005" ></td>
+        </tr>
+        <tr>
+            <td> Display   </td>
+            <td>  <input type="range" id="speed" value="50"></td>
+        </tr>        <tr>
+            <td>  Press to pause/unpause:  </td>
+            <td>  <button onclick="swapPause()">(un)pause</button></td>
+        </tr>
+    </table>
+
+    <script>
+        var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+                height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+                color = d3.scale.category20(),
+                nrOfNodes = 200,
+                lambda = 4,
+                displayID = -1;
+        var graph = createERgraph(nrOfNodes, lambda * 1.0 / nrOfNodes);
+        var force, svg, link, node, distanceStorage = {};
+        var edgesadded = 0, chartNotShown = true, chartelement = [], nameTag = {}, chartType = "", modelTag = "ERRG";
+        var shownedges = [], notShownEdges = [];
+        var pauseisNotSet, edgeIncreaseTime = 500;
+
+        function draw() {
+            document.getElementById("nrNodes").value = nrOfNodes;
+            document.getElementById("lambda").value = lambda;
+            document.getElementById("prob").value = lambda / nrOfNodes;
+            document.getElementById("speed").value = edgeIncreaseTime/10;
+
+            pauseisNotSet = true;
+
+            graph.futureLinks = [];
+
+
+            while (graph.links.length > 0) {
+                var index = Math.floor(Math.random() * graph.links.length);
+                var nextedge;
+                if (index === 0) {
+                    graph.futureLinks.push(graph.links.shift());
+                } else {
+                    graph.futureLinks.push(graph.links[index]);
+                    graph.links[index] = graph.links[0];
+                    graph.links.shift();
+                }
+            }
+
+            for (i = 0; i < graph.nodes.length; i++) {
+                graph.nodes[i].group = 0;
+            }
+            for (i = 0; i < graph.futureLinks.length; i++) {
+                graph.futureLinks[i].age = i;
+            }
+
+            initializeForceFullscreen();
+
+            displayID = setTimeout(function () {
+                addEgdeToGraph();
+            }, 2000);
+
+            addLogo();
+        }
+        ;
+
+        function addEgdeToGraph() {
+            if (pauseisNotSet) {
+                if (graph.futureLinks.length > 0) {
+                    var newedge = graph.futureLinks.shift();
+                    graph.links.push(newedge);
+                    graph.nodes[newedge.source].group++;
+                    graph.nodes[newedge.target].group++;
+                    link = link.data(graph.links);
+                    link.enter().append("path")
+                            .attr("class", function (d) {
+                                return "link count" + d.count;
+                            }).style("stroke", "red")
+                            .attr("stroke-width", "3px");
+                    link.transition().duration(edgeIncreaseTime)
+                            .style("stroke", function (d) {
+                                if (edgesadded - d.age < 3) {
+                                    return "red";
+                                }
+                                else {
+                                    return "black";
+                                }
+                            }).attr("stroke-width",
+                            function (d) {
+                                if (edgesadded - d.age < 3) {
+                                    return "3px";
+                                }
+                                else {
+                                    return "1px";
+                                }
+                            }
+                    );
+
+                    node.style("fill", function (d) {
+                        return color(d.group);
+                    });
+                    edgesadded++;
+                    force.start();
+                }
+                displayID = setTimeout(function () {
+                    addEgdeToGraph();
+                }, edgeIncreaseTime);
+            }
+        }
+        ;
+
+
+
+        d3.select("input[id=nrNodes]").on("change", function () {
+            if (this.value < 0)
+                alert("The number of nrOfNodes was selected to be negative. This does not make sense.");
+            else if (this.value > 2000)
+                alert("The number of nrOfNodes is a bit high. I'm sorry Dave, I'm afraid I can't do that.");
+            else {
+                nrOfNodes = this.value;
+                document.getElementById("prob").value = lambda / nrOfNodes;
+                d3.select("svg").remove();
+                graph = createERgraph(nrOfNodes, lambda / nrOfNodes);
+                draw();
+            }
+        });
+
+        d3.select("input[id=lambda]").on("change", function () {
+            if (this.value < 0) {
+                alert("The parameter lambda, needs to be positive.");
+            }
+            else {
+                lambda = this.value;
+                document.getElementById("prob").value = lambda / nrOfNodes;
+                d3.select("svg").remove();
+                graph = createERgraph(nrOfNodes, lambda / nrOfNodes);
+                draw();
+            }
+        });
+
+        d3.select("input[id=prob]").on("change", function () {
+            if ((this.value < 0) || (this.value > 1)) {
+                alert("The parameter p need to be between 0 and 1.");
+            }
+            else {
+                lambda = this.value * nrOfNodes;
+                document.getElementById("lambda").value = this.value * nrOfNodes;
+                d3.select("svg").remove();
+                graph = createERgraph(nrOfNodes, lambda / nrOfNodes);
+                draw();
+            }
+        });
+
+        d3.select("input[id=speed]").on("change", function () {
+            if (this.value < 0) {
+                alert("The speed should be a  positive integer.");
+            } else {
+                edgeIncreaseTime = Math.max(10,this.value*10);
+            }
+        });
+        function swapPause() {
+            if (pauseisNotSet) {
+                clearInterval(displayID);
+                pauseisNotSet = false;
+            }
+            else {
+                pauseisNotSet = true;
+                addEgdeToGraph();
+            }
+        }
+        ;
+
+
+    </script>

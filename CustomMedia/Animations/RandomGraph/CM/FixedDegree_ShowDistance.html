@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<link rel="stylesheet" type="text/css" href="../multigraphForcefield.css">
+
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+    <script src="../../SharedResources/d3.tip.v0.6.3.js"></script>
+    <script src="../SharedResources/GraphAlgorithmLibaryFitzner.js"></script>
+    <script src="../SharedResources/VisualFunctionFitzner.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Configuration model, fixed degree
+    </h2>
+    <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway;">
+        <tr>
+            <td> Nr. of vertices</td> 
+            <td> <input style="position:relative;top:3px;width: 70px;" type="number"  id="nrNodes" value="50"></td>
+        </tr>
+        <tr>
+            <td> Fixed Nr. of edges:  </td>
+            <td>    <input style="position:relative;top:3px;width: 70px;" type="number" id="degree" value="3" ></td>
+        </tr>
+        <tr>
+            <td>  <div id="buttonField"> </div> </td> 
+            <td>  </td>
+        </tr>
+    </table>
+
+    <script>
+    var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            color = d3.scale.category20(),
+            nrOfNodes = 50,
+            degree = 3,
+            distanceStorage = {};
+    distanceStorage.origin = {};
+    var graph = createConfigModelgraphFixedDegree(nrOfNodes, degree);
+    var force, svg, link, node;
+    var chartNotShown,chartelement = [], nameTag = {}, chartType="DistanceChart", modelTag="ConfigFixed";
+
+
+    function draw() {
+        chartNotShown=true;
+        initializeForceFullscreen();
+        addLogo();
+    }
+    ;
+
+
+    d3.select("input[id=nrNodes]").on("change", function () {
+        if (this.value < 0)
+            alert("The number of nrOfNodes was selected to be negative. This does not make sense.");
+        else if (this.value > 2000)
+            alert("The number of nrOfNodes is a bit high. I'm sorry Dave, I'm afraid I can't do that.");
+        else {
+            nrOfNodes = this.value;
+            d3.select("svg").remove();
+            graph = createConfigModelgraphFixedDegree(nrOfNodes, degree);
+            draw();
+        }
+    });
+
+    d3.select("input[id=degree]").on("change", function () {
+        var input=Number(this.value);
+        if (input < 0) {
+            alert("The number of edges need to be a positive integer.");
+        } else if (input !== parseInt(this.value,10)){
+            alert("The number of edges need to be an integer.");
+        } else {
+            degree = input;
+            d3.select("svg").remove();
+            graph = createConfigModelgraphFixedDegree(nrOfNodes, degree);
+            draw();
+        }
+    });
+
+    </script>

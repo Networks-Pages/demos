@@ -1,0 +1,399 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #aaa;
+        stroke-opacity: 1.2;
+        stroke-width:8px; // width of lines
+    }
+    .node{
+        stroke:#333;
+        stroke-width:1px;
+    }
+    .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border-radius: 2px;
+    }
+    
+</style>
+<body onload="start()">
+    <script src="d3.min.js"></script>
+    <script src="d3.tip.v0.6.3.js"></script>
+    <h2 style="font-family: Raleway">
+        Flow on Network Prototype
+    </h2>
+
+    <script>
+    var graph = {};
+    var width = 0.9 * window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = 0.9 * window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            color = d3.scale.category20(),
+            displaycontainer = {};
+    displaycontainer.animationTime = 1000;
+    displaycontainer.intervalID = [];
+    displaycontainer.walkers = 0;
+    displaycontainer.sizeWalkers = "3px"; // the radi of the moving nodes
+    displaycontainer.sizeNodes = "14px"; // the radi of the nodes
+    displaycontainer.nodeColor = "#f9d44d"; // the radi of the nodes
+    // colormap 0- non-removable edge, 1- removable edge, 2- removed edge,
+    // For the traffic forcast effect  3- traffic increase, 4- traffic decrease
+           
+    displaycontainer.colorMap=["#f2f4cb","#cdeef2","#f8f8f8","#f7c3c3","#c6f2c6"];
+    displaycontainer.edgeOver=false;
+    displaycontainer.nodeOver=false;
+
+    function start() {
+        graph.nodes = [];
+        d3.csv("nodes.csv", function (data) {
+            graph.nodes = convertToObj(data);
+            d3.csv("edges.csv", function (dataE) {
+                graph.links = convertToObj(dataE);
+                d3.csv("flowData.csv", function (dataF) {
+                    graph.setsOfFlows=convertFlowSet(dataF);
+                    draw();
+                })
+            })
+        });
+    }
+
+    function convertToObj(data) {
+        for (var i = 0; i < data.length; i++) {
+            for (var property1 in data[i]) {
+                if (!isNaN(data[i][property1]))
+                    data[i][property1] = parseFloat(data[i][property1]);
+                else {
+                    data[i][property1] = data[i][property1].trim();
+                    if (data[i][property1]==="true") data[i][property1]=true;
+                    if (data[i][property1]==="false") data[i][property1]=false;
+                }
+            }
+        }
+        return data;
+    }
+
+    function convertFlowSet(data) {
+        for (i = 0; i < data.length; i++) {
+             var ed = data[i].edgeSet.split(' ');
+             var fl = data[i].flow.split(' ');
+             var edges=[];
+             var flows=[];
+             for ( j = 0; j < graph.links.length; j++) {
+                 flows.push(0);
+             }
+             for ( j = 0; j < data.length; j++) {
+                 if (!isNaN(ed[j])){
+                    var id=parseFloat(ed[j]);
+                    edges.push(id);
+                    flows[id]=parseFloat(fl[j]);
+             }}
+             data[i].edgeSet=edges;
+             data[i].flow=flows;
+             
+        }
+        return data;
+    }
+    
+    function convertXtoDisp(x) {
+        return displaycontainer.boundary + 1.0 * (x - graph.minx) / (graph.maxx - graph.minx) * displaycontainer.effwidth;
+    }
+
+    function convertYtoDisp(y) {
+        return displaycontainer.boundary + 1.0 * (y - graph.miny) / (graph.maxy - graph.miny) * displaycontainer.effheight;
+    }
+    
+    function lookForEdge(list){
+        for (i = 0; i < graph.setsOfFlows.length; i++) {
+            if(graph.setsOfFlows[i].edgeSet.length===list.length){
+                var boo=true;
+                for (j = 0; j < graph.setsOfFlows[i].edgeSet.length && boo; j++) {
+                    if(graph.setsOfFlows[i].edgeSet[j]!== list[j]){
+                        boo=false;
+                        j = graph.setsOfFlows[i].edgeSet.length;
+                    }
+                }
+                if (boo) return i;
+            }
+        }
+        return -1;
+    }
+    
+    function copyList(list){
+        var l=[];
+        list.forEach(function(element) { l.push(element);});
+        return l;
+    }
+    
+    function copyListWithout(list,item){
+        var l=[];
+        list.forEach(function(element) { if (element!==item) l.push(element);});
+        return l;
+    }
+    
+    function updateEdgeDeleteable(){
+        var activeEdgeSet= graph.setsOfFlows[graph.activeEdgeSetNr].edgeSet;
+        var count=0;
+        for (var i = 0; i <activeEdgeSet.length; i++) {
+            var id=activeEdgeSet[i];
+            var list= copyListWithout(activeEdgeSet,id);
+            var pos=lookForEdge(list);
+            graph.links[id].removable= (pos!==-1);
+            if(graph.links[id].removable) count++;
+        }
+        //console.log("Counted "+count+" removable edges.");
+    }
+    
+    function draw() {
+        var list=[];
+        for (var i = graph.links.length-1; i >= 0; i--) {
+            list.push(i);
+            graph.links[i].stillPresent=true;
+        }
+        graph.activeEdgeSetNr=lookForEdge(list);
+        
+        updateEdgeDeleteable();
+        
+        graph.minx = 100000;
+        graph.miny = 100000;
+        graph.maxx = 0;
+        graph.maxy = 0;
+
+        for (i = 0; i < graph.nodes.length; i++) {
+            graph.maxx = Math.max(graph.nodes[i].x, graph.maxx);
+            graph.minx = Math.min(graph.nodes[i].x, graph.minx);
+            graph.maxy = Math.max(graph.nodes[i].y, graph.maxy);
+            graph.miny = Math.min(graph.nodes[i].y, graph.miny);
+
+        }
+
+        graph.weights = [];
+        for (i = 0; i < graph.links.length; i++) {
+            graph.links[i].weight = Math.ceil(Math.random() * 10) + 1;
+            graph.weights.push(Math.ceil(Math.random() * 4));
+        }
+
+        graph.activeNode = 0;
+        graph.checkedNodes = [];
+        displaycontainer.animationStep = 0;
+        displaycontainer.svg = d3.select("body")
+                .append("svg").attr("width", width).attr("height", height);
+        displaycontainer.boundary = Math.max(15,Math.min(width, height) * 0.05);
+        displaycontainer.effwidth = width - 2 * displaycontainer.boundary;
+        displaycontainer.effheight = height - 2 * displaycontainer.boundary;
+
+        displaycontainer.tip = d3.tip()
+            .attr('class', 'd3-tip')
+            .direction('e')
+            .html(function (d) {
+                return '<table class="d3-tip" id="tiptable">' + "Traffic in current network: " +Math.abs(graph.setsOfFlows[graph.activeEdgeSetNr].flow[d.name]) + "</table>";
+            });
+        displaycontainer.svg.call(displaycontainer.tip);    
+        displaycontainer.dummyline = {name: -1, source: -1, target: -1};
+        displaycontainer.lineSelected = displaycontainer.dummyline;
+        displaycontainer.links = displaycontainer.svg.selectAll("link")
+                .data(graph.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    var sourceNode = graph.nodes.filter(function (d, i) {
+                        return i === l.source
+                    })[0];
+                    d3.select(this).attr("y1", convertYtoDisp(sourceNode.y));
+                    return convertXtoDisp(sourceNode.x)
+                })
+                .attr("x2", function (l) {
+                    var targetNode = graph.nodes.filter(function (d, i) {
+                        return i == l.target
+                    })[0];
+                    d3.select(this).attr("y2", convertYtoDisp(targetNode.y));
+                    return convertXtoDisp(targetNode.x)
+                }).attr("id", function (d) {
+            if (d.source.name < d.target.name)
+                return "idlink" + d.source + "t" + d.target;
+            else
+                return "idlink" + d.target + "t" + d.source;
+        }).on("mouseover",  function (d) {
+              handleMouseOver(d);
+        }).on("mouseleave", function (d) { 
+            handleMouseOut(d);
+        }).on('click', function (d) {
+           if ((d.removable)&&(d.stillPresent))
+               removeEdge(d);
+        });
+        
+        linksToStandardColor(); 
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node").append("circle")
+                .attr("r", displaycontainer.sizeNodes).attr("cx", function (d) {
+            return convertXtoDisp(d.x)
+        })
+                .attr("cy", function (d) {
+                    return convertYtoDisp(d.y)
+                }).attr("fill", displaycontainer.nodeColor);
+
+
+            
+        for (i = 0; i < graph.links.length; i++) {
+            if (Math.random() > 0.5)
+                keepmovementAlongLine(i);
+            else
+                keepmovementAlongLine(i);
+        }
+    }
+
+   function linksToStandardColor(){
+         displaycontainer.links.style("stroke", function (d) {
+            if (!d.stillPresent) return displaycontainer.colorMap[2];
+            else if (d.removable) return displaycontainer.colorMap[1];
+            else return displaycontainer.colorMap[0];
+         });
+   }
+   
+    function handleMouseOver (edge){
+       //displaycontainer.nodeOver=false;
+       displaycontainer.tip.show(edge);
+       if(edge.removable){
+            var list= copyListWithout(graph.setsOfFlows[graph.activeEdgeSetNr].edgeSet,edge.name);
+            var pos=lookForEdge(list);
+            var diff=[];
+            for(j=0;j<graph.setsOfFlows[pos].flow.length;j++){
+                diff.push(Math.abs(graph.setsOfFlows[pos].flow[j])-Math.abs(graph.setsOfFlows[graph.activeEdgeSetNr].flow[j]));
+            }
+            displaycontainer.links.style("stroke", function (d) {
+                if ((!d.stillPresent)||(d.name===edge.name)) return displaycontainer.colorMap[2];
+                else if (diff[d.name]===0) return displaycontainer.colorMap[0];
+                else if (diff[d.name]>0) return displaycontainer.colorMap[3];
+                else if (diff[d.name]<0) return displaycontainer.colorMap[4];
+                    return "#eee";
+            });
+       }
+   }
+
+   function handleMouseOut (edge){
+       displaycontainer.intervalID.push(setTimeout(function () {
+          if(displaycontainer.nodeOver===false) {
+              linksToStandardColor();
+              displaycontainer.tip.hide(edge);
+          }
+       },10));
+   }
+   
+   function removeEdge (edge){
+        var list= copyListWithout(graph.setsOfFlows[graph.activeEdgeSetNr].edgeSet,edge.name);
+        var pos=lookForEdge(list);
+        if(pos!==-1){
+            graph.activeEdgeSetNr=pos;
+            graph.links[edge.name].stillPresent=false;
+            updateEdgeDeleteable();
+            linksToStandardColor();
+        }
+   }
+    function movePointAlongLine(edgeNr, speed) {
+        displaycontainer.walkers++;
+        var walker = {};
+        walker.edge = graph.links[edgeNr];
+        if (speed > 0) {
+            walker.startX = graph.nodes[walker.edge.source].x;
+            walker.startY = graph.nodes[walker.edge.source].y;
+            walker.endX = graph.nodes[walker.edge.target].x;
+            walker.endY = graph.nodes[walker.edge.target].y;
+        } else {
+            walker.endX = graph.nodes[walker.edge.source].x;
+            walker.endY = graph.nodes[walker.edge.source].y;
+            walker.startX = graph.nodes[walker.edge.target].x;
+            walker.startY = graph.nodes[walker.edge.target].y;
+        }
+        walker.diffX = walker.endX - walker.startX;
+        walker.diffY = walker.endY - walker.startY;
+        walker.walkerID = "id" + displaycontainer.walkers;
+        walker.point = displaycontainer.svg.append("circle").attr("class", "walker")
+                .attr("id", walker.walkerID).attr("cx", convertXtoDisp(walker.startX+ walker.diffX * 0.1)).attr("cy", convertYtoDisp(walker.startY+ walker.diffY * 0.1))
+                .attr("r", displaycontainer.sizeWalkers).style("fill", "red")
+                .on("mouseover",  function (d) {
+                    displaycontainer.nodeOver=true;
+                }).on("mouseout",  function (d) {
+                    displaycontainer.nodeOver=false;
+                });
+        stepPointAlongLine(walker, Math.abs(speed), 0);
+    }
+
+    function stepPointAlongLine(walker, speed, i) {
+        var steps = 100;
+        if (i < steps) {
+            i++;
+            walker.point.transition().duration(speed / steps).attr("cx", convertXtoDisp(walker.startX + walker.diffX * (0.05 + 0.9 * i / steps))).attr("cy", convertYtoDisp(walker.startY + walker.diffY * (0.05 + 0.9 * i / steps)));
+            displaycontainer.intervalID.push(setTimeout(function () {
+                stepPointAlongLine(walker, speed, i);
+            }, speed / steps));
+        } else {
+            walker.point.remove();
+        }
+    }
+    function keepmovementAlongLine(edgeNr) {
+        if (graph.links[edgeNr].stillPresent)
+        {
+            var speed=4000;
+            var nrCars=graph.setsOfFlows[graph.activeEdgeSetNr].flow[edgeNr];
+            movePointAlongLine(edgeNr, speed);
+            if(nrCars>0){
+                displaycontainer.intervalID.push(setTimeout(function () {
+                    keepmovementAlongLine(edgeNr);
+                }, Math.abs(speed) / nrCars));
+            }
+        }
+    }
+    
+/*
+ function createSampleFlow() {
+        var array = [];
+        for (i = 0; i < graph.links.length; i++) {
+            array.push(i);
+        }
+        const getAllSubsets = 
+              theArray => theArray.reduce(
+                (subsets, value) => subsets.concat(
+                 subsets.map(set => [value,...set])
+                ),
+                [[]]
+              );
+      
+        var allsubsets = getAllSubsets(array);
+
+        let csvContent = "data:text/csv;charset=utf-8,";
+        
+        for (i = 0; i < allsubsets.length; i++) {
+            if (allsubsets[i].length>13) {
+                var weights = [];
+                for (j = 0; j < allsubsets[i].length; j++) {
+                    weights.push(Math.ceil(Math.random() * 10) + 1);
+                }
+                csvContent += stringList(allsubsets[i])+" , "+stringList(weights)+"\r\n";
+                //printlist(allsubsets[i],weights);
+            }
+        }
+        
+        //var csvContent="asdafasdas";
+        var encodedUri = encodeURI(csvContent);
+        window.open(encodedUri);
+
+    }
+    
+    
+    function stringList(list){
+        var s=""
+        for (t = 0; t < list.length-1; t++) {
+            s+=list[t]+" ";
+        }
+        return s+list[list.length-1];
+    }
+    */
+
+    </script>

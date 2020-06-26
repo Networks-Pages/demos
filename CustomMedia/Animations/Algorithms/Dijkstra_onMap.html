@@ -1,0 +1,1212 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css"/>
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+    .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(0.4, 0.5, 0.5, 0.05);
+        color: #000;
+        border-radius: 2px;
+    }
+
+</style>
+<body onload="draw()">
+    <script src="../SharedResources/d3.min.js"></script>
+    <script src="../SharedResources/d3.tip.v0.6.3.js"></script>
+    <script src="https://d3js.org/d3-path.v1.min.js"></script>
+
+    <table style="position:absolute;top:20px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Display speed </td> 
+        </tr>
+        <tr>
+            <td> <input type="range" id="speed" value="50"   style="width:70px"></td>
+        </tr>
+        <tr>
+            <td>  <div id="buttonFieldSelect"> </div> </td>
+        </tr>
+    </table>
+
+
+    <script>
+    var displaycontainer = {};
+    displaycontainer.map = {};
+    displaycontainer.map.w = 1208;
+    displaycontainer.map.h = 1029;
+    displaycontainer.map.ratio = displaycontainer.map.w*1.0/displaycontainer.map.h;
+    displaycontainer.width = Math.min(displaycontainer.map.w, window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth),
+    displaycontainer.height = Math.min(displaycontainer.map.h, window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight);
+    
+        
+    displaycontainer.animationTime = 500;
+    displaycontainer.highlightTime = 400;
+    displaycontainer.ratio=displaycontainer.width*1.0/displaycontainer.height
+    displaycontainer.selected = false;
+    displaycontainer.computationFinished = false;
+    displaycontainer.animationRunning = false;
+    displaycontainer.hoveractive = false;
+    displaycontainer.unSelectSelectBottonintialised = false;
+    displaycontainer.tip = {};
+    displaycontainer.markedcolors = [];
+    displaycontainer.animationcolors = [];
+    displaycontainer.notescolors = [];
+    displaycontainer.root = -1;
+
+    displaycontainer.animationcolors[0] = "#999999";// untouched
+    displaycontainer.animationcolors[1] = "#00CC00";// currently checked
+    displaycontainer.animationcolors[2] = "#AAAAAA";// check and not used on path
+    displaycontainer.animationcolors[3] = "#CC0000";// checked and used as path 
+
+
+    displaycontainer.markedcolors[0] = "#AAAAAA";// untouched
+    displaycontainer.markedcolors[1] = "#AAAAAA";// currently checked
+    displaycontainer.markedcolors[2] = "#BBBBBB";// check and not used on path
+    displaycontainer.markedcolors[3] = "#AA0000";// checked and used as path 
+    displaycontainer.markedcolors[4] = "#FF4444";// checked path of specific path
+
+    displaycontainer.notescolors[0] = "#FFFFFF";// untouched
+    displaycontainer.notescolors[1] = "#00CC00";// currently checked
+    displaycontainer.notescolors[2] = "#999999";// check and not used on path
+
+
+
+    var color = d3.scale.category20(),
+            graph = {};
+    graph.nrXboxes = 2;
+    graph.nrYboxes = 2;
+    graph.nrNodes = graph.nrXboxes * graph.nrYboxes;
+
+
+
+
+    function createGraph() {
+        graph = {
+            nodes: [
+                {name: 0, dx: 165, dy: 80},
+                {name: 1, dx: 276, dy: 211},
+                {name: 2, dx: 397, dy: 137},
+                {name: 3, dx: 410, dy: 294},
+                {name: 4, dx: 489, dy: 53},
+                {name: 5, dx: 461, dy: 5},
+                {name: 6, dx: 650, dy: 2},
+                {name: 7, dx: 271, dy: 279},
+                {name: 8, dx: 195, dy: 338},
+                {name: 9, dx: 174, dy: 615},
+                {name: 10, dx: 240, dy: 737},
+                {name: 11, dx: 212, dy: 754},
+                {name: 12, dx: 64, dy: 455},
+                {name: 13, dx: 5, dy: 385},
+                {name: 14, dx: 48, dy: 467},
+                {name: 15, dx: 5, dy: 498},
+                {name: 16, dx: 190, dy: 770},
+                {name: 17, dx: 158, dy: 743},
+                {name: 18, dx: 126, dy: 710},
+                {name: 19, dx: 79, dy: 668},
+                {name: 20, dx: 95, dy: 739},
+                {name: 21, dx: 124, dy: 777},
+                {name: 22, dx: 107, dy: 797},
+                {name: 23, dx: 132, dy: 823},
+                {name: 24, dx: 171, dy: 788},
+                {name: 25, dx: 282, dy: 863},
+                {name: 26, dx: 212, dy: 974},
+                {name: 27, dx: 103, dy: 854},
+                {name: 28, dx: 137, dy: 888},
+                {name: 29, dx: 274, dy: 913},
+                {name: 30, dx: 162, dy: 866},
+                {name: 31, dx: 218, dy: 912},
+                {name: 32, dx: 190, dy: 943},
+                {name: 33, dx: 276, dy: 823},
+                {name: 34, dx: 376, dy: 340},
+                {name: 35, dx: 335, dy: 377},
+                {name: 36, dx: 422, dy: 398},
+                {name: 37, dx: 407, dy: 412},
+                {name: 38, dx: 365, dy: 380},
+                {name: 39, dx: 393, dy: 433},
+                {name: 40, dx: 340, dy: 525},
+                {name: 41, dx: 379, dy: 592},
+                {name: 42, dx: 410, dy: 631},
+                {name: 43, dx: 345, dy: 677},
+                {name: 44, dx: 443, dy: 588},
+                {name: 45, dx: 428, dy: 603},
+                {name: 46, dx: 461, dy: 566},
+                {name: 47, dx: 525, dy: 556},
+                {name: 48, dx: 557, dy: 595},
+                {name: 49, dx: 532, dy: 632},
+                {name: 50, dx: 523, dy: 592},
+                {name: 51, dx: 549, dy: 569},
+                {name: 52, dx: 429, dy: 537},
+                {name: 53, dx: 454, dy: 506},
+                {name: 54, dx: 481, dy: 532},
+                {name: 55, dx: 460, dy: 500},
+                {name: 56, dx: 426, dy: 458},
+                {name: 57, dx: 453, dy: 432},
+                {name: 58, dx: 470, dy: 300},
+                {name: 59, dx: 447, dy: 264},
+                {name: 60, dx: 512, dy: 218},
+                {name: 61, dx: 535, dy: 272},
+                {name: 62, dx: 499, dy: 200},
+                {name: 63, dx: 672, dy: 159},
+                {name: 64, dx: 683, dy: 129},
+                {name: 65, dx: 687, dy: 102},
+                {name: 66, dx: 712, dy: 127},
+                {name: 67, dx: 735, dy: 148},
+                {name: 68, dx: 673, dy: 224},
+                {name: 69, dx: 826, dy: 153},
+                {name: 70, dx: 941, dy: 153},
+                {name: 71, dx: 980, dy: 78},
+                {name: 72, dx: 1024, dy: 60},
+                {name: 73, dx: 1118, dy: 16},
+                {name: 74, dx: 1130, dy: 5},
+                {name: 75, dx: 1202, dy: 170},
+                {name: 76, dx: 1065, dy: 151},
+                {name: 77, dx: 1025, dy: 151},
+                {name: 78, dx: 436, dy: 412},
+                {name: 79, dx: 517, dy: 327},
+                {name: 80, dx: 689, dy: 256},
+                {name: 81, dx: 742, dy: 237},
+                {name: 82, dx: 795, dy: 226},
+                {name: 83, dx: 795, dy: 249},
+                {name: 84, dx: 766, dy: 258},
+                {name: 85, dx: 771, dy: 280},
+                {name: 86, dx: 750, dy: 261},
+                {name: 87, dx: 764, dy: 348},
+                {name: 88, dx: 784, dy: 352},
+                {name: 89, dx: 773, dy: 433},
+                {name: 90, dx: 753, dy: 547},
+                {name: 91, dx: 723, dy: 645},
+                {name: 92, dx: 692, dy: 634},
+                {name: 93, dx: 633, dy: 615},
+                {name: 94, dx: 653, dy: 533},
+                {name: 95, dx: 668, dy: 483},
+                {name: 96, dx: 693, dy: 342},
+                {name: 97, dx: 630, dy: 346},
+                {name: 98, dx: 598, dy: 359},
+                {name: 99, dx: 545, dy: 381},
+                {name: 100, dx: 622, dy: 326},
+                {name: 101, dx: 410, dy: 584},
+                {name: 102, dx: 682, dy: 416},
+                {name: 103, dx: 740, dy: 428},
+                {name: 104, dx: 726, dy: 491},
+                {name: 105, dx: 620, dy: 460},
+                {name: 106, dx: 604, dy: 525},
+                {name: 107, dx: 582, dy: 586},
+                {name: 108, dx: 652, dy: 721},
+                {name: 109, dx: 485, dy: 469},
+                {name: 110, dx: 530, dy: 449},
+                {name: 111, dx: 558, dy: 479},
+                {name: 112, dx: 605, dy: 459},
+                {name: 113, dx: 716, dy: 542},
+                {name: 114, dx: 589, dy: 602},
+                {name: 115, dx: 569, dy: 643},
+                {name: 116, dx: 539, dy: 695},
+                {name: 117, dx: 563, dy: 414},
+                {name: 118, dx: 492, dy: 758},
+                {name: 119, dx: 457, dy: 789},
+                {name: 120, dx: 475, dy: 820},
+                {name: 121, dx: 482, dy: 816},
+                {name: 122, dx: 514, dy: 787},
+                {name: 123, dx: 550, dy: 758},
+                {name: 124, dx: 581, dy: 726},
+                {name: 125, dx: 613, dy: 664},
+                {name: 126, dx: 566, dy: 844},
+                {name: 127, dx: 751, dy: 669},
+                {name: 128, dx: 790, dy: 713},
+                {name: 129, dx: 781, dy: 629},
+                {name: 130, dx: 799, dy: 632},
+                {name: 131, dx: 799, dy: 474},
+                {name: 132, dx: 811, dy: 381},
+                {name: 133, dx: 819, dy: 319},
+                {name: 134, dx: 826, dy: 252},
+                {name: 135, dx: 855, dy: 191},
+                {name: 136, dx: 1203, dy: 208},
+                {name: 137, dx: 353, dy: 712},
+                {name: 138, dx: 388, dy: 766},
+                {name: 139, dx: 429, dy: 744},
+                {name: 140, dx: 407, dy: 709},
+                {name: 141, dx: 467, dy: 719},
+                {name: 142, dx: 431, dy: 659},
+                {name: 143, dx: 421, dy: 644},
+                {name: 144, dx: 458, dy: 614},
+                {name: 145, dx: 542, dy: 538},
+                {name: 146, dx: 493, dy: 694},
+                {name: 147, dx: 511, dy: 655},
+                {name: 148, dx: 621, dy: 755},
+                {name: 149, dx: 586, dy: 792},
+                {name: 150, dx: 557, dy: 825},
+                {name: 151, dx: 890, dy: 562},
+                {name: 152, dx: 884, dy: 252},
+                {name: 153, dx: 880, dy: 320},
+                {name: 154, dx: 882, dy: 367},
+                {name: 155, dx: 857, dy: 380},
+                {name: 156, dx: 851, dy: 434},
+                {name: 157, dx: 861, dy: 439},
+                {name: 158, dx: 866, dy: 414},
+                {name: 159, dx: 903, dy: 418},
+                {name: 160, dx: 856, dy: 483},
+                {name: 161, dx: 905, dy: 488},
+                {name: 162, dx: 915, dy: 444},
+                {name: 163, dx: 873, dy: 554},
+                {name: 164, dx: 849, dy: 541},
+                {name: 165, dx: 847, dy: 558},
+                {name: 166, dx: 830, dy: 550},
+                {name: 167, dx: 866, dy: 570},
+                {name: 168, dx: 851, dy: 600},
+                {name: 169, dx: 837, dy: 782},
+                {name: 170, dx: 886, dy: 782},
+                {name: 171, dx: 922, dy: 683},
+                {name: 172, dx: 933, dy: 615},
+                {name: 173, dx: 967, dy: 591},
+                {name: 174, dx: 970, dy: 607},
+                {name: 175, dx: 1024, dy: 630},
+                {name: 176, dx: 1063, dy: 468},
+                {name: 177, dx: 840, dy: 795},
+                {name: 178, dx: 830, dy: 831},
+                {name: 179, dx: 842, dy: 867},
+                {name: 180, dx: 880, dy: 873},
+                {name: 181, dx: 894, dy: 816},
+                {name: 182, dx: 855, dy: 803},
+                {name: 183, dx: 844, dy: 840},
+                {name: 184, dx: 942, dy: 827},
+                {name: 185, dx: 951, dy: 842},
+                {name: 186, dx: 962, dy: 825},
+                {name: 187, dx: 951, dy: 857},
+                {name: 188, dx: 1080, dy: 902},
+                {name: 189, dx: 1200, dy: 936},
+                {name: 190, dx: 1200, dy: 648},
+                {name: 191, dx: 958, dy: 888},
+                {name: 192, dx: 1200, dy: 1025},
+                {name: 193, dx: 972, dy: 946},
+                {name: 194, dx: 1050, dy: 1004},
+                {name: 195, dx: 888, dy: 995},
+                {name: 196, dx: 771, dy: 1001},
+                {name: 197, dx: 438, dy: 897},
+                {name: 198, dx: 364, dy: 893},
+                {name: 199, dx: 570, dy: 964},
+                {name: 200, dx: 348, dy: 1010},
+                {name: 201, dx: 809, dy: 427},
+            ],
+            links: [
+                {source: 0, target: 1},
+                {source: 1, target: 2},
+                {source: 2, target: 3},
+                {source: 2, target: 4},
+                {source: 4, target: 5},
+                {source: 4, target: 6},
+                {source: 1, target: 7},
+                {source: 7, target: 8},
+                {source: 8, target: 9},
+                {source: 9, target: 10},
+                {source: 10, target: 11},
+                {source: 10, target: 33},
+                {source: 11, target: 12},
+                {source: 12, target: 13},
+                {source: 12, target: 14},
+                {source: 14, target: 15},
+                {source: 11, target: 16},
+                {source: 16, target: 17},
+                {source: 17, target: 18},
+                {source: 18, target: 19},
+                {source: 18, target: 20},
+                {source: 17, target: 21},
+                {source: 20, target: 21},
+                {source: 21, target: 22},
+                {source: 22, target: 23},
+                {source: 16, target: 24},
+                {source: 23, target: 24},
+                {source: 23, target: 27},
+                {source: 24, target: 29},
+                {source: 27, target: 28},
+                {source: 28, target: 30},
+                {source: 28, target: 32},
+                {source: 30, target: 31},
+                {source: 31, target: 32},
+                {source: 26, target: 32},
+                {source: 26, target: 29},
+                {source: 3, target: 34},
+                {source: 34, target: 35},
+                {source: 34, target: 36},
+                {source: 36, target: 37},
+                {source: 36, target: 78},
+                {source: 37, target: 38},
+                {source: 37, target: 39},
+                {source: 39, target: 40},
+                {source: 40, target: 41},
+                {source: 41, target: 52},
+                {source: 52, target: 53},
+                {source: 53, target: 54},
+                {source: 53, target: 55},
+                {source: 55, target: 56},
+                {source: 55, target: 109},
+                {source: 39, target: 56},
+                {source: 56, target: 57},
+                {source: 57, target: 78},
+                {source: 57, target: 99},
+                {source: 57, target: 109},
+                {source: 78, target: 79},
+                {source: 73, target: 74},
+                {source: 79, target: 80},
+                {source: 79, target: 99},
+                {source: 80, target: 81},
+                {source: 81, target: 82},
+                {source: 81, target: 86},
+                {source: 84, target: 85},
+                {source: 84, target: 86},
+                {source: 83, target: 84},
+                {source: 83, target: 134},
+                {source: 86, target: 87},
+                {source: 87, target: 88},
+                {source: 87, target: 96},
+                {source: 96, target: 97},
+                {source: 97, target: 98},
+                {source: 97, target: 100},
+                {source: 98, target: 99},
+                {source: 98, target: 105},
+                {source: 34, target: 58},
+                {source: 58, target: 59},
+                {source: 58, target: 61},
+                {source: 59, target: 60},
+                {source: 60, target: 61},
+                {source: 60, target: 62},
+                {source: 61, target: 68},
+                {source: 62, target: 63},
+                {source: 63, target: 68},
+                {source: 63, target: 64},
+                {source: 63, target: 67},
+                {source: 64, target: 65},
+                {source: 64, target: 66},
+                {source: 66, target: 67},
+                {source: 68, target: 80},
+                {source: 80, target: 96},
+                {source: 96, target: 102},
+                {source: 88, target: 89},
+                {source: 89, target: 90},
+                {source: 90, target: 91},
+                {source: 91, target: 92},
+                {source: 92, target: 93},
+                {source: 93, target: 114},
+                {source: 107, target: 114},
+                {source: 107, target: 145},
+                {source: 109, target: 145},
+                {source: 68, target: 69},
+                {source: 69, target: 70},
+                {source: 70, target: 71},
+                {source: 71, target: 77},
+                {source: 71, target: 72},
+                {source: 72, target: 73},
+                {source: 72, target: 76},
+                {source: 76, target: 77},
+                {source: 73, target: 75},
+                {source: 82, target: 83},
+                {source: 89, target: 103},
+                {source: 102, target: 103},
+                {source: 91, target: 127},
+                {source: 91, target: 108},
+                {source: 95, target: 102},
+                {source: 95, target: 105},
+                {source: 94, target: 95},
+                {source: 94, target: 113},
+                {source: 94, target: 106},
+                {source: 93, target: 94},
+                {source: 106, target: 107},
+                {source: 105, target: 106},
+                {source: 105, target: 112},
+                {source: 109, target: 110},
+                {source: 110, target: 111},
+                {source: 110, target: 117},
+                {source: 111, target: 112},
+                {source: 112, target: 117},
+                {source: 99, target: 117},
+                {source: 90, target: 113},
+                {source: 92, target: 113},
+                {source: 104, target: 113},
+                {source: 95, target: 104},
+                {source: 103, target: 104},
+                {source: 126, target: 127},
+                {source: 127, target: 128},
+                {source: 127, target: 129},
+                {source: 128, target: 151},
+                {source: 129, target: 131},
+                {source: 129, target: 130},
+                {source: 131, target: 201},
+                {source: 132, target: 201},
+                {source: 156, target: 201},
+                {source: 132, target: 133},
+                {source: 133, target: 134},
+                {source: 134, target: 135},
+                {source: 135, target: 136},
+                {source: 41, target: 42},
+                {source: 42, target: 43},
+                {source: 42, target: 45},
+                {source: 44, target: 45},
+                {source: 44, target: 46},
+                {source: 44, target: 49},
+                {source: 46, target: 52},
+                {source: 46, target: 47},
+                {source: 47, target: 145},
+                {source: 47, target: 51},
+                {source: 47, target: 50},
+                {source: 48, target: 49},
+                {source: 48, target: 50},
+                {source: 48, target: 51},
+                {source: 48, target: 114},
+                {source: 42, target: 143},
+                {source: 142, target: 143},
+                {source: 143, target: 144},
+                {source: 137, target: 142},
+                {source: 141, target: 142},
+                {source: 137, target: 138},
+                {source: 138, target: 139},
+                {source: 139, target: 140},
+                {source: 139, target: 141},
+                {source: 118, target: 141},
+                {source: 118, target: 122},
+                {source: 118, target: 119},
+                {source: 114, target: 115},
+                {source: 115, target: 116},
+                {source: 116, target: 118},
+                {source: 93, target: 125},
+                {source: 115, target: 125},
+                {source: 119, target: 120},
+                {source: 120, target: 121},
+                {source: 121, target: 122},
+                {source: 121, target: 126},
+                {source: 122, target: 123},
+                {source: 123, target: 124},
+                {source: 124, target: 125},
+                {source: 116, target: 124},
+                {source: 118, target: 122},
+                {source: 141, target: 146},
+                {source: 146, target: 147},
+                {source: 11, target: 25},
+                {source: 25, target: 198},
+                {source: 198, target: 200},
+                {source: 197, target: 198},
+                {source: 197, target: 199},
+                {source: 120, target: 197},
+                {source: 196, target: 197},
+                {source: 191, target: 196},
+                {source: 191, target: 193},
+                {source: 191, target: 192},
+                {source: 193, target: 194},
+                {source: 193, target: 195},
+                {source: 187, target: 191},
+                {source: 187, target: 188},
+                {source: 188, target: 189},
+                {source: 188, target: 190},
+                {source: 185, target: 187},
+                {source: 185, target: 186},
+                {source: 184, target: 185},
+                {source: 184, target: 186},
+                {source: 170, target: 184},
+                {source: 170, target: 171},
+                {source: 171, target: 172},
+                {source: 171, target: 175},
+                {source: 172, target: 173},
+                {source: 172, target: 174},
+                {source: 173, target: 174},
+                {source: 176, target: 175},
+                {source: 128, target: 169},
+                {source: 131, target: 160},
+                {source: 169, target: 170},
+                {source: 169, target: 177},
+                {source: 177, target: 178},
+                {source: 177, target: 182},
+                {source: 181, target: 182},
+                {source: 180, target: 181},
+                {source: 179, target: 180},
+                {source: 178, target: 179},
+                {source: 182, target: 183},
+                {source: 134, target: 152},
+                {source: 133, target: 153},
+                {source: 152, target: 153},
+                {source: 153, target: 154},
+                {source: 154, target: 155},
+                {source: 132, target: 155},
+                {source: 155, target: 156},
+                {source: 156, target: 157},
+                {source: 157, target: 158},
+                {source: 158, target: 159},
+                {source: 157, target: 160},
+                {source: 160, target: 161},
+                {source: 161, target: 162},
+                {source: 161, target: 163},
+                {source: 160, target: 164},
+                {source: 163, target: 164},
+                {source: 163, target: 167},
+                {source: 164, target: 165},
+                {source: 165, target: 166},
+                {source: 167, target: 168},
+                {source: 108, target: 148},
+                {source: 148, target: 149},
+                {source: 149, target: 150},
+                {source: 124, target: 148},
+                {source: 123, target: 149},
+                {source: 45, target: 101},
+            ]
+        };
+
+        for (var i = 0; i < graph.nodes.length; i++) {
+            var pos=computeAbsolutePosition(graph.nodes[i].dx,graph.nodes[i].dy);
+            //graph.nodes[i].x = offsets[0] * graph.nodes[i].dx + offsets[2];
+            //graph.nodes[i].y = offsets[1] * graph.nodes[i].dy + offsets[3];
+            graph.nodes[i].x = pos.x;
+            graph.nodes[i].y = pos.y;
+            graph.nodes[i].dist = -1;
+            graph.nodes[i].solved = false;
+            graph.nodes[i].neighbors = [];
+            graph.nodes[i].path = [];
+
+        }
+        for (var i = 0; i < graph.links.length; i++) {
+            var st = graph.nodes[graph.links[i].source];
+            var end = graph.nodes[graph.links[i].target];
+            graph.links[i].le = Math.round(Math.sqrt((st.dx - end.dx) * (st.dx - end.dx) + (st.dy - end.dy) * (st.dy - end.dy)));
+            graph.links[i].status = 0;
+            graph.links[i].name = i;
+            graph.links[i].pointer = false;
+            // 0 initialized
+            // 1 checking
+            // 2 checked, but not path
+            // 3 is path of sortestpath
+            // 4 highlighted
+            st.neighbors.push(end.name);
+            end.neighbors.push(st.name);
+        }
+    }
+
+    function euclDistance(st, end){
+        return Math.round(Math.sqrt((st.dx - end.dx) * (st.dx - end.dx) + (st.dy - end.dy) * (st.dy - end.dy)));
+    }
+    
+    function computeAbsolutePosition(xo,yo){ 
+        var displayratio = displaycontainer.width / displaycontainer.height;
+        var pictureration = displaycontainer.map.w / displaycontainer.map.h;
+        var offsets = [];
+        for (var i = 0; i < 4; i++) {
+            offsets.push(1);
+        }
+        if (displayratio > pictureration) {
+            offsets[0] = displaycontainer.height / displaycontainer.map.h;
+            offsets[1] = displaycontainer.height / displaycontainer.map.h;
+
+            offsets[2] = (displaycontainer.width - displaycontainer.height * pictureration) / 2;
+            offsets[3] = 0;
+        }
+        else {
+            offsets[0] = displaycontainer.width / displaycontainer.map.w;
+            offsets[1] = displaycontainer.width / displaycontainer.map.w;
+
+            offsets[2] = 0;
+            offsets[3] = (displaycontainer.height - displaycontainer.width / pictureration) / 2;
+
+        }
+        var xp=offsets[0] * xo + offsets[2];
+        var yp=offsets[1] * yo + offsets[3];
+        var p={x:xp,    y:yp};
+        
+        return p;
+    }
+    
+    function computeRelativePosition(xp,yp){ 
+        var displayratio = displaycontainer.width / displaycontainer.height;
+        var pictureration = displaycontainer.map.w / displaycontainer.map.h;
+        var offsets = [];
+        for (var i = 0; i < 4; i++) {
+            offsets.push(1);
+        }
+        if (displayratio > pictureration) {
+            offsets[0] = displaycontainer.height / displaycontainer.map.h;
+            offsets[1] = displaycontainer.height / displaycontainer.map.h;
+
+            offsets[2] = (displaycontainer.width - displaycontainer.height * pictureration) / 2;
+            offsets[3] = 0;
+        }
+        else {
+            offsets[0] = displaycontainer.width / displaycontainer.map.w;
+            offsets[1] = displaycontainer.width / displaycontainer.map.w;
+
+            offsets[2] = 0;
+            offsets[3] = (displaycontainer.height - displaycontainer.width / pictureration) / 2;
+
+        }
+        
+        var xo=Math.floor((xp-offsets[2])*1.0/offsets[0]);
+        var yo=Math.floor((yp-offsets[3])*1.0/offsets[1]);
+        var p={x:xp, y:yp, dx:xo,    dy:yo};
+        return p;
+    }
+
+    
+    function draw() {
+        createGraph();
+        drawGraph();
+    }
+    
+    function drawGraph() {
+        document.getElementById("speed").value = 100-Math.floor(displaycontainer.animationTime / 20);
+        graph.checkedNodes = [];
+        displaycontainer.animationStep = 0;
+        displaycontainer.svg = d3.select("body")
+                .append("svg").attr("class", "back").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+
+
+        
+        displaycontainer.map.imgs = displaycontainer.svg.selectAll("image").data([0]);
+        displaycontainer.map.imgs.enter()
+                .append("svg:image")
+                .attr("xlink:href", "images/city.PNG")
+                .attr("width", displaycontainer.width)
+                .attr("height", displaycontainer.height).attr("id", "backimg");
+        document.getElementById("backimg").addEventListener('click', function(evt) {
+            if (!displaycontainer.selected) {
+                var pos = computeRelativePosition(evt.layerX,evt.layerY);
+                freePointAlgorithm(pos);                
+            }
+        });
+        
+        
+        displaycontainer.tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .direction('e')
+                .offset([-20, 10])
+                .html(function (d) {
+                    return '<table id="tiptable">' + d + "</table>";
+                });
+        displaycontainer.svg.call(displaycontainer.tip);
+
+
+        displaycontainer.links = displaycontainer.svg.selectAll("link")
+                .data(graph.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    var sourceNode = graph.nodes.filter(function (d, i) {
+                        return i === l.source;
+                    })[0];
+                    d3.select(this).attr("y1", sourceNode.y);
+                    return sourceNode.x
+                })
+                .attr("x2", function (l) {
+                    var targetNode = graph.nodes.filter(function (d, i) {
+                        return i === l.target;
+                    })[0];
+                    d3.select(this).attr("y2", targetNode.y);
+                    return targetNode.x
+                })
+                .attr("fill", "none")
+                .attr("stroke", "white");
+
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node");
+
+        displaycontainer.nodes.append("circle")
+                .attr("r", 3).attr("cx", function (d) {
+            return d.x
+        })
+                .attr("cy", function (d) {
+                    return d.y
+                }).attr("fill", "#000000");
+
+        displaycontainer.innerCycles = displaycontainer.nodes.append("circle")
+                .attr("r", 2.5).attr("cx", function (d) {
+            return d.x
+        })
+                .attr("cy", function (d) {
+                    return d.y
+                }).attr("fill", function (d) {
+            if (d.name === graph.activeNode)
+                return displaycontainer.notescolors[1];
+            else
+                return displaycontainer.notescolors[0];
+        });
+
+        displaycontainer.nodes.on('click', function (d) {
+            if (!displaycontainer.selected) {
+                displaycontainer.selected = true;
+                displaycontainer.root=d.name;
+                displaycontainer.animationRunning=true;
+                startComputation(d.name);
+                showUnselectButton();
+            }
+        }).on('mouseover', function (d) {
+            if (d.dist !== -1) {
+                displaycontainer.tip.show(niceDistTime(d.dist));
+                displaycontainer.hoveractive=true;
+                
+                var node =graph.nodes[d.name];
+                for(var i=0;i<node.path.length;i++){
+                    node.path[i].status=4;
+                }
+                showPathTo();
+            }
+        }).on('mouseout', function (d) {
+            displaycontainer.tip.hide(d.dist);
+            displaycontainer.hoveractive=false;
+            var node =graph.nodes[d.name];
+            for(var i=0;i<node.path.length;i++){
+                    node.path[i].status=3;
+            }
+            showNormalPath();
+            if(displaycontainer.animationRunning){
+               displaycontainer.intervalID = setTimeout(function () {
+                showAlgorithm();
+            }, displaycontainer.highlightTime+10);
+            }
+        });
+        
+    }
+    
+     function createArrow( edge , atSource){
+       var st;
+       var end;
+       if(atSource ){
+            st=graph.nodes[edge.source];
+            end=graph.nodes[edge.target];
+       } else {
+            end=graph.nodes[edge.source];
+            st=graph.nodes[edge.target];
+           
+       }
+       var off=10;
+       var t=off/edge.le;
+       //The data for our line
+       var tipx=Math.floor(st.x*t+end.x*1.0*(1-t));
+       var tipy=Math.floor(st.y*t+end.y*1.0*(1-t));
+       var angle=Math.atan( (st.x-end.x)/(st.y-end.y))+Math.PI;
+
+        var dummyy= tipy + off*Math.cos(angle);
+       var dummyx= tipx + off*Math.sin(angle);
+       var diff=(dummyy-end.y)*(dummyy-end.y)+(dummyx-end.x)*(dummyx-end.x);
+        
+        
+        if (diff>100){
+            angle+=Math.PI;            
+        }
+        
+        var dp=8;
+        var lineData = [ 
+            { "x": tipx,   "y": tipy},  
+            { "x": tipx+dp*Math.sin(angle+Math.PI*3/4),  "y": tipy+dp*Math.cos(angle+Math.PI*3/4)}, 
+            { "x": tipx+dp*Math.sin(angle+Math.PI)/3,  "y": tipy+dp*Math.cos(angle+Math.PI)/3}, 
+            { "x": tipx+dp*Math.sin(angle+Math.PI*5/4),  "y": tipy+dp*Math.cos(angle+Math.PI*5/4)}, 
+            { "x": tipx,  "y": tipy}];
+        //    { "x": dummyx,  "y": dummyy}];        
+        //This is the accessor function we talked about above
+        var lineFunction =  d3.svg.line().x(function(d) { return d.x; }).y(function(d) { return d.y; }).interpolate("linear");
+
+        //The line SVG Path we draw
+        var lineGraph = displaycontainer.svg.append("path")
+                            .attr("d", lineFunction(lineData))
+                            .attr("stroke", displaycontainer.animationcolors[1])
+                            .attr("stroke-width", 2)
+                            .attr("fill", displaycontainer.animationcolors[1]).attr("id", function () {
+                                return "id"+edge.name;
+                                });
+        lineGraph.transition().duration(4*displaycontainer.animationTime).style("stroke", displaycontainer.animationcolors[3]).style("fill",displaycontainer.animationcolors[3]);
+    }
+    
+    
+    function niceDistTime( dist ){
+        var num=Math.floor(dist*220.0/180);
+        if (num===0) return "We start here.";
+        else if (num<20) return "Only some meters.";
+        else return num +" meters";
+        
+    }
+
+    function freePointAlgorithm(pos){
+        var closest=0;
+        var lastDist= euclDistance(pos, graph.nodes[0]);
+        for (var i = 1; i < graph.nodes.length; i++) {
+            if (euclDistance(pos, graph.nodes[i])<lastDist){
+                closest=i;
+                lastDist=euclDistance(pos, graph.nodes[i]);
+            }
+        }
+        if (lastDist<30){
+            displaycontainer.selected = true;
+            displaycontainer.root=closest;
+            displaycontainer.animationRunning=true;
+            startComputation(closest);
+            showUnselectButton();
+        } else {
+            var closestLine=0;
+            var linePoint={dx:3000,d:3000};
+            var closestLineDist=3000;
+            for (var i = 0; i < graph.links.length; i++) {
+                var x1=graph.nodes[graph.links[i].source].dx;
+                var y1=graph.nodes[graph.links[i].source].dy;
+                var x2=graph.nodes[graph.links[i].target].dx;
+                var y2=graph.nodes[graph.links[i].target].dy;
+                var xp=pos.dx;
+                var yp=pos.dy;
+                var t= (x2*x2 - x2*xp + x1*(xp-x2) - (y1 - y2)*(y2 - yp))/(x1*x1 - 2*x1*x2 + x2*x2 + (y1 - y2)*(y1 - y2));
+                if((t>0)&&(t<1)){
+                    
+                    var n={};
+                    n.dx=x1*t+(1-t)*x2;
+                    n.dy=y1*t+(1-t)*y2;
+                    var dist=euclDistance(pos, n);
+                    if ((dist<lastDist)&&(dist<closestLineDist)){
+                        closestLineDist=dist;
+                        closestLine=i;
+                        linePoint=n;
+                    }
+                }
+            }
+            
+            var newNode={name: 202, dx: pos.dx, dy: pos.dy, x:pos.x, y:pos.y };
+                newNode.dist = -1;
+                newNode.solved = false;
+                newNode.neighbors = [];
+                newNode.path = [];
+                graph.nodes.push(newNode);
+                
+            if (lastDist<closestLineDist+5){ // connect to closest point
+                var newLink={source: closest, target:202};
+                newLink.le = lastDist;
+                newLink.status = 0;
+                graph.nodes[closest].neighbors.push(202);
+                newNode.neighbors.push(closest);
+                graph.links.push(newLink);
+            } else { 
+                // connected to closed line, by creating an artificial point on the line
+                // create the new point on the line
+                linePoint.name=203;
+                var screenpos=computeAbsolutePosition(linePoint.dx,linePoint.dy);
+                linePoint.x=screenpos.x;
+                linePoint.y=screenpos.y;
+                linePoint.dist = -1;
+                linePoint.solved = false;
+                linePoint.neighbors = [];
+                linePoint.path = [];
+                graph.nodes.push(linePoint);
+                
+                //split the old line 
+                var oldEdge=graph.links[closestLine];
+                var newHalfEdge={};
+                newHalfEdge.source=oldEdge.target;
+                oldEdge.target=203;
+                newHalfEdge.target=203;
+                newHalfEdge.status = 0;
+                oldEdge.le=euclDistance(graph.nodes[oldEdge.source], graph.nodes[oldEdge.target]);
+                newHalfEdge.le=euclDistance(graph.nodes[newHalfEdge.source], graph.nodes[newHalfEdge.target]);
+                graph.links.push(newHalfEdge);
+                // update the neighborhood information
+                removeConnectionsinNeighbor(oldEdge.source,oldEdge.target);
+                graph.nodes[oldEdge.source].neighbors.push(203);
+                graph.nodes[oldEdge.target].neighbors.push(203);
+                linePoint.neighbors.push(oldEdge.source);
+                linePoint.neighbors.push(oldEdge.target);
+                linePoint.neighbors.push(202);
+                newNode.neighbors.push(203);
+                
+                // add the new line
+                var newEdgeTooldEdge={source: 202, target:203};
+                newEdgeTooldEdge.le = closestLineDist;
+                newEdgeTooldEdge.status = 0;
+                
+                graph.links.push(newEdgeTooldEdge);
+                
+            }
+            d3.select("svg").remove();
+            drawGraph();
+            
+            displaycontainer.links.filter(function (d) {if ((d.source === 202)||(d.target === 202)) return d;}).style("stroke-dasharray", ("7, 3"));
+            displaycontainer.selected = true;
+            displaycontainer.root=202;
+            displaycontainer.animationRunning=true;
+            startComputation(202);
+            showUnselectButton();
+
+
+        }
+        
+    }
+    
+    function removeConnectionsinNeighbor(s,t) {
+        var ns=[];
+        for(var i=0;i<graph.nodes[s].neighbors.lenght;i++){
+            if (graph.nodes[s].neighbors[i]!==t) ns.push(graph.nodes[s].neighbors[i]);
+        }
+        graph.nodes[s].neighbors=ns;
+        var nt=[];
+        for(var i=0;i<graph.nodes[t].neighbors.lenght;i++){
+            if (graph.nodes[t].neighbors[i]!==t) nt.push(graph.nodes[t].neighbors[i]);
+        }
+        graph.nodes[t].neighbors=nt;
+    }
+    
+    function showPathTo() {
+        displaycontainer.links.filter(function (d) {if (d.status === 4)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "4px").style("stroke", displaycontainer.markedcolors[4]);
+        displaycontainer.links.filter(function (d) {if (d.status === 3)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1.5px").style("stroke", displaycontainer.markedcolors[3]);
+        displaycontainer.links.filter(function (d) {if (d.status === 2)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1px").style("stroke", displaycontainer.markedcolors[2]);
+        displaycontainer.links.filter(function (d) {if (d.status === 1)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1px").style("stroke", displaycontainer.markedcolors[1]);
+        displaycontainer.links.filter(function (d) {if (d.status === 0)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1px").style("stroke", displaycontainer.markedcolors[0]);
+    }
+
+    function showNormalPath() {
+        displaycontainer.links.filter(function (d) {if (d.status === 3)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "2px").style("stroke", displaycontainer.animationcolors[3]);
+        displaycontainer.links.filter(function (d) {if (d.status === 2)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1px").style("stroke", displaycontainer.animationcolors[2]);
+        displaycontainer.links.filter(function (d) {if (d.status === 1)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "2px").style("stroke", displaycontainer.animationcolors[1]);
+        displaycontainer.links.filter(function (d) {if (d.status === 0)return d;}).transition().duration(displaycontainer.highlightTime).attr("stroke-width", "1px").style("stroke", displaycontainer.animationcolors[0]);
+    }
+
+
+    function niceXdisplacementFortext(dist, x) {
+        if (dist > 99)
+            return x - 19;
+        else if (dist > 9)
+            return x - 13;
+        else if (dist === -1)
+            return x - 10;
+        else
+            return x - 7;
+    }
+
+    function startComputation(start) {
+        displaycontainer.intervalID = setTimeout(function () {
+            displaycontainer.map.imgs.attr("style", "opacity:0.0; filter:alpha(opacity=0.2);transition :opacity 3s");
+            displaycontainer.links.transition().duration(displaycontainer.animationTime).attr("stroke-width", "1px").style("stroke", displaycontainer.animationcolors[0]);
+            displaycontainer.intervalID = setTimeout(function () {
+                graph.activeNode = start;
+                graph.nodes[start].solved = true;
+                graph.nodes[start].dist = 0;
+                displaycontainer.animationStep =0;
+                showAlgorithm();
+            }, displaycontainer.animationTime * 1.5);
+        }, displaycontainer.animationTime / 2);
+    }
+
+    function showAlgorithm() {
+        if(!displaycontainer.hoveractive){
+            if (displaycontainer.animationStep === 0) {
+                //Step ONE: color the node as well as the connected links we check at this very moment
+                graph.activeNeighbors = [];
+                displaycontainer.links.filter(function (d) {
+                    if ((graph.nodes[d.source].name === graph.activeNode) || (graph.nodes[d.target].name === graph.activeNode)) {
+                        if ((graph.nodes[d.source].solved === false) && (graph.nodes[d.target].solved === false)) {
+                            d.status = 1;
+                            return d;
+                        }
+                    }
+                }).transition().duration(displaycontainer.animationTime).attr("stroke-width", "3px").style("stroke", displaycontainer.animationcolors[1]);
+                displaycontainer.innerCycles.filter(function (d) {if (graph.activeNode === d.name) return d;}).transition().duration(displaycontainer.animationTime).attr("fill", displaycontainer.notescolors[1]);
+                displaycontainer.animationStep = 1;
+            } else if (displaycontainer.animationStep === 1) {
+                //Step TWO: update the color of the node
+                computeNextDistances();
+                displaycontainer.animationStep = 2;
+            } else if (displaycontainer.animationStep === 2) {
+                displaycontainer.links.filter(function (d) {
+                    if (d.status === 3){
+                        if (d.pointer === false){
+                            if (d.source === graph.activeNode) createArrow(d,false);
+                            else createArrow(d,true);
+                            d.pointer=true;
+                        } 
+                        return d;
+                    }
+                }).transition().duration(displaycontainer.animationTime).attr("stroke-width", "2px").style("stroke", displaycontainer.animationcolors[3]);
+                displaycontainer.links.filter(function (d) {
+                    if (d.status === 2)
+                        return d;
+                }).transition().duration(displaycontainer.animationTime).attr("stroke-width", "1px").style("stroke", displaycontainer.animationcolors[2]);
+
+                displaycontainer.links.filter(function (d) {
+                    if ((d.status !== 3) && (d.status !== 2) && (d.status !== 0))
+                        return d;
+                }).transition().duration(displaycontainer.animationTime).attr("stroke-width", "2px").style("stroke", "#0000FF");
+
+                displaycontainer.innerCycles.transition().duration(displaycontainer.animationTime).attr("fill", function (d) {
+                    if (graph.checkedNodes.indexOf(d.name) === -1)
+                        return displaycontainer.notescolors[0];
+                    else{
+                        if (displaycontainer.root === d.name) return "#000000";
+                        else return displaycontainer.notescolors[2];
+                    }
+                });
+                computeRolesOfNodes();
+                displaycontainer.animationStep = 0;
+            }
+
+            if ((graph.checkedNodes.length !== graph.nodes.length) && (graph.activeNode > -1)) {
+                //var ti=Math.round(displaycontainer.animationTime);
+                //document.getElementById("CompetitionField1").innerHTML = ti+" to "+displaycontainer.animationStep;
+                displaycontainer.intervalID = setTimeout(function () {
+                    displaycontainer.intervalID = setTimeout(function () {
+                        showAlgorithm();
+                    },10);
+                }, displaycontainer.animationTime);
+                
+            }
+            else {
+                graph.activeNode=-1;
+                displaycontainer.computationFinished = true;
+                displaycontainer.animationRunning=false;
+            }
+        }
+    }
+
+    function nodesToBeupdatedFirstTime() {
+        var distanceToUpdate = {};
+        distanceToUpdate.firstTouched = [];
+        distanceToUpdate.toUpdate = [];
+        for (i = 0; i < graph.links.length; i++) {
+            var base = graph.nodes[graph.activeNode].dist;
+            var len = graph.links[i].le;
+            if (graph.links[i].source === graph.activeNode) {
+                var oldvalue = graph.nodes[graph.links[i].target].dist;
+                if (oldvalue === -1)
+                    distanceToUpdate.firstTouched.push(graph.links[i].target);
+                else {
+                    if (oldvalue > base + len)
+                        distanceToUpdate.toUpdate.push(graph.links[i].target);
+                }
+            } else if (graph.links[i].target === graph.activeNode) {
+                var oldvalue = graph.nodes[graph.links[i].source].dist;
+                if (oldvalue === -1)
+                    distanceToUpdate.firstTouched.push(graph.links[i].source);
+                else {
+                    if (oldvalue > base + len)
+                        distanceToUpdate.toUpdate.push(graph.links[i].source);
+                }
+            }
+        }
+        return distanceToUpdate;
+    }
+
+
+
+    function computeNextDistances() {
+        for (var i = 0; i < graph.links.length; i++) {
+            if ((graph.activeNode === graph.links[i].source) || (graph.activeNode === graph.links[i].target)) {
+                var base = graph.nodes[graph.activeNode].dist;
+                var len = graph.links[i].le;
+                var other = graph.links[i].source;
+                if (other === graph.activeNode) {
+                    other = graph.links[i].target;
+                }
+                var oldvalue = graph.nodes[other].dist;
+
+                if ((oldvalue === -1) || ((oldvalue !== -1) && (oldvalue > base + len))) {
+                    // we found a new shorter connection
+                    // first tell the last bond of old path that it does carry a shortest connection anymore;
+                    if ((oldvalue !== -1)&&(graph.nodes[other].path.length>0)){
+                        var lastedEdge=graph.nodes[other].path[graph.nodes[other].path.length-1]
+                        lastedEdge.status=2;
+                        d3.select("path#id"+lastedEdge.name).transition().duration(3000).style("stroke", "#EEEEEE").style("fill","#FFFFFF");
+                        displaycontainer.intervalID = setTimeout(function () {
+                            d3.select("path#id"+lastedEdge.name).remove();
+                        },3000);
+                    }
+                    graph.nodes[other].dist = base + len;
+                    graph.nodes[other].path = [];
+                    for (var j = 0; j < graph.nodes[graph.activeNode].path.length; j++)
+                        graph.nodes[other].path.push(graph.nodes[graph.activeNode].path[j]);
+                    graph.nodes[other].path.push(graph.links[i]);
+                    graph.links[i].status = 3;
+                } else if (graph.links[i].status === 1)
+                    graph.links[i].status = 2;
+            }
+        }
+    }
+
+
+    function computeRolesOfNodes() {
+        // find the point with the smallest distance. 
+        graph.checkedNodes.push(graph.activeNode);
+        if((graph.activeNode<0)||(graph.activeNode>graph.nodes.length)) console.log("ill point "+graph.activeNode);
+        graph.nodes[graph.activeNode].solved = true;
+        var minindex = -1, minvalue = 40000;
+        if (graph.checkedNodes.length !== graph.nodes.length) {
+            for (i = 0; i < graph.nodes.length; i++) {
+                if (graph.checkedNodes.indexOf(i) === -1) {
+                    if (graph.nodes[i].dist !== -1) {
+                        if (minindex === -1) {
+                            minindex = i;
+                            minvalue = graph.nodes[i].dist;
+                        } else {
+                            if (minvalue > graph.nodes[i].dist)
+                            {
+                                minindex = i;
+                                minvalue = graph.nodes[i].dist;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        graph.activeNode = minindex;
+    }
+
+    function resetInitialData() {
+        d3.select("svg").remove();
+        draw();
+    }
+    ;
+
+    d3.select("input[id=speed]").on("change", function () {
+        if (this.value < 0) {
+            alert("The speed should e a positive number.");
+        }
+        else {
+            displaycontainer.animationTime = Math.max(4, (100-this.value) * 20);
+        }
+    });
+
+    
+    function showUnselectButton() {
+        if (!displaycontainer.unSelectSelectBottonintialised) {
+            displaycontainer.unSelectSelectBottonintialised = true;
+
+            displaycontainer.unselectButtom = document.createElement("input");
+            displaycontainer.unselectButtom.type = "button";
+            displaycontainer.unselectButtom.onclick = function () {
+                unShowCompetition();
+            };
+
+            displaycontainer.unselectButtom.value = "Remove selection";
+            var placeHolder = document.getElementById("buttonFieldSelect");
+            placeHolder.appendChild(displaycontainer.unselectButtom);
+        }
+    }
+
+
+    function unShowUnselectButton() {
+        displaycontainer.unSelectSelectBottonintialised = false;
+        var placeHolder = document.getElementById("buttonFieldSelect");
+        placeHolder.removeChild(displaycontainer.unselectButtom);
+        displaycontainer.unselectButtom = {};
+    }
+
+    function unShowCompetition() {
+        displaycontainer.selected = false;
+        displaycontainer.computationFinished = false;
+        for (i = 0; i < displaycontainer.intervalID.length; i++)
+            clearInterval(displaycontainer.intervalID[i]);
+        displaycontainer.intervalID = [];
+
+        resetInitialData();
+
+        if (displaycontainer.unSelectSelectBottonintialised)
+            unShowUnselectButton();
+    }
+
+
+    </script>
+
+
+
+
+

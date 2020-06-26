@@ -1,0 +1,318 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+    <script src="../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        AI that learns from previous trails 
+    </h2>
+
+    <script>
+
+    var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            color = d3.scale.category20(),
+            dc = {};
+    dc.animationTime = 1000;
+    dc.intervalID = [];
+    dc.walkers = 0;
+    dc.started;
+    dc.inIteration = false;
+    dc.IterationValue = {};
+
+    function draw() {
+        // Finding the correct size of the frames
+        if (6 * height > width) {
+            height = width / 6;
+        } else
+            width = height * 6;
+        dc.fontsize = Math.min(20, Math.round(height / 10)) + "px";
+        dc.fx = (width - 50) * 1.0 / 200 / 3;
+        dc.fy = (height - 10) * 1.0 / 100;
+        dc.svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+
+        var experiments = createExperiments();
+        var buttonSize = Math.min(width / 11, height / 8);
+
+        dc.svg.append("image").attr("class", "button").attr("xlink:href", "Restart.png").attr("width", buttonSize).attr("height", buttonSize).attr("x", width - 10 - buttonSize).attr("y", 5).on('click',
+                function () {
+                    restart();
+                });
+
+
+        animatePoint(experiments);
+    }
+
+
+    function createExperiments() {
+        var experiments = {frameduration: 30};
+        experiments.sets = [];
+        for (i = 0; i < 3; i++) {
+            // each of the three shown runs we show is implemented an an independent experiment
+            var experiment = {};
+            var hS = 90;
+            var hE = 40;
+            var xS = 10;
+            var xSE = 120;
+            var xE = 180;
+            experiment.anchorX = 5 + width * i / 3 - 10 * i;
+            experiment.anchorY = 5;
+            experiment.point = {x: xS, y: hS - 2, dy: 0, dx: 0, dyInitial: 0};
+            experiment.lineStart = {x1: xS, x2: xSE, y1: hS, y2: hS};
+            experiment.lineEnd = {x1: xE - 20, x2: xE, y1: hE, y2: hE};
+            experiment.succes = false;
+            experiment.running = true;
+            experiment.backpannel = dc.svg.append("rect").attr("x", experiment.anchorX).attr("y", experiment.anchorY).attr("width", dc.fx * 200).attr("height", dc.fy * 100).style("fill", "#fafafa");
+
+            experiment.point.graphic = dc.svg.append("circle").attr("class", "walker")
+                    .attr("id", "one").attr("cx", experiment.anchorX + dc.fx * experiment.point.x).attr("cy", experiment.anchorY + dc.fy * experiment.point.y).attr("r", 3).style("fill", "red");
+
+            dc.svg.append("line").attr("class", "link").attr("x1", experiment.anchorX + dc.fx * experiment.lineStart.x1).attr("x2", experiment.anchorX + dc.fx * experiment.lineStart.x2).attr("y1", experiment.anchorY + dc.fy * experiment.lineStart.y1).attr("y2", experiment.anchorY + dc.fy * experiment.lineStart.y2)
+                    .style("stroke", "black").attr("stroke-width", "4px").attr("id", "base1").attr("fill", "#000000");
+            dc.svg.append("line").attr("class", "link").attr("x1", experiment.anchorX + dc.fx * experiment.lineEnd.x1).attr("x2", experiment.anchorX + dc.fx * experiment.lineEnd.x2).attr("y1", experiment.anchorY + dc.fy * experiment.lineEnd.y1).attr("y2", experiment.anchorY + dc.fy * experiment.lineEnd.y2)
+                    .style("stroke", "black").attr("stroke-width", "4px").attr("id", "base1").attr("fill", "#000000");
+           
+            // the following is the conceptionally the only difference between the stupid AI
+            if (dc.inIteration) {
+                experiment.point.dxInitial = Math.max(0.0001, dc.IterationValue.dxInitial + 0.12 * (Math.random()-0.5));
+                experiment.point.dyInitial = Math.min(-0.0001, dc.IterationValue.dyInitial + 0.12 * (Math.random()-0.5));
+                experiment.point.xJump = Math.max(xS, Math.min(xE, dc.IterationValue.xJump - 0.12*(xSE - xS) * (Math.random() - 0.5)));
+            }
+            else {
+                experiment.point.dxInitial = 0.1 + 1 * Math.random();//speed in x direction
+                experiment.point.dyInitial = -0.2 - 1 * Math.random();//speed in y direction once we jump
+                experiment.point.xJump = xS + (xSE - xS) * Math.random();
+            }
+            experiment.point.dx = experiment.point.dxInitial;
+            experiment.point.dy = experiment.point.dyInitial;
+            experiment.point.maxHigh = 100;
+            experiment.point.minDist = 200;
+
+            var absSpeed = Math.sqrt(experiment.point.dx * experiment.point.dx + experiment.point.dy * experiment.point.dy);
+            var jumpAngle = Math.atan(-experiment.point.dy / experiment.point.dx) * 180 / Math.PI;
+            experiment.speedMeterX = dc.svg.append('svg:text').attr('class', 'speedLabel')
+                    .attr('x', experiment.anchorX + dc.fx * experiment.lineStart.x1)
+                    .attr('y', experiment.anchorY + dc.fy * experiment.lineEnd.y1 - 10)
+                    //.text("Speed-x: "+(experiment.point.dx*100).toFixed(2)).attr("font-size", dc.fontsize);
+                    .text("Speed: " + (absSpeed * 100).toFixed(2)).attr("font-size", dc.fontsize);
+            experiment.speedMeterY = dc.svg.append('svg:text').attr('class', 'speedLabel')
+                    .attr('x', experiment.anchorX + dc.fx * experiment.lineStart.x1)
+                    .attr('y', experiment.anchorY + dc.fy * experiment.lineEnd.y1 + 10)
+                    //.text("Speed-y: "+(-experiment.point.dy*100).toFixed(2)).attr("font-size", dc.fontsize);
+                    .text("Angle: " + (jumpAngle).toFixed(2) + " degree").attr("font-size", dc.fontsize);
+            experiment.speedMeterY = dc.svg.append('svg:text').attr('class', 'speedLabel')
+                    .attr('x', experiment.anchorX + dc.fx * experiment.lineStart.x1)
+                    .attr('y', experiment.anchorY + dc.fy * experiment.lineEnd.y1 + 30)
+                    .text("JumpPoint: " + (experiment.point.xJump).toFixed(2) + ".").attr("font-size", dc.fontsize);
+
+
+
+            experiments.sets.push(experiment);
+        }
+        dc.inIteration = false;
+
+        experiments.frameduration = 4;// duration between frames
+        experiments.gravity = 0.006; //gravity per frame. So the downpull/accelaration down per frame
+
+        return experiments;
+    }
+    function animatePoint(experiments) {
+        var toCont = false;
+        for (i = 0; i < 3; i++) {
+            var moved = animateExperiment(experiments, i);
+            if (moved)
+                toCont = true;
+        }
+
+        if (toCont) {
+            dc.intervalID.push(setTimeout(function () {
+                animatePoint(experiments);
+            }, experiments.frameduration));
+        } else {
+            var anySucces = false;
+            var bestExperiment = 1;
+            var bestExperimentDist = experiments.sets[0].point.minDist;
+            for (i = 0; i < 3; i++) {
+                if (bestExperimentDist > experiments.sets[i].point.minDist) {
+                    bestExperiment = i;
+                    bestExperimentDist = experiments.sets[i].point.minDist;
+                }
+                if (experiments.sets[i].succes) {
+                    anySucces = true;
+                    experiments.sets[i].backpannel.style("fill", "#e6ffcc");
+                } else
+                    experiments.sets[i].backpannel.style("fill", "#ffebe6");
+            }
+            if (!anySucces) {
+                experiments.sets[bestExperiment].backpannel.style("fill", "#f7ffb3");
+                dc.intervalID.push(setTimeout(function () {
+                    dc.inIteration = true;
+                    dc.IterationValue = {dxInitial: experiments.sets[bestExperiment].point.dxInitial,
+                        dyInitial: experiments.sets[bestExperiment].point.dyInitial,
+                        xJump: experiments.sets[bestExperiment].point.xJump};
+                    restart();
+                }, 2000));
+            } else {
+                dc.intervalID.push(setTimeout(function () {
+                    for (i = 0; i < 3; i++) {
+                        if (experiments.sets[i].succes) {
+                            resetExperiment(experiments, i);
+                        }
+                    }
+                    var toCont = false;
+                    for (i = 0; i < 3; i++) {
+                        if (experiments.sets[i].succes) {
+                            if (animateExperiment(experiments, i))
+                                toCont = true;
+                        }
+                    }
+
+                    if (toCont) {
+                        dc.intervalID.push(setTimeout(function () {
+                            animatePoint(experiments);
+                        }, experiments.frameduration));
+                    }
+                }, 2000));
+            }
+        }
+
+    }
+    function restart() {
+        for (i = 0; i < dc.intervalID.length; i++)
+            clearInterval(dc.intervalID[i]);
+        dc.intervalID = [];
+        d3.select("svg").remove();
+        draw();
+    }
+
+    function resetExperiment(experiments, i) {
+        var experiment = experiments.sets[i];
+        var xS = 10;
+        var hS = 90;
+        experiment.point.x = xS;
+        experiment.point.y = hS - 2;
+        experiment.point.dy = experiment.point.dyInitial;
+        experiment.running = true;
+
+    }
+
+    function animateExperiment(experiments, i) {
+        var experiment = experiments.sets[i];
+        if (experiment.running === false)
+            return false;
+
+        var nextPossibleY = experiment.point.y + experiment.point.dy + experiments.gravity;
+        if ((experiment.point.x < 200) && (experiment.point.y < 100)) {
+            // we are still within the frame
+            if (experiment.point.x < experiment.point.xJump) {
+                // we have not jumped jet.
+                experiment.point.x += experiment.point.dx;
+            } else if (experiment.point.x + experiment.point.dx < experiment.lineStart.x2) {
+                // we have jumped but are still on top of the runway
+                experiment.point.x += experiment.point.dx;
+                if (nextPossibleY > experiment.lineStart.y1 - 2) {
+                    // On NO. We crushed back on the runway.
+                    experiment.point.y = experiment.lineStart.y1 - 2;
+                    experiment.running = false;
+                } else {
+                    // still flying up..
+                    experiment.point.dy += experiments.gravity;
+                    experiment.point.y += experiment.point.dy;
+                }
+            } else if (nextPossibleY >= 100) {
+                // will we hit the floor in this time frame?
+                moved = true;
+                var partialMovement = (100 - experiment.point.y) / (experiment.point.dy + experiments.gravity) * experiment.point.dx;
+                experiment.point.x += partialMovement;
+                experiment.point.y = 100;
+                experiment.running = false;
+            } else if (experiment.point.x + experiment.point.dx >= 200) {
+                // we will leave on the right side
+                moved = true;
+                var partialMovement = (200 - experiment.point.x) / (experiment.point.dx) * (experiment.point.dy + experiments.gravity);
+                experiment.point.y += partialMovement;
+                experiment.point.x = 200;
+                experiment.running = false;
+            } else if ((experiment.point.x < experiment.lineEnd.x1) || (experiment.point.x > experiment.lineEnd.x2)) {
+                // we are clear of the landing side and simply fly.
+                experiment.point.x += experiment.point.dx;
+                experiment.point.dy += experiments.gravity;
+                experiment.point.y += experiment.point.dy;
+            } else {
+                // we are now over or under the landing site.
+                if (Math.min(experiment.point.y, nextPossibleY) > experiment.lineEnd.y1 + 2) {
+                    // we are below the line, to sad. but ok, continue flight as usual.
+                    experiment.point.x += experiment.point.dx;
+                    experiment.point.dy += experiments.gravity;
+                    experiment.point.y += experiment.point.dy;
+                } else if (Math.max(experiment.point.y, nextPossibleY) < experiment.lineEnd.y1 - 2) {
+                    // we are flying above the line and will not hit it in this time frame. Fly normal
+                    experiment.point.x += experiment.point.dx;
+                    experiment.point.dy += experiments.gravity;
+                    experiment.point.y += experiment.point.dy;
+                } else {
+                    if (nextPossibleY - experiment.point.y >= 0) {
+                        // we are falling 
+                        if (experiment.point.y <= experiment.lineEnd.y1 - 2) {
+                            // we started on top of the line. As Math.max(experiment.point.y,nextPossibleY)>experiment.lineEnd.y1-2
+                            // we know that nextPossibleY is at/below the line:
+                            // eagle has landed.
+                            experiment.point.x += experiment.point.dx;
+                            experiment.point.y = experiment.lineEnd.y1 - 2;
+                            experiment.running = false;
+                            experiment.succes = true;
+                        } else {
+                            // we are somehow in the line, this should not happen (only if you jump into it. 
+                            // close your eyes and continue
+                            experiment.point.dx = 0;
+                            experiment.point.x = experiment.lineEnd.x1 - 2;
+                            experiment.point.dy += experiments.gravity;
+                        }
+                    } else {
+                        // we are still rising
+                        if (experiment.point.y >= experiment.lineEnd.y1 + 2) {
+                            //we start below and crash into the landing side from below. So we 
+                            // bounce of it and continue.   
+                            experiment.point.x += experiment.point.dx;
+                            experiment.point.dy = -experiment.point.dy;// bouncing/reflecting at the line
+                            experiment.point.dy += experiments.gravity;// add gravity
+                            experiment.point.y = Math.max(experiment.point.y + experiment.point.dy, experiment.lineEnd.y1 + 3);
+                        } else {
+                            //again this should not happen. But in the case
+                            experiment.point.dx = 0;
+                            experiment.point.x = experiment.lineEnd.x1 - 2;
+                            experiment.point.dy = -experiments.gravity;
+                        }
+                    }
+                }
+            }
+        } else
+            return false;
+        // the following is needed to select the best on the failures 
+        experiment.point.maxHigh = Math.max(experiment.point.y, experiment.point.maxHigh);
+        experiment.point.minDist = Math.min(experiment.point.minDist, distanceToEndLine(experiment));
+        
+        experiment.point.graphic.transition().duration(experiments.frameduration).attr("cx", experiment.anchorX + dc.fx * experiment.point.x).attr("cy", experiment.anchorY + dc.fy * experiment.point.y);
+        return true;
+    }
+
+    function distanceToEndLine(experiment) {
+        var x = experiment.point.x;
+        var y = experiment.point.y;
+        if (x < experiment.lineEnd.x1) {
+            return Math.sqrt((experiment.lineEnd.x1 - x) * (experiment.lineEnd.x1 - x) + (experiment.lineEnd.y1 - 2 - y) * (experiment.lineEnd.y1 - 2 - y));
+        } else if (x > experiment.lineEnd.x2) {
+            return Math.sqrt((experiment.lineEnd.x2 - x) * (experiment.lineEnd.x2 - x) + (experiment.lineEnd.y1 - 2 - y) * (experiment.lineEnd.y1 - 2 - y));
+        }
+        else
+            return Math.abs(experiment.lineEnd.y1 - 2 - y);
+    }
+    </script>

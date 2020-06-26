@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<style>
+    .body {
+        transition-timing-function: cubic-bezier(0,0,0,0);
+    }
+</style>
+    
+<body onload="start()">
+    
+    <form name="myForm">
+    <input type="radio" id="r1" name="radio" value=1 checked="checked">&nbsp;random&nbsp;&nbsp;
+    <input type="radio" id="r2" name="radio" value=2>&nbsp;rear first&nbsp;&nbsp;
+    <input type="radio" id="r3" name="radio" value=3>&nbsp;front first&nbsp;&nbsp;
+    <input type="radio" id="r4" name="radio" value=4>&nbsp;windows/middle/aisle, random&nbsp;&nbsp;
+    <input type="radio" id="r5" name="radio" value=5>&nbsp;w/m/a ordered&nbsp;&nbsp;
+    <input type="button" value="Change Boarding Order"
+           onClick="changeOrder();">
+  </form>
+        
+     <table style="position:absolute;top:20px; right: 50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> <p style="font-size:20px"> time passed </p></td> 
+            <td> <p id="timecounter" style="font-size:20px" ></p> </td>
+        </tr>
+    </table>
+
+    
+    <script src="../SharedResources/d3.min.js"></script>
+    <script>
+    var displaycontainer = {}, model = {};
+    displaycontainer.width = Math.min(1200, window.innerWidth-20),
+    displaycontainer.height = Math.min(1000, window.innerHeight-20),
+
+    
+    displaycontainer.animationTime = 100;
+    displaycontainer.stepSize = 100;
+    displaycontainer.picWidth = 1330;
+    displaycontainer.picHeight=369;
+    displaycontainer.picScale=1;
+    displaycontainer.orderParameter=1;
+    
+    var tmpscale=displaycontainer.width*1.0/displaycontainer.picWidth*displaycontainer.height/displaycontainer.picHeight;
+
+    if (tmpscale<1) {//then to slim (widther than the image)
+       displaycontainer.picScale=displaycontainer.height*1.0/displaycontainer.picHeight;
+       displaycontainer.xoffset=(displaycontainer.width-displaycontainer.picScale*displaycontainer.picWidth)/2;
+       displaycontainer.yoffset=0;
+    } else { //(window to high to skep image
+        displaycontainer.picScale=displaycontainer.width*1.0/displaycontainer.picWidth;
+        displaycontainer.xoffset=0;
+        displaycontainer.yoffset=(displaycontainer.height-displaycontainer.picScale*displaycontainer.picHeight)/2;
+    } 
+    
+    displaycontainer.waypoints=[];
+    displaycontainer.waypoints.push({x:214,y:279});
+    displaycontainer.waypoints.push({x:220,y:184});
+    displaycontainer.travelspeedStep=1;
+    displaycontainer.traveldistance=100;
+    
+    function createSeats(){
+        displaycontainer.seats=[];
+        model.nrNodes=0;
+        var highPosFirstClass=[];
+        highPosFirstClass.push(109);
+        highPosFirstClass.push(146);
+        highPosFirstClass.push(218);
+        highPosFirstClass.push(255);
+        var vertPosFirstClass=[];
+        vertPosFirstClass.push(291);
+        vertPosFirstClass.push(340);
+        vertPosFirstClass.push(389);
+        for(var j=0;j<vertPosFirstClass.length;j++){
+            for(var i=0;i<highPosFirstClass.length;i++){
+                displaycontainer.seats.push({x:vertPosFirstClass[j],y:highPosFirstClass[i], row:j, seat:i+1,nr:displaycontainer.seats.length});
+                model.nrNodes++;
+            }
+        }
+        var highPos=[];
+        var vertPos=[];
+        highPos.push(103);
+        highPos.push(129);
+        highPos.push(155);
+        highPos.push(209);
+        highPos.push(234);
+        highPos.push(260);
+        vertPos.push(426);
+        vertPos.push(460);
+        vertPos.push(491);
+        vertPos.push(525);
+        vertPos.push(558);
+        vertPos.push(593);
+        vertPos.push(625);
+        vertPos.push(658);
+        vertPos.push(690);
+        vertPos.push(724);
+        vertPos.push(756);
+        vertPos.push(790);
+        vertPos.push(824);
+        vertPos.push(858);
+        vertPos.push(890);
+        vertPos.push(923);
+        vertPos.push(956);
+        vertPos.push(990);
+        vertPos.push(1023);
+        vertPos.push(1057);
+        vertPos.push(1090);
+        vertPos.push(1123);
+        
+        for(var j=0;j<vertPos.length;j++){
+            for(var i=0;i<highPos.length;i++){
+                displaycontainer.seats.push({x:vertPos[j],y:highPos[i], row:vertPosFirstClass.length+j, seat:i+1,nr:displaycontainer.seats.length});
+                model.nrNodes++;
+            }
+        }
+        
+        model.queue=[];
+        for(var i=0;i<5;i++){
+            var po={};
+            var lambda=1.0*i/4;
+            po.x=displaycontainer.waypoints[0].x*(1-lambda)+displaycontainer.waypoints[1].x*lambda;
+            po.y=displaycontainer.waypoints[0].y*(1-lambda)+displaycontainer.waypoints[1].y*lambda;
+            po.goal=-1;
+            model.queue.push(po);
+        }
+        {
+            var po={};
+            po.x=(displaycontainer.waypoints[1].x+vertPosFirstClass[0])/2-7;
+            po.y=displaycontainer.waypoints[1].y;
+            po.goal=-1;
+            model.queue.push(po);
+        }
+        
+        for(var i=0;i<vertPosFirstClass.length;i++){
+            var po={};
+            po.x=vertPosFirstClass[i]-15;
+            po.y=displaycontainer.waypoints[1].y;
+            po.goal=i;
+            model.queue.push(po);
+            if(i+1<vertPosFirstClass.length){
+                var po2={};
+                po2.x=(vertPosFirstClass[i]+vertPosFirstClass[i+1])/2-15;
+                po2.y=displaycontainer.waypoints[1].y;
+                po2.goal=-1;
+                model.queue.push(po2);
+            }
+        }
+        {
+            var po={};
+            po.x=(vertPosFirstClass[vertPosFirstClass.length-1]+vertPos[0])/2-15;
+            po.y=displaycontainer.waypoints[1].y;
+            po.goal=-1;
+            model.queue.push(po);
+        }
+        for(var i=0;i<vertPos.length;i++){
+            var po={};
+            po.x=vertPos[i]-15;
+            po.y=displaycontainer.waypoints[1].y;
+            po.goal=i+vertPosFirstClass.length;
+            model.queue.push(po);
+            var po2={};
+                po2.y=displaycontainer.waypoints[1].y;
+                po2.goal=-1;
+                if(i+1<vertPos.length){                
+                    po2.x=(vertPos[i]+vertPos[i+1])/2-15;
+                } else po2.x=vertPos[i]+15;
+                model.queue.push(po2);
+            
+        }
+        
+        for(var i=0;i<model.queue.length;i++){
+            model.queue[i].occupier=-1;
+        }
+    }
+    
+    function createTravelers(){
+        model.nodes=[];
+        for(i=0;i<model.nrNodes;i++ ){
+            var node={ name: i,  active:false,x:displaycontainer.seats[i].x,y:displaycontainer.seats[i].y, status:0, luggageduration:-1, goal:displaycontainer.seats[i]};
+            displaycontainer.seats[i].owner=node;
+            model.nodes.push(node);
+        }
+        
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node").data(model.nodes).enter().append("g").attr("class", function (d) {
+            return "node"+d.name}).append("circle")
+        .attr("r", 8).attr("cx", function (d) {return conversionX(d);}).attr("cy", function (d) {return conversionY(d);})
+        .attr("fill","#DDFFFF").attr("id", function (d) {return "Traveler"+d.name;}).style("stroke", '#000000').style("stroke-width", 1).style("visibility", "hidden");
+    }
+    
+    function start( ) {
+        displaycontainer.svg = d3.select("body")
+                .append("svg").attr("class", "back").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+
+
+        displaycontainer.map={};
+        displaycontainer.map.imgs = displaycontainer.svg.selectAll("image").data([0]);
+        displaycontainer.map.imgs.enter()
+                .append("svg:image")
+                .attr("xlink:href", "images/PlaneBody.png")
+                .attr("width", displaycontainer.width)
+                .attr("height", displaycontainer.height).attr("id", "backimg");
+        createSeats();
+        createTravelers();
+        startAnimation();
+        //for(i=0;i<144;i++) animateTraveler(143-i);
+        
+    }
+    
+    function startAnimation(){
+        model.seatedTravelers=0;
+        model.movingTravelers=0;
+        model.uninitializedTravers=model.nodes.length;
+        computeBoardingOrder();
+        displaycontainer.timePassed=0;
+        document.getElementById("timecounter").innerHTML = ""+displaycontainer.timePassed;
+        
+        animate();
+    }
+    
+    function computeBoardingOrder(){
+        model.entryorder=[];
+        if (displaycontainer.orderParameter===1){
+            var tmplist=[];
+            for(var i=0;i<model.nodes.length;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0){
+                var pos=Math.floor(tmplist.length*Math.random());
+                model.entryorder.push(tmplist.splice(pos,1)[0]);
+            }
+        } else if (displaycontainer.orderParameter===2){
+            var tmplist=[];
+            // rear quater
+            var first=12+6*(18-3);
+            var last=17+6*(24-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // 1/2-3/4
+            first=12+6*(11-3);
+            last=17+6*(17-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // 1/4-2/4
+            first=12+6*(3-3);
+            last=17+6*(10-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // First Class
+            first=0;
+            last=11;
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+        } else if (displaycontainer.orderParameter===3){
+            var tmplist=[];
+            // First Class
+            var first=0;
+            var last=11;
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // 1/4-2/4
+            first=12+6*(3-3);
+            last=17+6*(10-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // 1/2-3/4
+            first=12+6*(11-3);
+            last=17+6*(17-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+            
+            // rear quater
+            first=12+6*(18-3);
+            last=17+6*(24-3);
+            for(var i=first;i<last+1;i++){
+                tmplist.push(i);
+            }
+            while(tmplist.length>0)
+                model.entryorder.push(tmplist.splice(Math.floor(tmplist.length*Math.random()),1)[0]);
+        }else {
+            var windowseats=[];
+            var middleseats=[];
+            var ailseseats=[];
+            for(var i=24;i>2;i-- ){
+                windowseats.push(12+6*(i-3));
+                windowseats.push(17+6*(i-3));
+            }
+            windowseats.push(8);windowseats.push(11);
+            windowseats.push(4);windowseats.push(7);
+            windowseats.push(0);windowseats.push(3);
+            for(var i=24;i>2;i-- ){
+                middleseats.push(13+6*(i-3));
+                middleseats.push(16+6*(i-3));
+            }
+            for(var i=24;i>2;i-- ){
+                ailseseats.push(14+6*(i-3));
+                ailseseats.push(15+6*(i-3));
+            }
+            ailseseats.push(9);ailseseats.push(10);
+            ailseseats.push(5);ailseseats.push(6);
+            ailseseats.push(1);ailseseats.push(2);
+            
+            
+            if (displaycontainer.orderParameter===5){
+                for (var i=0;i<windowseats.length;i++) model.entryorder.push(windowseats[i]);
+                for (var i=0;i<middleseats.length;i++) model.entryorder.push(middleseats[i]);
+                for (var i=0;i<ailseseats.length;i++) model.entryorder.push(ailseseats[i]);
+            } else {
+                while(windowseats.length>0)
+                    model.entryorder.push(windowseats.splice(Math.floor(windowseats.length*Math.random()),1)[0]);
+                while(middleseats.length>0)
+                    model.entryorder.push(middleseats.splice(Math.floor(middleseats.length*Math.random()),1)[0]);
+                while(ailseseats.length>0)
+                    model.entryorder.push(ailseseats.splice(Math.floor(ailseseats.length*Math.random()),1)[0]);
+            }
+        }
+    }
+    
+    function animate(){
+        if(model.seatedTravelers<model.nodes.length){
+            setTimeout(function () {
+                if (model.queue[0].occupier===-1){
+                    if(model.entryorder.length>0)
+                        if(0.3<Math.random()) activateTraveler(model.entryorder.shift());
+                }
+                moveEveryone();
+                animate();
+            }, displaycontainer.animationTime);
+        }
+        displaycontainer.timePassed++;
+        document.getElementById("timecounter").innerHTML = ""+displaycontainer.timePassed;
+    }
+    
+    function activateTraveler(name){
+        displaycontainer.nodes.filter(function(d) { if (d.name===name) return d;}).style("visibility", "visible").attr("cx", conversionX(displaycontainer.waypoints[0])).attr("cy", conversionY(displaycontainer.waypoints[0]));
+        model.nodes[name].status=1;
+        model.nodes[name].position=0;
+        model.queue[0].occupier=name;
+        model.uninitializedTravers--;
+    }
+    
+    function moveEveryone(){
+       for(var i=model.queue.length-2;i>-1;i--){
+           if(model.queue[i].occupier!==-1){
+               var traveler= model.nodes[model.queue[i].occupier];
+               if (traveler.goal.row===model.queue[i].goal){
+                   if(traveler.luggageduration===-1){
+                       traveler.luggageduration=Math.floor(Math.random()*7);
+                   }
+                   else if(traveler.luggageduration>0)
+                       traveler.luggageduration--;
+                   else{ //traveler.luggageduration===0
+                       if (traveler.status===1) 
+                           traveler.luggageduration=timeToSeat(traveler);// we might have to wait for others in the row to let us pass.
+                       if (traveler.luggageduration===0){
+                           model.queue[i].occupier=-1;
+                           model.seatedTravelers++;
+                       }
+                    }
+               } else {
+                   if (model.queue[i+1].occupier===-1){
+                       displaycontainer.nodes.filter(function(d) { if (d.name===traveler.name) return d;}).transition().duration(displaycontainer.animationTime*1.1)
+                               .attr("cx", conversionX(model.queue[i+1])).attr("cy", conversionY(model.queue[i+1]));
+                       model.queue[i+1].occupier=model.queue[i].occupier;
+                       model.queue[i].occupier=-1;
+                   }
+               }
+           }
+       }
+       if (model.queue[model.queue.length-1].occupier!==-1){
+            var traveler= model.nodes[model.queue[model.queue.length-1].occupier];
+            console.log("Error, dummy posiiton was used? : "+traveler.name+" going to "+traveler.goal.row);
+       }
+    }
+    
+    function moveToSeat(traveler){
+        traveler.status=4;//traveling in row
+        
+        displaycontainer.nodes.filter(function(d) { if (d.name===traveler.name) return d;}).transition().duration(displaycontainer.animationTime)
+             .attr("cy", conversionY(traveler.goal)).attr("cx",conversionX(traveler.goal)-12);;
+        setTimeout(function () {
+            traveler.status=2;//seated
+             displaycontainer.nodes.filter(function(d) { if (d.name===traveler.name) return d;}).transition().duration(displaycontainer.animationTime)
+            .attr("cx",conversionX(traveler.goal));
+        }, displaycontainer.animationTime);
+    }
+
+    function moveFromSeat(traveler, first){
+        traveler.status=4;//traveling in row
+        var offset=17;
+        if (first) offset=6;
+        displaycontainer.nodes.filter(function(d) { if (d.name===traveler.name) return d;}).transition().duration(displaycontainer.animationTime)
+                .attr("cx",conversionX(traveler.goal)-12);
+        setTimeout(function () {
+             displaycontainer.nodes.filter(function(d) { if (d.name===traveler.name) return d;}).transition().duration(displaycontainer.animationTime)
+            .attr("cx",conversionX(traveler.goal)+offset).attr("cy",conversionY(displaycontainer.waypoints[1]));
+        }, displaycontainer.animationTime);
+    }
+
+    
+    function timeToSeat(traveler){
+        traveler.status=3;
+        var timeTos=0;
+        var moveP1={};
+        var moveP2={};
+        if (traveler.goal.row<3){
+            if (traveler.goal.seat===1){
+                if(displaycontainer.seats[traveler.goal.nr+1].owner.status===2){
+                    timeTos=4;
+                    moveP1=displaycontainer.seats[traveler.goal.nr+1].owner;
+                }
+            }
+            if (traveler.goal.seat===4){
+                if(displaycontainer.seats[traveler.goal.nr-1].owner.status===2){
+                    timeTos=4;
+                    moveP1=displaycontainer.seats[traveler.goal.nr-1].owner;
+                }
+            }
+        } else {
+            if (traveler.goal.seat===2){
+                if(displaycontainer.seats[traveler.goal.nr+1].owner.status===2){
+                    timeTos=4;
+                    moveP1=displaycontainer.seats[traveler.goal.nr+1].owner;
+                }
+            }
+            if (traveler.goal.seat===1){
+                if((displaycontainer.seats[traveler.goal.nr+1].owner.status===2)||(displaycontainer.seats[traveler.goal.nr+2].owner.status===2)){
+                    if((displaycontainer.seats[traveler.goal.nr+1].owner.status===2)&&(displaycontainer.seats[traveler.goal.nr+2].owner.status===2)){
+                        timeTos=8;
+                        moveP1=displaycontainer.seats[traveler.goal.nr+1].owner;
+                        moveP2=displaycontainer.seats[traveler.goal.nr+2].owner;
+                    } else {
+                        timeTos=4;
+                        if((displaycontainer.seats[traveler.goal.nr+1].owner.status===2)){
+                            moveP1=displaycontainer.seats[traveler.goal.nr+1].owner;
+                        }
+                        else moveP1=displaycontainer.seats[traveler.goal.nr+2].owner;
+                    }
+            }}
+            if (traveler.goal.seat===5){
+                if(displaycontainer.seats[traveler.goal.nr-1].owner.status===2){
+                    if(displaycontainer.seats[traveler.goal.nr-1].owner.status===2){
+                    timeTos=4;
+                    moveP1=displaycontainer.seats[traveler.goal.nr-1].owner;
+            }}}
+            if (traveler.goal.seat===6){
+                if((displaycontainer.seats[traveler.goal.nr-2].owner.status===2)||(displaycontainer.seats[traveler.goal.nr-1].owner.status===2)){
+                    if((displaycontainer.seats[traveler.goal.nr-2].owner.status===2)&&(displaycontainer.seats[traveler.goal.nr-1].owner.status===2)){
+                        timeTos=8;
+                        moveP1=displaycontainer.seats[traveler.goal.nr-2].owner;
+                        moveP2=displaycontainer.seats[traveler.goal.nr-1].owner;
+                    } else {
+                        timeTos=4;
+                        if (displaycontainer.seats[traveler.goal.nr-1].owner.status===2) {                           
+                            moveP1=displaycontainer.seats[traveler.goal.nr-1].owner;
+                        } else moveP1=displaycontainer.seats[traveler.goal.nr-2].owner;
+                    }
+                }
+            }
+        }
+        if (timeTos===0){
+            moveToSeat(traveler);
+        } else if (timeTos===4){
+            moveFromSeat(moveP1,true);
+            setTimeout(function () {
+                moveToSeat(traveler);
+                setTimeout(function () {moveToSeat(moveP1); }, displaycontainer.animationTime*2);
+            }, displaycontainer.animationTime*2);
+        } else if (timeTos===8){
+            moveFromSeat(moveP1,true);//start now
+            setTimeout(function () {
+                moveFromSeat(moveP2,false); //start in 1 second
+                setTimeout(function () {
+                    moveToSeat(traveler); //start in 2 seconds
+                    setTimeout(function () {
+                        moveToSeat(moveP2); //start in 3 seconds
+                        setTimeout(function () {moveToSeat(moveP1);//start in 4 seconds
+            }, displaycontainer.animationTime*2);}, displaycontainer.animationTime*2);}, displaycontainer.animationTime*2); }, displaycontainer.animationTime*2);
+        }
+        return timeTos;
+    }
+    
+    function changeOrder(){
+        var oldPara=displaycontainer.orderParameter;
+        if (document.getElementById('r1').checked) {
+            displaycontainer.orderParameter=1;
+        }
+        if (document.getElementById('r2').checked) {
+            displaycontainer.orderParameter=2;
+        }
+        if (document.getElementById('r3').checked) {
+            displaycontainer.orderParameter=3;
+        }
+        if (document.getElementById('r4').checked) {
+            displaycontainer.orderParameter=4;
+        }
+        if (document.getElementById('r5').checked) {
+            displaycontainer.orderParameter=5;
+        }
+        if (oldPara!==displaycontainer.orderParameter){
+            d3.select("svg").remove();
+            start();
+        }
+        
+    }
+
+    
+    
+    function conversionX(node){
+        return node.x*displaycontainer.picScale+displaycontainer.xoffset;
+    }
+
+    function conversionY(node){
+        return node.y*displaycontainer.picScale+displaycontainer.yoffset;
+    }
+    </script>
+
+
+    

@@ -1,0 +1,604 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+    .button {
+        background-color: #265299;
+        border: none;
+        color: white;
+        padding: 15px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+    }
+
+    .button:hover {
+        background-color: #1369f4; /* Green */
+        color: white;
+        box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+    }
+    
+    .slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 25px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  background: #265299;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  background: #265299;
+  cursor: pointer;
+}
+.axisLine {
+        stroke: #111;
+        stroke-opacity: 1.2;
+        stroke-width:2px;
+    }
+    
+    .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(255, 255, 255, 0.5);
+        color: #000;
+        border-radius: 2px;
+        //border: 1px solid black;
+    }
+    .dot {
+        height: 25px;
+        width: 25px;
+        border-radius: 50%;
+        display: inline-block;
+    }
+</style>
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Dynamic growing network
+    </h2>
+    <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+        <td>
+            <button class="button"   onclick="growinEStart()"> Add Nodes.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="growinVStart()"> Add edges.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="growinEVStart()"> Add both.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="pause()"> Pause.</button>
+        </td>
+        <td>Speed:</td>
+        <td><input type="range" min="1" max="100" value="60" class="slider" id="speedrange"></td>
+        </tr><tr>
+        <td>Nodes: </td>
+        <td><span style="font-size:18px; font-family: Raleway;" id="nrNodes"></span></td>
+        <td>Edges:</td>
+        <td><span style="font-size:18px; font-family: Raleway;" id="nrEdges"></span></td>
+        </tr>
+        
+    </table>
+
+    <script>
+        var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+                height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+                lambda = 0.45;
+        var dc = {};
+        dc.intervalID = [];
+        dc.framespeed = 200;
+        dc.color = ["#f25006", "#80ba01", "#ffb902", "#02a4ef", "#8b1599", "#726906"];
+        dc.plot= {};
+        dc.plot.initialise=false;
+
+        function draw() {
+            createGraph();
+            initializeGraphic();
+            var slider = document.getElementById("speedrange");
+
+            slider.oninput = function() {
+              dc.framespeed=2000*Math.exp(-this.value*this.value/1600);
+            }
+
+            dc.intervalID.push(setTimeout(function () {
+                growinE();
+            }, 1000));
+
+            addLogo();
+        }
+        ;
+
+        function updateDisplayNumbers() {
+            document.getElementById("nrNodes").innerHTML=graph.nodes.length;
+            document.getElementById("nrEdges").innerHTML=graph.links.length;
+        }
+        function createGraph() {
+            graph = {};
+            graph.nodes = [];
+            graph.links = [];
+            graph.futureLinks = [];
+            graph.clusters = [];
+            graph.dummy = {};
+            graph.distanceMap = graph.dummy;
+            graph.simpleSparseGraph = [];
+            graph.clusterStructure ={};
+            graph.clusterStructure.singletons =[];
+            graph.clusterStructure.clusters =[];
+        }
+
+
+        function growinEStart() {
+            pause();
+            growinE();
+            updatePlot();
+        }
+        
+        function growinE() {
+            pause();
+            var node = {name: graph.nodes.length, degree: 0, clusterID: -1};
+            graph.nodes.push(node);
+            graph.simpleSparseGraph.push([]);
+            for (var i = 0; i < graph.nodes.length - 1; i++) {
+                graph.futureLinks.push({source: graph.nodes[i], target: node});
+            }
+            graph.clusterStructure.singletons.push(node);
+            dc.node = dc.node.data(graph.nodes);
+            dc.node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    })
+                    .attr("r", 3).style("fill", "#ccc").call(dc.force.drag);
+            dc.node.exit().remove();
+
+            dc.force.start();
+            updateDisplayNumbers();
+            dc.intervalID.push(setTimeout(function () {
+                growinE();
+            }, dc.framespeed));
+        }
+
+        function randomElement(array) {
+            return array[ Math.floor(Math.random() * array.length)];
+        }
+
+        function takeRandomElement(array) {
+            var index = Math.floor(Math.random() * array.length);
+            var ca = array.splice(index, 1)[0];
+            return ca;
+        }
+        
+        function removeGivenElement(array, value) {
+           return array.filter(function(ele){
+               return ele !== value;
+           });
+        }
+
+
+        function growinVStart() {
+            pause();
+            growinV();
+            updatePlot();
+        }
+        
+        function growinV() {
+            if (graph.futureLinks.length > 0) {
+                var edge = takeRandomElement(graph.futureLinks);
+                edge.name = graph.futureLinks.length;
+                edge.degree = 1;
+                graph.links.push(edge);
+                edge.source.degree++;
+                edge.target.degree++;
+                graph.simpleSparseGraph[edge.source.name].push(edge.target.name);
+                graph.simpleSparseGraph[edge.target.name].push(edge.source.name);
+                if (edge.source.degree===1){
+                    graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.source);
+                    if (edge.target.degree===1){
+                        graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.target);
+                        createNewCluster(edge);
+                    } else {
+                        addToCluster(edge.target,edge.source);
+                    }
+                } else if (edge.target.degree===1){
+                    addToCluster(edge.source,edge.target);
+                    graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.target);
+                } else {
+                    // both nodes were not singletons
+                    if(edge.source.clusterID!==edge.target.clusterID){
+                        mergeClusters(edge);
+                    }
+                }
+                dc.link = dc.link.data(graph.links);
+                dc.link.enter().append("path")
+                        .attr("class", function (d) {
+                            return "link count" + d.degree;
+                        })
+                        .attr("id", function (d) {
+                            if (d.source.name < d.target.name)
+                                return "idlink" + d.source.name + "t" + d.target.name;
+                            else
+                                return "idlink" + d.target.name + "t" + d.source.name;
+                        });
+                dc.link.exit().remove();
+
+                dc.force.start();
+                updateDisplayNumbers();
+                twoLargestWithColor();
+                updatePlot();
+                dc.intervalID.push(setTimeout(function () {
+                    growinV();
+                }
+                , dc.framespeed));
+            }
+        }
+
+        function growinEVStart() {
+            pause();
+            growinEV();
+        }
+        
+        function growinEV() {
+            pause();
+            var node = {name: graph.nodes.length, degree: 0, clusterID: -1};
+            graph.nodes.push(node);
+            graph.simpleSparseGraph.push([]);
+            for (var i = 0; i < graph.nodes.length - 1; i++) {
+                var edgeP = lambda / (graph.nodes.length);
+                if (Math.random() < edgeP) {
+                    var edge = {source: graph.nodes[i], target: node};
+                    edge.name = graph.futureLinks.length;
+                    edge.degree = 1;
+                    graph.links.push(edge);
+                    edge.source.degree++;
+                    edge.target.degree++;
+                    graph.simpleSparseGraph[edge.source.name].push(edge.target.name);
+                    graph.simpleSparseGraph[edge.target.name].push(edge.source.name);
+                    if(edge.source.degree===1){ // ist singleton
+                        if(edge.target.clusterID===-1)
+                        createNewCluster(edge); //connected to singleton
+                        else addToCluster(edge.target,edge.source);
+                    } else { // source is part of a cluster
+                        if(node.clusterID===-1){
+                           addToCluster(edge.source,edge.target);
+                        } else {
+                            mergeClusters(edge);
+                        }
+                    }
+                } else {
+                    graph.futureLinks.push({source: graph.nodes[i], target: node});
+                }
+            }
+            dc.node = dc.node.data(graph.nodes);
+            dc.node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    })
+                    .attr("r", 3).style("fill", "#ccc").call(dc.force.drag);
+            dc.node.exit().remove();
+            if (graph.simpleSparseGraph[node.name].length > 0) {
+                dc.link = dc.link.data(graph.links);
+                dc.link.enter().append("path")
+                        .attr("class", function (d) {
+                            return "link count" + d.degree;
+                        })
+                        .attr("id", function (d) {
+                            if (d.source.name < d.target.name)
+                                return "idlink" + d.source.name + "t" + d.target.name;
+                            else
+                                return "idlink" + d.target.name + "t" + d.source.name;
+                        });
+                dc.link.exit().remove();
+            } else {
+                graph.clusterStructure.singletons.push(node.name);
+            }
+            dc.force.start();
+            updateDisplayNumbers();
+            twoLargestWithColor();
+            updatePlot();
+            dc.intervalID.push(setTimeout(function () {
+                growinEV();
+            }, dc.framespeed));
+        }
+
+
+        function pause() {
+            for (var i = 0; i < dc.intervalID.length; i++) {
+                clearTimeout(dc.intervalID[i]);
+            }
+            dc.intervalID = [];
+        }
+
+        function createNewCluster(edge){
+            var cluster={name:graph.clusters.length};
+            cluster.points=[];
+            edge.source.clusterID=cluster.name;
+            edge.target.clusterID=cluster.name;
+            cluster.points.push(edge.source);
+            cluster.points.push(edge.target);
+            graph.clusters.push(cluster);
+            
+        }
+        function addToCluster(oldNode,newNode){
+            var cluster=graph.clusters[oldNode.clusterID];
+            newNode.clusterID=cluster.name;
+            cluster.points.push(newNode);
+        }
+        function mergeClusters(edge){
+          if(edge.source.clusterID!==edge.target.clusterID){            
+              
+                var clusterAid=edge.source.clusterID;
+                var clusterBid=edge.target.clusterID;
+                if (clusterAid>clusterBid){
+                     clusterAid=edge.target.clusterID;
+                     clusterBid=edge.source.clusterID;
+                }
+                graph.clusters[clusterBid].points.forEach(function(d){
+                    d.clusterID=clusterAid;
+                    graph.clusters[clusterAid].points.push(d);
+                });
+                graph.clusters[clusterBid]=graph.dummy;
+          }
+        }
+        
+        function mergeClustersA(edge){
+          if(edge.source.clusterID!==edge.target.clusterID){            
+              
+                var clusterA=graph.clusters[edge.source.clusterID];
+                var clusterB=graph.clusters[edge.target.clusterID];
+                if (clusterA.name>clusterB.name){
+                     clusterA=graph.clusters[edge.target.clusterID];
+                     clusterB=graph.clusters[edge.source.clusterID];
+                }
+                clusterB.points.forEach(function(d){
+                    d.clusterID=clusterA.name;
+                    clusterA.points.push(d);
+                });
+                clusterB=graph.dummy;
+          }
+        }
+        
+        function maxClusterSize(){
+            var tmpmax=0;
+            var tmpmaxID=-1;
+            var s="";
+            for(var i=0; i<graph.clusters.length;i++){
+                if (graph.clusters[i]!==graph.dummy){
+                    if(graph.clusters[i].points.length>tmpmax){
+                        tmpmaxID=i;
+                        tmpmax=graph.clusters[i].points.length;
+                    }
+                    s+=" "+graph.clusters[i].points.length;
+                } else s+=" D"
+            }
+        }
+        
+        function twoLargestWithColor(){
+            var tmpmax=-1;
+            var tmpmaxID=-2;
+            var tmpmax2=-1;
+            var tmpmax2ID=-2;
+            for(var i=0; i<graph.clusters.length;i++){
+                if (graph.clusters[i]!==graph.dummy){
+                    var size=graph.clusters[i].points.length;
+                    if(size>tmpmax2){
+                        if (size>tmpmax) 
+                        {
+                            tmpmax2ID=tmpmaxID;
+                            tmpmax2=tmpmax;
+                            tmpmaxID=i;
+                            tmpmax=graph.clusters[i].points.length;
+                        } else {
+                            tmpmax2ID=i;
+                            tmpmax2=graph.clusters[i].points.length;
+                        }
+                    }
+                }
+            }
+            graph.sizeMax=tmpmax;
+            graph.sizeMax2=tmpmax2;
+            dc.node.style("fill", function(d){
+                if (d.clusterID===tmpmaxID) return dc.color[0];
+                else if (d.clusterID===tmpmax2ID) return dc.color[1];
+                else return "#ccc";
+            } );
+        }
+        
+        function updatePlot(){
+            if (dc.plot.initialise){
+                dc.plot.data.push({time: dc.plot.data.length, nrNodes: graph.nodes.length, nrLinks:graph.links.length, sizeMax:graph.sizeMax, sizeLarge:graph.sizeMax2, nrSingle:graph.clusterStructure.singletons.length});
+                //var it = dc.plot.data[dc.plot.data.length-1];
+                //console.log(it.time+"  "+ it.nrNodes+ " "+ it.nrLinks+"  "+ it.nrSingle);
+                updateLine();
+            } else {
+                if (graph.links.length>0){
+                    dc.plot.initialise=true;
+                    createPlot();
+                    dc.plot.data=[];
+                    dc.plot.data.push({time:0, nrNodes: graph.nodes.length, nrLinks:graph.links.length, sizeMax:graph.sizeMax, sizeLarge:graph.sizeMax2, nrSingle:graph.clusterStructure.singletons.length});
+                }
+            }
+            
+        }
+        
+        function createPlot() {
+            dc.boundary = 0.05*Math.min(height,width);
+            dc.plotAnchorx= dc.boundary;
+            dc.plotAnchory= height*0.9 - dc.boundary;
+            dc.plotEffheight= (height-  dc.boundary*2)*0.3;
+            dc.plotEffwidth= (width-  dc.boundary*2)*0.3;
+
+            dc.svg.append("rect").attr("x", dc.plotAnchorx).attr("y", dc.plotAnchory-dc.plotEffheight).attr("width", dc.plotEffwidth).attr("height",dc.plotEffheight).style("fill", "#f2f2f2");
+                    //.on("mouseover", sectorMouseOver).on("mouseout", sectorMouseOut).on("mousemove", mousemove);
+
+            dc.x = d3.time.scale().range([0, dc.plotEffheight]);
+            //dc.lastTipValue=-1;
+
+            /*dc.tip = d3.tip()
+                .attr('class', 'd3-tip')
+                .direction('e')
+                .html(function (d) { return htmltooltip(d);});
+            dc.svg.call(dc.tip);  
+            */
+            dc.xAxis = dc.svg.append("line")
+                    .attr("class", "axisLine").attr("x1", dc.plotAnchorx-1).attr("y1", dc.plotAnchory+1)
+                    .attr("x2", dc.plotEffwidth+dc.plotAnchorx).attr("y2", dc.plotAnchory+2).attr("id", "xAxis")
+                    .style("stroke","#111");
+            dc.yAxis = dc.svg.append("line")
+                    .attr("class", "axisLine").attr("x1", dc.plotAnchorx-1).attr("y1", dc.plotAnchory+1)
+                    .attr("x2", dc.plotAnchorx-1).attr("y2", dc.plotAnchory- dc.plotEffheight+1 ).attr("id", "yAxis")
+                    .style("stroke","#111");
+            
+            for (var j = 0; j < 2; j++) {
+                var lineData = [];
+                lineData.push({ "x": dc.plotAnchorx,   "y": dc.plotAnchory });
+                lineData.push({ "x": dc.plotAnchorx + 1,   "y": dc.plotAnchory-100*(j+1)});
+                
+                var lineFunction = d3.svg.line().x(function(d) { return d.x; }).y(function(d) { return d.y; }).interpolate("linear");
+                dc.svg.append("path").attr("id", "idPlotL"+j)
+                            .attr("d", lineFunction(lineData)).style("stroke", dc.color[j]).style("stroke-width", "5px").style("fill","none");
+            }
+        
+        }
+        
+        function updateLine(){
+            dc.xfactor =dc.plotEffwidth/(dc.plot.data.length-1);
+            dc.yfactor =dc.plotEffheight/(graph.nodes.length);
+        
+            var lineData = [];
+            var lineDataLarge = [];
+ //dc.plot.data.push({time: dc.plot.data.length, nrNodes: graph.nodes.length, nrLinks:graph.links.length, sizeMax:graph.sizeMax, sizeLarge :graph.sizeMax2, nrSingle:graph.clusterStructure.singletons.length});
+            for (var j = 0; j < dc.plot.data.length; j++) {
+                var item=dc.plot.data[j];
+                lineData.push({ "x": dc.plotAnchorx+j*dc.xfactor,   "y": dc.plotAnchory - dc.yfactor*Math.max(0,item.sizeMax)});
+                lineDataLarge.push({ "x": dc.plotAnchorx+j*dc.xfactor,   "y": dc.plotAnchory - dc.yfactor*Math.max(0,item.sizeLarge)});
+            }
+            var lineFunction = d3.svg.line().x(function(d) { return d.x; }).y(function(d) { return d.y; }).interpolate("linear");
+            if (dc.framespeed>100){
+                dc.svg.selectAll("path#"+"idPlotL"+0).transition().duration(dc.framespeed).attr("d", lineFunction(lineData));
+                dc.svg.selectAll("path#"+"idPlotL"+1).transition().duration(dc.framespeed).attr("d", lineFunction(lineDataLarge));
+            }
+            else {
+                dc.svg.selectAll("path#"+"idPlotL"+0).attr("d", lineFunction(lineData));
+                dc.svg.selectAll("path#"+"idPlotL"+1).attr("d", lineFunction(lineDataLarge));                
+            }
+        }
+        
+        function initializeGraphic() {
+            // first of the standard configurations:
+            dc.svg = d3.select("body").append("svg")
+                    .attr("width", width).attr("height", height);
+
+            dc.force = d3.layout.force()
+                    .size([width - 20, height - 20]).charge(-30)
+                    .gravity(0.2).nodes(graph.nodes)
+                    .links(graph.links).linkDistance(20);
+            dc.force.on("tick", tick).start();
+
+
+            dc.link = dc.svg.selectAll(".link")
+                    .data(graph.links).enter().append("path").attr("class", "link").attr("id", function (d) {
+                if (d.source.name < d.target.name)
+                    return "idlink" + d.source.name + "t" + d.target.name;
+                else
+                    return "idlink" + d.target.name + "t" + d.source.name;
+            });
+
+            dc.node = dc.svg.selectAll(".node").data(graph.nodes).enter().append("circle").attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    }).attr("r", 3).style("fill", "#ccc")// function (d) { return dc.color[d.type]; })
+                    .call(dc.force.drag);
+        }
+        ;
+
+
+        function tick() {
+            dc.link.attr("d", function (d) {
+                var x1 = d.source.x,
+                        y1 = d.source.y,
+                        x2 = d.target.x,
+                        y2 = d.target.y,
+                        dr = 0;
+
+                // The following is need to display selfloops
+                // First some default values
+                var drx = dr,
+                        dry = dr,
+                        yRotation = 0, // degrees
+                        largeArc = 0, // 1 or 0
+                        sweep = 1; // 1 or 0
+                // now to the self-loops:
+                if (x1 === x2 && y1 === y2) {
+                    yRotation = -45;
+                    largeArc = 1;
+                    // (width-2*x1>0) Change sweep to change orientation of loop. 
+                    if (2 * y1 - height + width - 2 * x1 > 0)
+                        sweep = 0;
+                    else
+                        sweep = 1;
+                    // Make drx and dry : radi of ellipse
+                    drx = 20;
+                    dry = 15;
+
+                    // For whatever reason the arc collapses to a point if the beginning
+                    // and ending points of the arc are the same, so kludge it.
+                    x2 = x2 + 1;
+                    y2 = y2 + 1;
+                }
+                return "M" + x1 + "," + y1 + "A" + drx + "," + dry + " " + yRotation + "," + largeArc + "," + sweep + " " + x2 + "," + y2;
+            });
+
+            dc.node.attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            });
+
+        }
+        ;
+
+
+        function addLogo() {
+            nameTag = dc.svg.append("text")
+                    .attr("class", "xlabel")
+                    .attr("text-anchor", "end")
+                    .attr("x", window.innerWidth * 6 / 7)
+                    .attr("y", height - 100)
+                    .style("font-family", "Raleway")
+                    .style("fill", "rgba(0,0,0, 0.5)")
+                    .style("font-size", "20px")
+                    .text("Fitzner, networkpages.nl")[0][0];
+        }
+        ;
+
+
+    </script>
+

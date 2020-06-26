@@ -1,0 +1,499 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+    .button {
+        background-color: #265299;
+        border: none;
+        color: white;
+        padding: 15px 15px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 14px;
+        margin: 4px 2px;
+        cursor: pointer;
+    }
+
+    .button:hover {
+        background-color: #1369f4; /* Green */
+        color: white;
+        box-shadow: 0 12px 16px 0 rgba(0,0,0,0.24), 0 17px 50px 0 rgba(0,0,0,0.19);
+    }
+    
+    .slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 25px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: .2s;
+  transition: opacity .2s;
+}
+
+.slider:hover {
+  opacity: 1;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  background: #265299;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  background: #265299;
+  cursor: pointer;
+}
+
+</style>
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Erdös-Rényi Graph
+    </h2>
+    <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+        <td>
+            <button class="button"   onclick="growinEStart()"> Add Nodes.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="growinVStart()"> Add edges.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="growinEVStart()"> Add both.</button>
+        </td>
+        <td>
+            <button class="button"   onclick="pause()"> Pause.</button>
+        </td>
+        <td>Speed:</td>
+        <td><input type="range" min="1" max="100" value="60" class="slider" id="speedrange"></td>
+        </tr><tr>
+        <td>Nodes: </td>
+        <td><span style="font-size:18px; font-family: Raleway;" id="nrNodes"></span></td>
+        <td>Edges:</td>
+        <td><span style="font-size:18px; font-family: Raleway;" id="nrEdges"></span></td>
+        </tr>
+        
+    </table>
+
+    <script>
+        var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+                height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+                color = d3.scale.category20(),
+                nrOfNodes = 0, lambda = 0.45;
+        var dc = {};
+        dc.intervalID = [];
+        dc.framespeed = 200;
+        dc.color = ["#f25006", "#80ba01", "#ffb902", "#02a4ef", "#8b1599", "#726906"];
+
+        function draw() {
+            createGraph();
+            initializeGraphic();
+            var slider = document.getElementById("speedrange");
+
+            slider.oninput = function() {
+              dc.framespeed=2000*Math.exp(-this.value*this.value/1600);
+            }
+
+            dc.intervalID.push(setTimeout(function () {
+                growinE();
+            }, 1000));
+
+            addLogo();
+        }
+        ;
+
+        function updateDisplayNumbers() {
+            document.getElementById("nrNodes").innerHTML=graph.nodes.length;
+            document.getElementById("nrEdges").innerHTML=graph.links.length;
+        }
+        function createGraph() {
+            graph = {};
+            graph.nodes = [];
+            graph.links = [];
+            graph.futureLinks = [];
+            graph.clusters = [];
+            graph.dummy = {};
+            graph.distanceMap = graph.dummy;
+            graph.simpleSparseGraph = [];
+            graph.clusterStructure ={};
+            graph.clusterStructure.singletons =[];
+            graph.clusterStructure.clusters =[];
+        }
+
+
+        function growinEStart() {
+            pause();
+            growinE()
+        }
+        
+        function growinE() {
+            pause();
+            var node = {name: graph.nodes.length, degree: 0, clusterID: -1};
+            graph.nodes.push(node);
+            graph.simpleSparseGraph.push([]);
+            for (var i = 0; i < graph.nodes.length - 1; i++) {
+                graph.futureLinks.push({source: graph.nodes[i], target: node});
+            }
+            graph.clusterStructure.singletons.push(node);
+            dc.node = dc.node.data(graph.nodes);
+            dc.node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    })
+                    .attr("r", 3).style("fill", "#ccc").call(dc.force.drag);
+            dc.node.exit().remove();
+
+            dc.force.start();
+            updateDisplayNumbers();
+            dc.intervalID.push(setTimeout(function () {
+                growinE();
+            }, dc.framespeed));
+        }
+
+        function randomElement(array) {
+            return array[ Math.floor(Math.random() * array.length)];
+        }
+
+        function takeRandomElement(array) {
+            var index = Math.floor(Math.random() * array.length);
+            var ca = array.splice(index, 1)[0];
+            return ca;
+        }
+        
+        function removeGivenElement(array, value) {
+           return array.filter(function(ele){
+               return ele !== value;
+           });
+        }
+
+
+        function growinVStart() {
+            pause();
+            growinV()
+        }
+        
+        function growinV() {
+            if (graph.futureLinks.length > 0) {
+                var edge = takeRandomElement(graph.futureLinks);
+                edge.name = graph.futureLinks.length;
+                edge.degree = 1;
+                graph.links.push(edge);
+                edge.source.degree++;
+                edge.target.degree++;
+                graph.simpleSparseGraph[edge.source.name].push(edge.target.name);
+                graph.simpleSparseGraph[edge.target.name].push(edge.source.name);
+                if (edge.source.degree===1){
+                    graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.source);
+                    if (edge.target.degree===1){
+                        graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.target);
+                        createNewCluster(edge);
+                    } else {
+                        addToCluster(edge.target,edge.source);
+                    }
+                } else if (edge.target.degree===1){
+                    addToCluster(edge.source,edge.target);
+                    graph.clusterStructure.singletons=removeGivenElement(graph.clusterStructure.singletons,edge.target);
+                } else {
+                    // both nodes were not singletons
+                    if(edge.source.clusterID!==edge.target.clusterID){
+                        mergeClusters(edge);
+                    }
+                }
+                dc.link = dc.link.data(graph.links);
+                dc.link.enter().append("path")
+                        .attr("class", function (d) {
+                            return "link count" + d.degree;
+                        })
+                        .attr("id", function (d) {
+                            if (d.source.name < d.target.name)
+                                return "idlink" + d.source.name + "t" + d.target.name;
+                            else
+                                return "idlink" + d.target.name + "t" + d.source.name;
+                        });
+                dc.link.exit().remove();
+
+                dc.force.start();
+                updateDisplayNumbers();
+                twoLargestWithColor();
+                dc.intervalID.push(setTimeout(function () {
+                    growinV();
+                }
+                , dc.framespeed));
+            }
+        }
+
+        function growinEVStart() {
+            pause();
+            growinEV();
+        }
+        
+        function growinEV() {
+            pause();
+            var node = {name: graph.nodes.length, degree: 0, clusterID: -1};
+            graph.nodes.push(node);
+            graph.simpleSparseGraph.push([]);
+            for (var i = 0; i < graph.nodes.length - 1; i++) {
+                var edgeP = lambda / (graph.nodes.length);
+                if (Math.random() < edgeP) {
+                    var edge = {source: graph.nodes[i], target: node};
+                    edge.name = graph.futureLinks.length;
+                    edge.degree = 1;
+                    graph.links.push(edge);
+                    edge.source.degree++;
+                    edge.target.degree++;
+                    graph.simpleSparseGraph[edge.source.name].push(edge.target.name);
+                    graph.simpleSparseGraph[edge.target.name].push(edge.source.name);
+                    if(edge.source.degree===1){ // ist singleton
+                        if(edge.target.clusterID===-1)
+                        createNewCluster(edge); //connected to singleton
+                        else addToCluster(edge.target,edge.source);
+                    } else { // source is part of a cluster
+                        if(node.clusterID===-1){
+                           addToCluster(edge.source,edge.target);
+                        } else {
+                            mergeClusters(edge);
+                        }
+                    }
+                } else {
+                    graph.futureLinks.push({source: graph.nodes[i], target: node});
+                }
+            }
+            dc.node = dc.node.data(graph.nodes);
+            dc.node.enter().append("circle")
+                    .attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    })
+                    .attr("r", 3).style("fill", "#ccc").call(dc.force.drag);
+            dc.node.exit().remove();
+            if (graph.simpleSparseGraph[node.name].length > 0) {
+                dc.link = dc.link.data(graph.links);
+                dc.link.enter().append("path")
+                        .attr("class", function (d) {
+                            return "link count" + d.degree;
+                        })
+                        .attr("id", function (d) {
+                            if (d.source.name < d.target.name)
+                                return "idlink" + d.source.name + "t" + d.target.name;
+                            else
+                                return "idlink" + d.target.name + "t" + d.source.name;
+                        });
+                dc.link.exit().remove();
+            } else {
+                graph.clusterStructure.singletons.push(node.name);
+            }
+            dc.force.start();
+            updateDisplayNumbers();
+            twoLargestWithColor();
+            dc.intervalID.push(setTimeout(function () {
+                growinEV();
+            }, dc.framespeed));
+        }
+
+
+        function pause() {
+            for (var i = 0; i < dc.intervalID.length; i++) {
+                clearTimeout(dc.intervalID[i]);
+            }
+            dc.intervalID = [];
+        }
+
+        function createNewCluster(edge){
+            var cluster={name:graph.clusters.length};
+            cluster.points=[];
+            edge.source.clusterID=cluster.name;
+            edge.target.clusterID=cluster.name;
+            cluster.points.push(edge.source);
+            cluster.points.push(edge.target);
+            graph.clusters.push(cluster);
+            
+        }
+        function addToCluster(oldNode,newNode){
+            var cluster=graph.clusters[oldNode.clusterID];
+            newNode.clusterID=cluster.name;
+            cluster.points.push(newNode);
+        }
+        function mergeClusters(edge){
+          if(edge.source.clusterID!==edge.target.clusterID){            
+              
+                var clusterAid=edge.source.clusterID;
+                var clusterBid=edge.target.clusterID;
+                if (clusterAid>clusterBid){
+                     clusterAid=edge.target.clusterID;
+                     clusterBid=edge.source.clusterID;
+                }
+                graph.clusters[clusterBid].points.forEach(function(d){
+                    d.clusterID=clusterAid;
+                    graph.clusters[clusterAid].points.push(d);
+                });
+                graph.clusters[clusterBid]=graph.dummy;
+          }
+        }
+        
+        function mergeClustersA(edge){
+          if(edge.source.clusterID!==edge.target.clusterID){            
+              
+                var clusterA=graph.clusters[edge.source.clusterID];
+                var clusterB=graph.clusters[edge.target.clusterID];
+                if (clusterA.name>clusterB.name){
+                     clusterA=graph.clusters[edge.target.clusterID];
+                     clusterB=graph.clusters[edge.source.clusterID];
+                }
+                clusterB.points.forEach(function(d){
+                    d.clusterID=clusterA.name;
+                    clusterA.points.push(d);
+                });
+                clusterB=graph.dummy;
+          }
+        }
+        
+        function maxClusterSize(){
+            var tmpmax=0;
+            var tmpmaxID=-1;
+            var s="";
+            for(var i=0; i<graph.clusters.length;i++){
+                if (graph.clusters[i]!==graph.dummy){
+                    if(graph.clusters[i].points.length>tmpmax){
+                        tmpmaxID=i;
+                        tmpmax=graph.clusters[i].points.length;
+                    }
+                    s+=" "+graph.clusters[i].points.length;
+                } else s+=" D"
+            }
+            console.log(tmpmax);
+            console.log(s);
+        }
+        
+        function twoLargestWithColor(){
+            var tmpmax=-1;
+            var tmpmaxID=-2;
+            var tmpmax2=-1;
+            var tmpmax2ID=-2;
+            for(var i=0; i<graph.clusters.length;i++){
+                if (graph.clusters[i]!==graph.dummy){
+                    var size=graph.clusters[i].points.length;
+                    if(size>tmpmax2){
+                        if (size>tmpmax) 
+                        {
+                            tmpmax2ID=tmpmaxID;
+                            tmpmax2=tmpmax;
+                            tmpmaxID=i;
+                            tmpmax=graph.clusters[i].points.length;
+                        } else {
+                            tmpmax2ID=i;
+                            tmpmax2=graph.clusters[i].points.length;
+                        }
+                    }
+                }
+            }
+            dc.node.style("fill", function(d){
+                if (d.clusterID===tmpmaxID) return dc.color[0];
+                else if (d.clusterID===tmpmax2ID) return dc.color[1];
+                else return "#ccc";
+            } );
+        }
+        
+        function initializeGraphic() {
+            // first of the standard configurations:
+            dc.svg = d3.select("body").append("svg")
+                    .attr("width", width).attr("height", height);
+
+            dc.force = d3.layout.force()
+                    .size([width - 20, height - 20]).charge(-30)
+                    .gravity(0.2).nodes(graph.nodes)
+                    .links(graph.links).linkDistance(20);
+            dc.force.on("tick", tick).start();
+
+
+            dc.link = dc.svg.selectAll(".link")
+                    .data(graph.links).enter().append("path").attr("class", "link").attr("id", function (d) {
+                if (d.source.name < d.target.name)
+                    return "idlink" + d.source.name + "t" + d.target.name;
+                else
+                    return "idlink" + d.target.name + "t" + d.source.name;
+            });
+
+            dc.node = dc.svg.selectAll(".node").data(graph.nodes).enter().append("circle").attr("class", "node")
+                    .attr("id", function (n) {
+                        return "id" + n.name;
+                    }).attr("r", 3).style("fill", "#ccc")// function (d) { return dc.color[d.type]; })
+                    .call(dc.force.drag);
+        }
+        ;
+
+
+        function tick() {
+            dc.link.attr("d", function (d) {
+                var x1 = d.source.x,
+                        y1 = d.source.y,
+                        x2 = d.target.x,
+                        y2 = d.target.y,
+                        dr = 0;
+
+                // The following is need to display selfloops
+                // First some default values
+                var drx = dr,
+                        dry = dr,
+                        yRotation = 0, // degrees
+                        largeArc = 0, // 1 or 0
+                        sweep = 1; // 1 or 0
+                // now to the self-loops:
+                if (x1 === x2 && y1 === y2) {
+                    yRotation = -45;
+                    largeArc = 1;
+                    // (width-2*x1>0) Change sweep to change orientation of loop. 
+                    if (2 * y1 - height + width - 2 * x1 > 0)
+                        sweep = 0;
+                    else
+                        sweep = 1;
+                    // Make drx and dry : radi of ellipse
+                    drx = 20;
+                    dry = 15;
+
+                    // For whatever reason the arc collapses to a point if the beginning
+                    // and ending points of the arc are the same, so kludge it.
+                    x2 = x2 + 1;
+                    y2 = y2 + 1;
+                }
+                return "M" + x1 + "," + y1 + "A" + drx + "," + dry + " " + yRotation + "," + largeArc + "," + sweep + " " + x2 + "," + y2;
+            });
+
+            dc.node.attr("transform", function (d) {
+                return "translate(" + d.x + "," + d.y + ")";
+            });
+
+        }
+        ;
+
+
+        function addLogo() {
+            nameTag = dc.svg.append("text")
+                    .attr("class", "xlabel")
+                    .attr("text-anchor", "end")
+                    .attr("x", window.innerWidth * 6 / 7)
+                    .attr("y", height - 100)
+                    .style("font-family", "Raleway")
+                    .style("fill", "rgba(0,0,0, 0.5)")
+                    .style("font-size", "20px")
+                    .text("Fitzner, networkpages.nl")[0][0];
+        }
+        ;
+
+
+    </script>
+

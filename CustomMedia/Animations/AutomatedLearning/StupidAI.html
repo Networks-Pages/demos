@@ -1,0 +1,206 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+    <script src="../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Stupid AI
+    </h2>
+
+    <script>
+        
+    var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+        height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+        color = d3.scale.category20(),
+        dc={};
+        dc.animationTime=1000;
+        dc.intervalID=[];
+        dc.walkers=0;
+        dc.started;
+        
+
+    function draw() {
+        // Finding the correct size of the frames
+        if(6*height>width){
+            height=width/6;
+        } else width=height*6;
+        dc.fontsize=Math.min(20,Math.round(height   /10))+"px";
+        dc.fx=(width-50)*1.0/200/3;
+        dc.fy=(height-10)*1.0/100;
+        dc.svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+        
+        var experiments={frameduration:30};
+        experiments.sets=[];
+        
+        for(i=0;i<3;i++){
+            // each of the three shown runs we show is implemented an an independent experiment
+            var experiment={};
+            var hS=17;
+            var hE=83;
+            var xS=10;
+            var xE=180;
+            experiment.anchorX=5+width*i/3;
+            experiment.anchorY=5;
+            experiment.point={x:xS,y:hS-2,dy:0,dx:0};
+            experiment.lineStart={x1:xS,x2:xS+10, y1:hS, y2:hS};
+            experiment.lineEnd=  {x1:xE-20,x2:xE, y1:hE, y2:hE};
+            experiment.succes=false;
+            // We add a backpannel to change the background color of this specific run
+            experiment.backpannel= dc.svg.append("rect").attr("x", experiment.anchorX).attr("y", experiment.anchorY).attr("width", dc.fx*200).attr("height", dc.fy*100).style("fill", "#fafafa");
+            // The jumpingball
+            experiment.point.graphic= dc.svg.append("circle").attr("class", "walker")
+                              .attr("id","one").attr("cx", experiment.anchorX+dc.fx*experiment.point.x).attr("cy", experiment.anchorY+dc.fy*experiment.point.y).attr("r", 3).style("fill", "red");
+            // The start and landing plattform
+            dc.svg.append("line").attr("class", "link").attr("x1", experiment.anchorX+dc.fx*experiment.lineStart.x1).attr("x2", experiment.anchorX+dc.fx*experiment.lineStart.x2).attr("y1", experiment.anchorY+dc.fy*experiment.lineStart.y1).attr("y2", experiment.anchorY+dc.fy*experiment.lineStart.y2)
+            .style("stroke", "black").attr("stroke-width", "4px").attr("id", "base1").attr("fill","#000000");
+            dc.svg.append("line").attr("class", "link").attr("x1", experiment.anchorX+dc.fx*experiment.lineEnd.x1).attr("x2", experiment.anchorX+dc.fx*experiment.lineEnd.x2).attr("y1", experiment.anchorY+dc.fy*experiment.lineEnd.y1).attr("y2", experiment.anchorY+dc.fy*experiment.lineEnd.y2)
+            .style("stroke", "black").attr("stroke-width", "4px").attr("id", "base1").attr("fill","#000000");
+            
+            // set the very first initial parameters
+            experiment.point.dx=0.1+1.6*Math.random();//speed in x direction
+            experiment.speedMeter=dc.svg.append('svg:text').attr('class', 'speedLabel')
+              .attr('x', experiment.anchorX+dc.fx*experiment.lineStart.x1 )
+              .attr('y', experiment.anchorY+dc.fy*experiment.lineEnd.y1 )
+              .text("Speed: "+(experiment.point.dx*100).toFixed(2)).attr("font-size", dc.fontsize);
+                    
+            
+            experiments.sets.push(experiment);
+        }
+        var buttonSize=Math.min(width/11,height/8);
+
+        dc.svg.append("image").attr("class", "button").attr("xlink:href", "Restart.png").attr("width", buttonSize).attr("height", buttonSize).attr("x", width-10-buttonSize).attr("y", 5).on('click', 
+        function(){restart();});
+        
+        experiments.frameduration=12;// duration between frames
+        experiments.gravity=0.006; //gravity per frame. So the downpull/accelaration down per frame
+            
+        animatePoint(experiments);
+      }
+    
+      
+      function animatePoint(experiments){
+        var toCont=false;
+        for(i=0;i<3;i++){
+            var moved=animateExperiment(experiments,i);
+            if (moved) toCont=true;
+        }
+        
+        if(toCont){
+            dc.intervalID.push(setTimeout(function () {
+                animatePoint(experiments);
+                dc.started=true;
+            },experiments.frameduration));
+        } else {
+            var anySucces=false;
+            for(i=0;i<3;i++){
+                if (experiments.sets[i].succes){
+                    anySucces=true;
+                    experiments.sets[i].backpannel.style("fill", "#e6ffcc");
+                } else
+                    experiments.sets[i].backpannel.style("fill", "#ffebe6");
+            }
+            if (!anySucces){
+                dc.intervalID.push(setTimeout(function () {
+                    // we failes so we start fresh once more
+                    restart();
+                },2000));
+            } else {
+                dc.intervalID.push(setTimeout(function () {
+                for(i=0;i<3;i++){
+                    if (experiments.sets[i].succes){
+                        resetExperiment(experiments,i);
+                    }
+                }
+                var toCont=false;
+                for(i=0;i<3;i++){
+                    if (experiments.sets[i].succes){
+                        if (animateExperiment(experiments,i)) toCont=true;
+                    }
+                }
+
+                if(toCont){
+                    dc.intervalID.push(setTimeout(function () {
+                        animatePoint(experiments);
+                    },experiments.frameduration));
+                    }
+                },2000));
+            }
+        }
+        
+      }
+      function restart(){
+         for(i=0;i<dc.intervalID.length;i++)
+                clearInterval(dc.intervalID[i]);
+            dc.intervalID=[];
+
+            d3.select("svg").remove();
+              draw();
+      }
+    
+    function resetExperiment(experiments,i){
+            var experiment=experiments.sets[i];
+            var hS=17;
+            var xS=10;
+            experiment.point.x=xS;
+            experiment.point.y=hS-2;
+            experiment.point.dy=0;
+
+    }
+    
+    function animateExperiment(experiments,i){
+            var moved=false;
+            var experiment=experiments.sets[i];
+            if ((experiment.point.x<200)&&(experiment.point.y<100)){
+                // we are still within the frame
+                if(experiment.point.x<experiment.lineStart.x2){
+                    // we are still on the starting plattform
+                    moved=true;
+                    experiment.point.x+=experiment.point.dx;
+                } else if (experiment.point.y===experiment.lineEnd.y1-2){
+                    // we are at the right height! Did we land?
+                    if (!((experiment.point.x>experiment.lineEnd.x1)&&(experiment.point.x<experiment.lineEnd.x2))){
+                        //No
+                        experiment.point.x+=experiment.point.dx;
+                        experiment.point.dy+=experiments.gravity;
+                        experiment.point.y+=experiment.point.dy; 
+                        moved=true;
+                    }
+                } else if(experiment.point.y<experiment.lineEnd.y1-2){
+                    // we are above landing site, so we are still falling.
+                    experiment.point.x+=experiment.point.dx;
+                    experiment.point.dy+=experiments.gravity;
+                    experiment.point.y+=experiment.point.dy; 
+                    moved=true;
+                    if (!(experiment.point.y<=experiment.lineEnd.y1-2)){
+                        // we just passed the landing hight. did we hit it
+                        if ((experiment.point.x>experiment.lineEnd.x1)&&(experiment.point.x<experiment.lineEnd.x2)){
+                            //yes so correct the weight.
+                                experiment.point.y=experiment.lineEnd.y1-2;
+                                experiment.succes=true;
+                            }
+                        }
+                 } else { //(experiment.point.y>experiment.lineEnd.y1-3){
+                    experiment.point.x+=experiment.point.dx;
+                    experiment.point.dy+=experiments.gravity;
+                    experiment.point.y+=experiment.point.dy; 
+                    moved=true;
+                    if (experiment.point.y>100){
+                        experiment.point.y=100;
+                    }
+                 }  
+            }
+            if (moved){
+                toCont=true;
+                experiment.point.graphic.transition().duration(experiments.frameduration).attr("cx", experiment.anchorX+dc.fx*experiment.point.x).attr("cy", experiment.anchorY+dc.fy*experiment.point.y);
+            }
+        return moved;
+    }
+    </script>

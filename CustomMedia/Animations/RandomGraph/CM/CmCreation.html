@@ -1,0 +1,553 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<link rel="stylesheet" type="text/css" href="../multigraphForcefield.css">
+<!-- <style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>-->
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Creation of a graph in the configuration model.
+    </h2>
+
+        <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Nr. of vertices</td> 
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="nrNodes" value="50"></td>
+        </tr>
+        <tr>
+            <td> Display speed</td> 
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="speed" value="500" step="100"></td>
+        </tr>
+        <tr>
+            <td> Minimal degree </td>
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="mindeg" value="1" step="1"></td>
+        </tr>
+        <tr>
+            <td> Maximal degree </td>
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="maxdeg" value="4" step="1"></td>
+        </tr>
+    </table>
+    
+    <script>
+
+    var width = Math.min(window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth, 1600),
+        height = Math.min(window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight, 1200),
+        color = d3.scale.category20(),
+        colorarray = ["#0000FF", "#00FFFF", "#00CCCC", "#00AAAA", "#009999", "#006666", "#005555", "#005555", "#005555", "#005555", "#005555", "#005555"];
+
+    displaycontainer = {};
+    displaycontainer.animationTime = 500;
+    displaycontainer.intervalID=-1;
+    graph = {};
+    graph.size = 30;
+    graph.mindeg = 0;
+    graph.maxdeg = 5;
+    var chartNotShown=true,chartelement = [], nameTag = {}, modelTag="ConfigFixed",chartType ="";
+
+    function draw() {
+        document.getElementById("nrNodes").value = graph.size;
+        document.getElementById("speed").value = displaycontainer.animationTime;
+        document.getElementById("mindeg").value = graph.mindeg;
+        document.getElementById("maxdeg").value = graph.maxdeg;
+
+        createGraph();
+        
+        displaycontainer.svg = d3.select("body").append("svg").attr("width", width).attr("height", height);
+        displaycontainer.links = displaycontainer.svg.selectAll("link")
+                .data(graph.links).enter().append("line").attr("class", "link")
+                .attr("id", function (l) {
+                    return l.target.name;
+                })
+                .attr("x1", function (l) {
+                    return l.source.x;
+                })
+                .attr("x2", function (l) {
+                    return l.target.x;
+                })
+                .attr("y1", function (l) {
+                    return l.source.y;
+                })
+                .attr("y2", function (l) {
+                    return l.target.y;
+                });
+        //.attr("fill", "blue")
+        //.attr("stroke", "white");
+
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node");
+
+
+        displaycontainer.innerCycles = displaycontainer.nodes.append("circle")
+                .attr("r", 5).attr("cx", function (d) {
+            return d.x
+        })
+                .attr("cy", function (d) {
+                    return d.y
+                })
+                .style("fill", function (d) {
+                    return colorarray[d.group % colorarray.length];
+                });
+        //.attr("fill", "#FFFF00");
+
+        addLogo();
+        displaycontainer.formerEndpoint1 = null;
+        displaycontainer.formerEndpoint2 = null;
+
+
+         displaycontainer.intervalID= setTimeout(function () {
+            showAlgorithm();
+        }, displaycontainer.animationTime);
+
+    }
+
+    function showAlgorithm() {
+
+        //unmark the edges from the last step
+        if (displaycontainer.formerEndpoint1 !== null) {
+            var arr = [displaycontainer.formerEndpoint1, displaycontainer.formerEndpoint2];
+            for (i = 0; i < 2; i++) {
+                console.log("line#" + arr[i].name);
+                console.log(displaycontainer.svg.selectAll("line#" + arr[i].name));
+                displaycontainer.svg.selectAll("line#" + arr[i].name).transition().duration(displaycontainer.animationTime)
+                        .style("stroke", "black").attr("stroke-width", "1px");
+            }
+        }
+
+        // Select two half edges
+        var p1 = graph.unassignedPseudonodes.splice(Math.floor(Math.random() * graph.unassignedPseudonodes.length), 1)[0];
+        var p2 = graph.unassignedPseudonodes.splice(Math.floor(Math.random() * graph.unassignedPseudonodes.length), 1)[0];
+        // connect them in the model
+        p1.partner = p2;
+        p2.partner = p1;
+        if (p1.parent.name < p2.parent.name) {
+            graph.adjacencyMatrix[p2.parent.name][p1.parent.name]++;
+        } else {
+            graph.adjacencyMatrix[p1.parent.name][p2.parent.name]++;
+        }
+
+        // connected then in the graphic
+        var arr = [p1, p2];
+        for (i = 0; i < 2; i++) {
+            displaycontainer.svg.selectAll("line#" + arr[i].name).transition().duration(displaycontainer.animationTime)
+                    .attr("x2", function (l) {
+                        l.x = (p1.x + p2.x) / 2;
+                        return l.x;
+                    })
+                    .attr("y2", function (l) {
+                        l.y = (p1.y + p2.y) / 2;
+                        return l.y;
+                    })
+                    .style("stroke", "green")
+                    .attr("stroke-width", "3px");
+        }
+        // remember them, so that they can be unmarked before selecting the next pair
+        displaycontainer.formerEndpoint1 = p1;
+        displaycontainer.formerEndpoint2 = p2;
+
+
+        if (graph.unassignedPseudonodes.length > 1) {
+             displaycontainer.intervalID = setTimeout(function () {
+                showAlgorithm();
+            }, displaycontainer.animationTime);
+        }
+        else {
+            displaycontainer.intervalID = setTimeout(function () {
+                finalizeShowAlgorithm();
+            }, displaycontainer.animationTime);
+        }
+    }
+
+    function finalizeShowAlgorithm() {
+        if (displaycontainer.formerEndpoint1 !== null) {
+            var arr = [displaycontainer.formerEndpoint1, displaycontainer.formerEndpoint2];
+            for (i = 0; i < 2; i++) {
+                displaycontainer.svg.selectAll("line#" + arr[i].name).transition().duration(displaycontainer.animationTime)
+                        .style("stroke", "black").attr("stroke-width", "1px");
+            }
+        }
+        displaycontainer.formerEndpoint1 = null;
+        displaycontainer.formerEndpoint2 = null;
+
+        displaycontainer.intervalID = setTimeout(function () {
+            flattenEdges();
+        }, displaycontainer.animationTime);
+    }
+
+
+    function flattenEdges() {
+        displaycontainer.deleteList = [];
+        displaycontainer.links.transition().duration(displaycontainer.animationTime)
+                .attr("x2", function (l) {
+                    displaycontainer.deleteList.push(l.target.name);
+                    if ((l.target.partner === null)) {
+                        //displaycontainer.deleteList.push(l.target.name);
+                        return l.x;
+                    } else {
+                        if (l.target.parent.name < l.target.partner.parent.name) {
+                            //displaycontainer.deleteList.push(l.target.name);
+                            return l.target.parent.x;
+                        } else {
+                            return l.target.partner.parent.x;
+                        }
+                    }
+                })
+                .attr("y2", function (l) {
+                    if (l.target.partner === null) {
+                        return l.y;
+                    } else {
+                        if (l.target.parent.name < l.target.partner.parent.name) {
+                            return l.target.parent.y;
+                        } else {
+                            return l.target.partner.parent.y;
+                        }
+                    }
+                });
+        displaycontainer.intervalID = setTimeout(function () {
+            convertToForceLayout();
+        }, displaycontainer.animationTime * 5);
+    }
+
+
+
+    function convertToForceLayout() {
+        createClassicalGrahData();
+
+        for (i = 0; i < displaycontainer.deleteList.length; i++) {
+            //console.log(displaycontainer.deleteList[i]);
+            var element = document.getElementById(displaycontainer.deleteList[i]);
+            if (element !== null) {
+                element.parentNode.removeChild(element);
+            }
+            else
+                console.log("did not found " + displaycontainer.deleteList[i]);
+        }
+
+        var myNodes = displaycontainer.svg.selectAll(".node")[0];
+        for (i = 0; i < myNodes.length; i++) {
+            if (myNodes[i] !== null) {
+                myNodes[i].parentNode.removeChild(myNodes[i]);
+            }
+            else
+                console.log("did not found " + myNodes[i]);
+        }
+
+        force = d3.layout.force()
+                .size([width - 50, height - 50]).charge(-140)
+                //  .friction(0.3) 
+                .gravity(0.05)
+                .linkDistance(100)
+                .linkStrength(0.03)
+                .nodes(graph.nodes)
+                .links(graph.links).on("tick", tick)//.alpha(-5)
+                .start();
+
+
+        link = displaycontainer.svg.selectAll(".link")
+                .data(graph.links)
+                .enter().append("path")
+                .attr("class", function (d) {
+                    return "link count" + d.count;
+                }).attr("id", function (d) {
+            d.id;
+        });
+
+        node = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("r", 6)
+                .style("fill", function (d) {
+                    return colorarray[d.group % colorarray.length];
+                })
+                //.style("fill", "#FFFF00")
+                .style("stroke", "#000")
+                .style("stroke-width", "1.5")
+                .call(force.drag);
+
+
+    }
+
+    function createClassicalGrahData() {
+        for (i = 0; i < graph.size; i++) {
+            graph.nodes[i].group = 0;
+        }
+
+        // once we counted the edges, we create the represenation for the display
+        var link = [];
+        for (i = 0; i < graph.size; i++) {
+            for (j = 0; j < i; j++) {
+                graph.nodes[i].group += graph.adjacencyMatrix[i][j];
+                graph.nodes[j].group += graph.adjacencyMatrix[i][j];
+                if (graph.adjacencyMatrix[i][j] === 1) {
+                    edge = {};
+                    edge.source = i;
+                    edge.target = j;
+                    edge.angle = 0;
+                    edge.count = 1;
+                    edge.id = "id" + j + ":" + i + ":" + 0;
+                    //if (edge.source == edge.target)
+                    //    console.log("self loop.");
+                    link.push(edge);
+                }
+                if (graph.adjacencyMatrix[i][j] === 2) {
+                    edge = {};
+                    edge.source = i;
+                    edge.target = j;
+                    edge.angle = 1;
+                    edge.count = 2;
+                    edge.id = "id" + j + ":" + i + ":" + 0;
+                    //if (edge.source == edge.target)
+                    //    console.log("self loop.");
+                    link.push(edge);
+                    edge2 = {};
+                    edge2.source = j;
+                    edge2.target = i;
+                    edge2.angle = 2;
+                    edge2.count = 2;
+                    edge.id = "id" + j + ":" + i + ":" + 1;
+                    link.push(edge2);
+                }
+                if (graph.adjacencyMatrix[i][j] === 3) {
+                    edge = {};
+                    edge.source = i;
+                    edge.target = j;
+                    edge.angle = 1;
+                    edge.count = 3;
+                    edge.id = "id" + j + ":" + i + ":" + 0;
+                    //if (edge.source == edge.target)
+                    //    console.log("self loop.");
+                    link.push(edge);
+                    edge2 = {};
+                    edge2.source = j;
+                    edge2.target = i;
+                    edge2.angle = 1;
+                    edge2.count = 3;
+                    edge.id = "id" + j + ":" + i + ":" + 1;
+                    link.push(edge2);
+                    edge3 = {};
+                    edge3.source = i;
+                    edge3.target = j;
+                    edge3.angle = 0;
+                    edge3.count = 3;
+                    edge.id = "id" + j + ":" + i + ":" + 2;
+                    link.push(edge3);
+                }
+                if (graph.adjacencyMatrix[i][j] > 3) {
+                    for (k = 0; k < graph.adjacencyMatrix[i][j]; k++) {
+                        edge = {};
+                        edge.source = i;
+                        edge.target = j;
+                        edge.angle = 1;
+                        edge.count = k + 1;
+                        edge.id = "id" + j + ":" + i + ":" + k;
+                        //if (edge.source == edge.target)
+                        //    console.log("self loop.");
+                        link.push(edge);
+                    }
+                }
+            }
+            if (graph.adjacencyMatrix[i][i] > 0) {
+                edge = {};
+                edge.source = i;
+                edge.target = j;
+                edge.angle = 0;
+                edge.count = graph.adjacencyMatrix[i][i];
+                graph.nodes[i].group += graph.adjacencyMatrix[i][j];
+                edge.id = "id" + i + ":" + i + ":" + 0;
+                //if (edge.source == edge.target)
+                //    console.log("self loop.");
+                link.push(edge);
+            }
+        }
+        graph.links = link;
+    }
+
+
+    function tick() {
+        link.attr("d", function (d) {
+            // default for single edges:
+            var x1 = d.source.x,
+                    y1 = d.source.y,
+                    x2 = d.target.x,
+                    y2 = d.target.y,
+                    dr = 0;
+            // In the case of multiple edge we change its curvature
+            if (d.angle != 0) {
+                var dx = x2 - x1,
+                        dy = y2 - y1,
+                        dr = Math.sqrt(dx * dx + dy * dy) - Math.sqrt(300 * (d.angle - 1));
+            }
+            // The following is need to display selfloops
+            // First some default values
+            var drx = dr,
+                    dry = dr,
+                    yRotation = 0, // degrees
+                    largeArc = 0, // 1 or 0
+                    sweep = 1; // 1 or 0
+            // now to the self-loops:
+            if (x1 === x2 && y1 === y2) {
+                yRotation = -45;
+                largeArc = 1;
+                // (width-2*x1>0) Change sweep to change orientation of loop. 
+                if (2 * y1 - height + width - 2 * x1 > 0)
+                    sweep = 0;
+                else
+                    sweep = 1;
+                // Make drx and dry : radi of ellipse
+                drx = 20;
+                dry = 15;
+
+                // For whatever reason the arc collapses to a point if the beginning
+                // and ending points of the arc are the same, so kludge it.
+                x2 = x2 + 1;
+                y2 = y2 + 1;
+            }
+
+            return "M" + x1 + "," + y1 + "A" + drx + "," + dry + " " + yRotation + "," + largeArc + "," + sweep + " " + x2 + "," + y2;
+        });
+
+        node.attr("transform", function (d) {
+            return "translate(" + d.x + "," + d.y + ")";
+        });
+    }
+    ;
+
+
+    function createGraph() {
+        graph.nodes = [];
+        graph.pseudonodes = [];
+        graph.links = [];
+        var maxAngle = Math.PI - 2 * Math.PI / graph.size;
+        var smallLength = Math.min(width, height) / 4 * Math.sin(Math.PI / graph.size) * 1.2;
+        for (i = 0; i < graph.size; i++) {
+            var point = {};
+            graph.nodes[i] = point;
+            point.name = i;
+            point.x = width / 2 + Math.min(width, height) / 3 * Math.sin(2 * Math.PI * i / graph.size);
+            point.y = height / 2 + Math.min(width, height) / 3 * Math.cos(2 * Math.PI * i / graph.size);
+            point.degree = Math.floor(
+                    (graph.mindeg + Math.random() * (graph.maxdeg-graph.mindeg+1)));
+            console.log(point.degree+" min "+graph.mindeg+" max "+graph.maxdeg+" "+(graph.maxdeg-graph.mindeg+1));
+            
+            
+            point.group = point.degree;
+            point.pseudochildren = [];
+            var gamma = maxAngle / (point.degree + 1);
+            for (j = 0; j < point.degree; j++) {
+                angle = Math.PI / 2 + Math.PI / graph.size + (j + 1) * gamma + 2 * Math.PI * i / graph.size;
+                var ps = {};
+                ps.name = "id" + ((i + 1) * 1000 + j + 1);
+                ps.parent = point;
+                ps.partner = null;
+                point.pseudochildren.push(ps);
+                graph.pseudonodes.push(ps);
+                ps.x = point.x + smallLength * Math.sin(angle);
+                ps.y = point.y + smallLength * Math.cos(angle);
+
+                var edge = {};
+                edge.source = point;
+                edge.target = ps;
+                edge.assigned = false;
+                edge.x = ps.x;
+                edge.y = ps.y;
+                edge.count = 1;
+                graph.links.push(edge);
+            }
+        }
+        graph.unassignedPseudonodes = [];
+        for (i = 0; i < graph.pseudonodes.length; i++) {
+            graph.unassignedPseudonodes.push(graph.pseudonodes[i]);
+        }
+
+        graph.adjacencyMatrix = [];
+        for (i = 0; i < graph.size; i++) {
+            graph.adjacencyMatrix[i] = [];
+            for (j = 0; j < i + 1; j++) {
+                graph.adjacencyMatrix[i].push(0);
+            }
+        }
+
+    }
+
+    function addLogo() {
+        displaycontainer.nameTag = displaycontainer.svg.append("text")
+                .attr("class", "xlabel")
+                .attr("text-anchor", "middle")
+                .attr("x", width * 6 / 7)
+                .attr("y", height - 100)
+                .style("font-family", "Raleway")
+                .style("fill", "rgba(0,0,0, 0.5)")
+                .style("font-size", "20px")
+                .text("Robert Fitzner, TU/e")[0][0];
+    };
+
+    
+    d3.select("input[id=nrNodes]").on("change", function () {
+        if (this.value < 0)
+            alert("Having a negative number of vertices makes no sense.");
+        else if (this.value > 500)
+            alert("The number of vertices is a bit high. I'm sorry Dave, I'm afraid I can't do that.");
+        else {
+            graph.size = Number(this.value);
+            restartAnimation();
+        }
+    });
+    
+    d3.select("input[id=speed]").on("change", function () {
+        if (this.value < 0)
+            alert("A negative speed makes no sense.");
+        else if (this.value > 10000)
+            alert("Do you really want to wait for 10 seconds for each step.");
+        else {
+            displaycontainer.animationTime=Number(this.value);
+        }
+    });
+    
+    d3.select("input[id=mindeg]").on("change", function () {
+        if (this.value < 0)
+            alert("A negative number of edges makes no sense.");
+        else if (this.value > graph.maxdeg)
+            alert("Please increase first the maximal possible degree.");
+        else {
+            graph.mindeg=Number(this.value);
+            restartAnimation();
+        }
+    });
+
+        d3.select("input[id=maxdeg]").on("change", function () {
+        if (this.value < 0)
+            alert("A negative number of edges makes no sense.");
+        else if (this.value > 10000)
+            alert("So many edges? For each node? No we will not do this.");
+        else {
+            graph.maxdeg=Number(this.value);
+            restartAnimation();
+        }
+    });
+    
+    function restartAnimation() {
+        var maxd=graph.maxdeg, mind=graph.mindeg, size=graph.size, speed=displaycontainer.animationTime;
+        clearInterval(displaycontainer.intervalID);
+        
+        d3.select("svg").remove();
+        
+        displaycontainer = {};
+        displaycontainer.animationTime = speed;
+        displaycontainer.intervalID=-1;
+        graph = {};
+        graph.size = size;
+        graph.mindeg = mind;
+        graph.maxdeg = maxd;
+
+        draw();
+    }
+    </script>

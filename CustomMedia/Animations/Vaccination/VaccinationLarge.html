@@ -1,0 +1,449 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+    <script src="../SharedResources/d3.min.js"></script>
+
+    <table style="font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> vaccination rate </td> 
+            <td> <input type="number" id="vacrate" value="85"></td>
+        </tr>
+        <tr>
+            <td> Display speed </td> 
+            <td> <input type="range" id="speed" value="50"></td>
+        </tr>
+    </table>
+
+
+    <table style="position:absolute;top:20px; right: 50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> <p id="CompetitionTitle1"  style="color:black;font-size:20px" ></p></td> 
+            <td> <p id="CompetitionField1"  style="color:red;font-size:32px" ></p> </td>
+        </tr><tr>
+            <td>  <div id="buttonFieldRedo"> </div> </td> 
+            <td>  </td>
+        </tr>
+    </table>
+    <div id="svgContainer" width="100%" height="80%"></div>
+
+    <script>
+    var displaycontainer = {};
+    displaycontainer.width = Math.min(1424, window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth),
+            displaycontainer.height = Math.min(1000, 0.85*window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight),
+            displaycontainer.boundary = 30;
+    displaycontainer.animationTime = 400;
+    var color = d3.scale.category20(),
+            graph = {};
+    graph.nrXboxes = 120;
+    graph.nrYboxes = 80;
+    graph.nrNodes = graph.nrXboxes * graph.nrYboxes;
+    var distanceStorage = {};
+    distanceStorage.origin = {};
+    distanceStorage.origin1selected = false;
+    distanceStorage.speedType1 = 2;
+    var competitiondisplay = {};
+    competitiondisplay.vacinationp = 0.85;
+    competitiondisplay.sus = [];
+
+
+    function createGraph() {
+        graph.maxx = displaycontainer.width - displaycontainer.boundary;
+        graph.maxy = displaycontainer.height - displaycontainer.boundary;
+        var maxdistance = Math.sqrt(graph.maxx * graph.maxx + graph.maxy * graph.maxy);
+        var blockwidth = (displaycontainer.width - 2 * displaycontainer.boundary) / graph.nrXboxes;
+        var blockheight = (displaycontainer.height - 2 * displaycontainer.boundary) / graph.nrYboxes;
+        graph.nodes = [];
+        for (var i = 0; i < graph.nrXboxes; i++) {
+            for (var j = 0; j < graph.nrYboxes; j++) {
+                var node = {};
+                node.name = i * graph.nrYboxes + j;
+                node.x = displaycontainer.boundary + i * blockwidth + Math.random() * blockwidth / 4 * 2 + blockwidth / 4;
+                node.y = displaycontainer.boundary + j * blockheight + Math.random() * (blockheight) / 4 * 2 + blockheight / 4;
+                node.type = 0; //suseptible
+                graph.nodes.push(node);
+                if (competitiondisplay.vacinationp > Math.random())
+                    node.type = 2; //vacinated
+                else
+                    competitiondisplay.sus.push(node.name);
+            }
+        }
+        var randomstart = competitiondisplay.sus[Math.floor(Math.random() * competitiondisplay.sus.length)];
+        distanceStorage.origin = graph.nodes[randomstart];
+
+        graph.links = [];
+        graph.visuallinks = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            for (var j = i + 1; j < graph.nrNodes; j++) {
+                var distance = Math.sqrt(Math.pow(graph.nodes[i].x - graph.nodes[j].x, 2) + Math.pow(graph.nodes[i].y - graph.nodes[j].y, 2));
+                var param = 82;
+                var linkprob = (1 - Math.exp(-param * distance / maxdistance)) / (1 - Math.exp(-param));
+                if (linkprob < Math.random()) {
+                    var link = {};
+                    link.source = i;
+                    link.target = j;
+                    link.le = Math.ceil(distance);
+                    graph.links.push(link);
+                    if((graph.nodes[link.source].type===0)&&(graph.nodes[link.target].type===0)) {
+                        graph.visuallinks.push(link);
+                    }
+                    link.name = "idlink" + i + "t" + j;
+                }
+            }
+        }
+        console.log("Average degree: "+(2*graph.links.length/graph.nodes.length)+"  and "+graph.visuallinks.length +"  "+competitiondisplay.vacinationp);
+    }
+
+    function draw() {
+        createGraph();
+        document.getElementById("speed").value = Math.floor(displaycontainer.animationTime / 10);
+        graph.checkedNodes = [];
+        displaycontainer.animationStep = 0;
+        //displaycontainer.svg = d3.select("body").append("svg").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+        displaycontainer.svg = d3.select("#svgContainer").append("svg").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+        
+        //.data(graph.  links)
+        displaycontainer.links = displaycontainer.svg.selectAll("link")
+                .data(graph.visuallinks)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    var sourceNode = graph.nodes[l.source];
+                    d3.select(this).attr("y1", sourceNode.y);
+                    return sourceNode.x
+                })
+                .attr("x2", function (l) {
+                    var targetNode = graph.nodes[l.target];
+                    d3.select(this).attr("y2", targetNode.y);
+                    return targetNode.x
+                })
+                .attr("fill", "none")
+                .attr("stroke", "white").attr("id", function (d) {
+            return d.name;
+        }).attr("stroke-width", "0.2px");;
+
+
+
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node");
+
+        displaycontainer.innerCycles = displaycontainer.nodes.append("circle")
+                .attr("r", 3).attr("cx", function (d) {
+            return d.x
+        }).attr("cy", function (d) {return d.y}).attr("fill", function (d) {
+            if (d.name === distanceStorage.origin.name)
+                return "#FF000";
+            else if (d.type===0)
+                return "#FFFF00";
+            else return "#77FF77"
+        }).attr("id", function (d) {
+            return "id" + d.name;
+        }).style("stroke", '#000000').style("stroke-width", 0.5);
+
+
+        displaycontainer.intervalID = setTimeout(function () {
+            startCompetition();
+        }, Math.max(1000,displaycontainer.animationTime));
+    }
+
+
+    function startCompetition() {
+        computeContactStructureDeterministic();
+        competitiondisplay.intervalID = [];
+        competitiondisplay.timerEdge = 0;
+        competitiondisplay.timerNode = 0;
+        competitiondisplay.intialised = true;
+
+        competitiondisplay.nrInfected = 1;
+        competitiondisplay.nredges = 0;
+        competitiondisplay.usedId = 10000;
+
+        for (i = 0; i < graph.nodes.length; i++) {
+            graph.nodes[i].animated = false;
+            graph.nodes[i].animatedAsGoal = false;
+        }
+
+        // ===================================================
+        // Change the standard coloring before starting the animation
+        //link.style("stroke", "#888888").attr("stroke-width", "1px");
+        // Changee the initial style of all verticies
+        displaycontainer.svg.selectAll(".node").style("fill", function (e)
+        {
+            if (e.name === distanceStorage.origin.name) {
+                return "red";
+            } else if (e.type === 1) {
+                return "#DD0000";
+            } else if (e.type === 2) {
+                return "#444444";
+            } else {
+                return "#FFFFFF";
+            }
+        }).attr("r", function (e) {
+            if (e.name === distanceStorage.origin.name) {
+                return 9;
+            } else {
+                return 4;
+            }
+        });
+
+        competitiondisplay.nrInfected = 0;
+        if (distanceStorage.checkOrder.length > 0) {
+            competitiondisplay.currentIndexEdge = 0;
+            document.getElementById("CompetitionTitle1").innerHTML = "Infected Sides: ";
+            document.getElementById("CompetitionField1").innerHTML = "1";
+            competitiondisplay.nextDurationEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth;
+            competitiondisplay.timerEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth;
+            competitiondisplay.intervalID.push(setTimeout(function () {
+                animateLink();
+            }, competitiondisplay.nextDurationEdge * displaycontainer.animationTime));
+        } else {
+            document.getElementById("CompetitionTitle1").innerHTML = "No one else was infected ";
+            document.getElementById("CompetitionField1").innerHTML = "";
+             showRedoButton();
+        }
+    }
+
+    function animateLink() {
+        var edge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge];
+        var useColor = "red";
+
+        displaycontainer.svg.selectAll(edge.id).transition().style("stroke", useColor);
+        // Change color and width of the selected line
+        competitiondisplay.intervalID.push(setTimeout(function () {
+
+            displaycontainer.svg.selectAll(edge.id).transition().duration(displaycontainer.animationTime * edge.transmissionTime * 0.6).attr("stroke-width", "3px");
+        }, 0.4 * displaycontainer.animationTime * edge.transmissionTime));
+        // Call the endpoint of the edge, and tell it to animate once 75% of the edge animation is done
+        if (!graph.nodes[edge.target].animated) {
+            if (!graph.nodes[edge.target].animatedAsGoal) {
+                animateInfection(edge, useColor);
+                graph.nodes[edge.target].animatedAsGoal = true;
+            }
+            competitiondisplay.intervalID.push(setTimeout(function () {
+                animateNode(graph.nodes[edge.target], 0.2 * displaycontainer.animationTime * edge.transmissionTime);
+            }, 0.75 * displaycontainer.animationTime * edge.transmissionTime));
+        }
+
+        // Change color and width of the selected line
+        competitiondisplay.intervalID.push(setTimeout(function () {
+            displaycontainer.svg.selectAll(edge.id).transition().duration(displaycontainer.animationTime).attr("stroke-width", "1.5px");
+        }, displaycontainer.animationTime * edge.transmissionTime));
+
+
+        competitiondisplay.currentIndexEdge++;
+        if (competitiondisplay.currentIndexEdge < distanceStorage.checkOrder.length) {
+            competitiondisplay.nextDurationEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth - competitiondisplay.timerEdge;
+            competitiondisplay.timerEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth;
+            if (competitiondisplay.nextDurationEdge > 0) {
+                competitiondisplay.intervalID.push(setTimeout(function () {
+                    animateLink();
+                }, competitiondisplay.nextDurationEdge * displaycontainer.animationTime));
+            } else
+                animateLink();
+        } else
+            showRedoButton();
+    }
+    ;
+
+
+    function animateInfection(edge, color) {
+        competitiondisplay.usedId++;
+        var start = graph.nodes[edge.source];
+        var end = graph.nodes[edge.target];
+        displaycontainer.svg.append("circle").attr("class", "walker")
+                .attr("id", "id" + competitiondisplay.usedId).attr("cx", start.x).attr("cy", start.y).attr("r", 2).style("fill", color);
+        var nodeIdtag = "circle#id" + competitiondisplay.usedId;
+
+        var timeStart = 0.15 * displaycontainer.animationTime * edge.transmissionTime;
+        var timeTravel = 0.5 * displaycontainer.animationTime * edge.transmissionTime;
+        var timeEnter = 0.15 * displaycontainer.animationTime * edge.transmissionTime;
+
+        displaycontainer.svg.selectAll(nodeIdtag).attr("r", 3).attr("cy", start.y - 5);
+        displaycontainer.svg.selectAll(nodeIdtag).transition().duration(timeStart * 0.95);//.attr("r", 6).attr("cy", start.y - 5);
+        competitiondisplay.intervalID.push(setTimeout(function () {
+            displaycontainer.svg.selectAll(nodeIdtag).transition().duration(timeTravel * 0.95).attr("r", 3).attr("cx", end.x).attr("cy", end.y - 5);
+            competitiondisplay.intervalID.push(setTimeout(function () {
+                displaycontainer.svg.selectAll(nodeIdtag).transition().duration(timeEnter * 0.95).attr("r", 2).attr("cx", end.x).attr("cy", end.y);
+                competitiondisplay.intervalID.push(setTimeout(function () {
+                    displaycontainer.svg.selectAll(nodeIdtag).remove();
+                }, timeEnter));
+            }, timeTravel));
+        }, timeStart));
+    }
+    ;
+
+    function animateNode(node) {
+        node.animated = true;
+        competitiondisplay.nrInfected++;
+        document.getElementById("CompetitionField1").innerHTML = "" + competitiondisplay.nrInfected;
+
+        var useColor = "red";
+        displaycontainer.svg.selectAll(node.id).transition().duration(displaycontainer.animationTime).style("fill", useColor).attr("r", 6);
+    }
+
+    function createUndirectedSimpleGraphSparse() {
+        graph.undirectedSimple = [];
+        for (i = 0; i < graph.nodes.length; i++) {
+            graph.undirectedSimple[i] = [];
+        }
+
+        for (i = 0; i < graph.links.length; i++) {
+            var start = graph.links[i].source,
+                    end = graph.links[i].target;
+            graph.undirectedSimple[start].push(end);
+            graph.undirectedSimple[end].push(start);
+        }
+    }
+
+    function computeContactStructureDeterministic() {
+        distanceStorage.infty = 0;
+        distanceStorage.checkOrder = [];
+        distanceStorage.checkOrderNodes = [];
+        for (i = 0; i < graph.nodes.length; i++) {
+            if (graph.nodes[i].type === 0)
+                graph.nodes[i].distance = distanceStorage.infty;
+            else
+                graph.nodes[i].distance = -1;
+        }
+        createUndirectedSimpleGraphSparse();
+        
+
+        var checking = [distanceStorage.origin.name];
+        var arrivalTime = 0;
+        var speed = distanceStorage.speedType1;
+        while (checking.length > 0) {
+            var nextCheck = [];
+            // The we let the selected type do the next step of the invasion.
+            // We save save all neighbor of the expored verticies into the array nextcheck
+            for (i = 0; i < checking.length; i++) {
+                if (graph.nodes[checking[i]].type === 0) {
+                    var thisNr = checking[i];
+                    graph.nodes[thisNr].distance = arrivalTime;
+                    graph.nodes[thisNr].type = 1;
+                    graph.nodes[thisNr].id = "circle#id" + thisNr;
+                    distanceStorage.checkOrderNodes.push(graph.nodes[thisNr]);
+                    for (j = 0; j < graph.undirectedSimple[thisNr].length; j++) {
+                        var otherNr = graph.undirectedSimple[thisNr][j];
+                        if (graph.nodes[otherNr].type === 0) {
+                            // we found an vertex that has not been infected. 
+                            // So let us do so.
+                            nextCheck.push(otherNr);
+                            var newEdge = {};
+                            newEdge.birth = Math.abs(arrivalTime);
+                            newEdge.transmissionTime = speed;
+                            newEdge.source = thisNr;
+                            newEdge.target = otherNr;
+
+                            if (otherNr < thisNr) {
+                                newEdge.id = "line#" + "idlink" + otherNr + "t" + thisNr;
+                            }
+                            else {
+                                newEdge.id = "line#" + "idlink" + thisNr + "t" + otherNr;
+                            }
+                            newEdge.type = 1;
+                            distanceStorage.checkOrder.push(newEdge);
+                        }/* else if (graph.nodes[thisNr].type !== graph.nodes[otherNr].type) {
+                            // Oh we found point at which both end have a different type. This is a boundary!
+                            var newEdge = {};
+                            newEdge.birth = Math.abs(arrivalTime);
+                            newEdge.death = Math.abs(arrivalTime + distanceStorage.speedType1);
+
+                            newEdge.source = thisNr;
+                            newEdge.target = otherNr;
+
+                            newEdge.transmissionTime = speed;
+
+                            if (otherNr < thisNr) {
+                                newEdge.id = "path#" + "idlink" + otherNr + "t" + thisNr;
+                            }
+                            else {
+                                newEdge.id = "path#" + "idlink" + thisNr + "t" + otherNr;
+                            }
+                            newEdge.type = 2;
+                            distanceStorage.checkOrder.push(newEdge);
+                        }*/
+                    }
+                }
+            }
+            checking = nextCheck;
+            arrivalTime += distanceStorage.speedType1;
+            distanceStorage.maxdist = arrivalTime;
+            
+        }        
+    }
+    ;
+
+    function showRedoButton() {
+        if (!competitiondisplay.RedoSelectBottonintialised) {
+            competitiondisplay.RedoSelectBottonintialised = true;
+            competitiondisplay.redoButtom = document.createElement("input");
+            competitiondisplay.redoButtom.type = "button";
+            competitiondisplay.redoButtom.onclick = function () {
+                showAnotherOne();
+            };
+
+            competitiondisplay.redoButtom.value = "New infection";
+            var placeHolder = document.getElementById("buttonFieldRedo");
+            placeHolder.appendChild(competitiondisplay.redoButtom);
+        }
+    }
+
+
+
+    function unShowRedoButton() {
+        competitiondisplay.RedoSelectBottonintialised = false;
+        var placeHolder = document.getElementById("buttonFieldRedo");
+        placeHolder.removeChild(competitiondisplay.redoButtom);
+        competitiondisplay.redoButtom = {};
+    }
+
+
+
+
+    function showAnotherOne(){
+        distanceStorage.origin1selected = null;
+        
+        if (competitiondisplay.RedoSelectBottonintialised){
+            unShowRedoButton();
+            resetInitialData();
+        }
+    }
+
+
+
+    function resetInitialData() {
+        d3.select("svg").remove();
+        draw();
+    }
+    ;
+
+    d3.select("input[id=speed]").on("change", function () {
+        if (this.value < 0) {
+            alert("The speed should be a positive number.");
+        }
+        else {
+            displaycontainer.animationTime = Math.max(50, this.value * 10);
+        }
+    });
+    d3.select("input[id=vacrate]").on("change", function () {
+            if ((this.value < 0)||(this.value>100))
+                alert("The number of nrOfNodes was selected to be negative. This does not make sense.");
+            else {
+                competitiondisplay.vacinationp = this.value*1.0/100;
+               if (competitiondisplay.RedoSelectBottonintialised){
+                 unShowRedoButton();
+                  resetInitialData();
+              }
+            }
+        });
+    </script>

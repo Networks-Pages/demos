@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body onload="start()">
+    <table style="position:absolute;top:5px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Average service time</td> 
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="ServiceTime" value="1.5" step="0.25" min="0.25"></td>
+        </tr>
+        <tr>
+            <td> Average time until breakdown</td>
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="BreakdownTime" value="3" step="0.25" min="0.25"></td>
+        </tr>
+        <tr>
+            <td> Average time for repair </td>
+            <td>    <input style="position:relative;top:3px;width:70px;" type="number" id="Repairtime" value="5" step="0.25" min="0.25"></td>
+        </tr>
+    </table>
+    
+    <script src="../SharedResources/d3.min.js"></script>
+    <script>
+    var displaycontainer = {}, customers = {}, servers = {}, products = {}, repairguy = {};
+
+    displaycontainer.width = Math.min(800, window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth),
+            displaycontainer.height = Math.min(600, window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight),
+            displaycontainer.speed = 1000;
+
+
+    customers.picWidth = 20,
+            customers.picHeight = 60,
+            customers.image = "images/cucumber.png",
+            customers.p = [],
+            customers.storedbufferSize = 50,
+            customers.activeAllTime = 0;
+
+
+    products.picWidth = 60,
+            products.picHeight = 60,
+            products.image = "images/HighBox.png",
+            products.p = [],
+            products.storedbufferSize = 10;
+
+    servers.nr = 2,
+            servers.p = [],
+            servers.maxQueueLength = 20,
+            servers.image = "images/comicMachine1.png",
+            servers.picWidth = 120,
+            servers.picHeight = 70,
+            repairguy.status = -1,
+            repairguy.image = "images/handywoman.png",
+            repairguy.picWidth = 60,
+            repairguy.picHeight = 120,
+            repairguy.jobs = [];
+    displaycontainer.machineH = [Math.floor(displaycontainer.height * 2 / 5 - servers.picHeight), Math.floor(displaycontainer.height * 4 / 5 - servers.picHeight)];
+    displaycontainer.machineV = [Math.floor(displaycontainer.width * 2 / 3) - servers.picWidth / 2, Math.floor(displaycontainer.width * 2 / 3) - servers.picWidth / 2];
+
+    displaycontainer.enterTime=2.5;
+    displaycontainer.repairTimeAVG=5;
+    displaycontainer.serviceTimeAVG=1.5;
+    displaycontainer.breakdownTimeAVG=3;
+
+    function start( )
+    {
+        
+        document.getElementById("ServiceTime").value = displaycontainer.serviceTimeAVG ;
+        document.getElementById("BreakdownTime").value = displaycontainer.breakdownTimeAVG;
+        document.getElementById("Repairtime").value = displaycontainer.repairTimeAVG;
+        createObjects();
+        setTimeout(function () {
+            activateCustomers(0);
+        }, 400);
+        setTimeout(function () {
+            activateCustomers(1);
+        }, 400);
+    }
+
+    //*getExponential(1) 
+
+    function activateCustomers(serverid) {
+        activateOneCustomer(serverid);
+        customers.activeAllTime++;
+        if (customers.activeAllTime < 4) {
+            setTimeout(function () {
+                activateCustomers(serverid);
+            }, 100);
+        } else {
+            setTimeout(function () {
+                activateCustomers(serverid);
+            }, displaycontainer.enterTime * displaycontainer.speed);
+        }
+    }
+
+    function activateOneCustomer(serverid) {
+        var customerNumber = getFirstInactiveCustomer();
+        if (customerNumber !== -1) {
+            customers.p[customerNumber].status = 0;// entered and going to the arriving area
+            displaycontainer.customers[customerNumber].attr("x", 0).attr("y", displaycontainer.machineH[serverid]).style("visibility", "visible");
+            moveToQueue(serverid, customerNumber);
+        }
+    }
+
+
+    function moveToQueue(serverid, customerNumber) {
+        if (servers.maxQueueLength - 1 > servers.p[serverid].queuedCustomers.length) {
+            customers.p[customerNumber].status = 1;// going to queue
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed)
+                    .attr("x", servers.p[serverid].queuedisplayPosition[servers.p[serverid].queuedCustomers.length][0]);
+            servers.p[serverid].queuedCustomers.push(customers.p[customerNumber]);
+            setTimeout(function () {
+                arriveInQueuePosition(serverid, customerNumber);
+            }, displaycontainer.speed + 100);
+        }
+        else {
+            deactivateCustomer(customerNumber);
+        }
+    }
+
+
+    function arriveInQueuePosition(serverid, customerNumber) {
+        if (customers.p[customerNumber].status === 1) {// has the customer just arrived
+            customers.p[customerNumber].status = 2;// yes, now you are waiting in the queue.
+        } else {
+            console.log("The customer was already waiting here.");
+        }
+
+        if ((servers.p[serverid].queuedCustomers[0].name === customerNumber) && (servers.p[serverid].idle)) {
+            moveToMachine(serverid);
+        }
+    }
+
+    function moveToMachine(serverid) {
+        var c = servers.p[serverid].queuedCustomers.shift();
+        servers.p[serverid].idle = false;
+        if (customers.p[c.name].status === 2) {// the customer wa not jet waiting
+            customers.p[c.name].status = 3;// yes, now you as counted in service.
+        } else {
+            console.log("The customer was already waiting here.");
+        }
+
+        // move the first customer to the server 
+        displaycontainer.customers[c.name].transition().duration(displaycontainer.speed / 3)
+                .attr("x", servers.p[serverid].x);
+        // and start service as soon as they arrive
+        setTimeout(function () {
+            deactivateCustomer(c.name);
+            startServing(serverid);
+        }, displaycontainer.speed / 3 + 2);
+
+        // move the remainder of the queue by one slot.
+        for (i = 0; i < servers.p[serverid].queuedCustomers.length; i++) {
+            displaycontainer.customers[servers.p[serverid].queuedCustomers[i].name].transition().duration(displaycontainer.speed)
+                    .attr("x", servers.p[serverid].queuedisplayPosition[i][0])
+                    .attr("y", servers.p[serverid].queuedisplayPosition[i][1]);
+        }
+        // in the case that the service was VERY fast we need call the first item in the queue to the server.
+        setTimeout(function () {
+            if ((servers.p[serverid].idle) && (servers.p[serverid].queuedCustomers.length > 0)) {
+                if (servers.p[serverid].queuedCustomers[0].status === 2) {
+                    moveToMachine(serverid);
+                }
+            }
+        }, displaycontainer.speed + 2);
+    }
+
+
+
+    
+    function startServing(serverid) {
+        //var serviceTime =Math.min(Math.max(0.3, getPoison(displaycontainer.serviceTimeAVG) + 1 * getSTNormal()), 10); //getExponential(1/(displaycontainer.serciveTimeAVG-1)));
+        //var breakDownTime = Math.min(Math.max(0.5, getPoison(displaycontainer.breakdownTimeAVG) + 1 * getSTNormal()), 20);//getExponential(1/(displaycontainer.breakdownTimeAVG-1)));
+        var serviceTime =Math.min(Math.max(0.2, getExponential(1/(displaycontainer.serviceTimeAVG-0.5))), 10); //getExponential(1/(displaycontainer.serciveTimeAVG-1)));
+        var breakDownTime = Math.min(Math.max(0.3, getExponential(1/(displaycontainer.breakdownTimeAVG-0.5))), 10);//getExponential(1/(displaycontainer.breakdownTimeAVG-1)));
+
+        
+        if (serviceTime < breakDownTime) {
+            setTimeout(function () {
+                endServedCustomer(serverid);
+            }, displaycontainer.speed * serviceTime);
+        } else {
+            setTimeout(function () {
+                startbreakDown(serverid);
+            }, displaycontainer.speed * breakDownTime);
+        }
+    }
+
+    function startbreakDown(serverid) {
+        displaycontainer.servers[serverid].attr("xlink:href", "images/comicMachineDamaged.png");
+        repairguy.jobs.push(serverid);
+        if (repairguy.jobs.length === 1) {
+            displaycontainer.repairguy.transition().duration(displaycontainer.speed / 2)
+                    .attr("x", servers.p[serverid].x + servers.picWidth - 10)
+                    .attr("y", servers.p[serverid].y + 10);
+            setTimeout(function () {
+                startRepair(serverid);
+            }, displaycontainer.speed / 2 + 2);
+        }
+    }
+
+    function startRepair(serverid) {
+        var repairtime =Math.min(Math.max(0.3, getExponential(1/(displaycontainer.repairTimeAVG-0.5))), 10);
+        //var repairtime=Math.min(Math.max(0.3, getPoison(displaycontainer.repairTimeAVG) + 1 * getSTNormal()), 20); 
+        //getExponential(1.0/(displaycontainer.repairTimeAVG-0.5));
+        
+        displaycontainer.servers[serverid].attr("xlink:href", "images/comicMachineUnderRepair.png");
+        setTimeout(function () {
+            endRepair(serverid);
+        }, displaycontainer.speed *repairtime);
+    }
+
+    function endRepair(serverid) {
+        displaycontainer.servers[serverid].attr("xlink:href", "images/comicMachine1.png");
+        repairguy.jobs.shift();
+        startServing(serverid);
+        if(repairguy.jobs.length===0){
+            displaycontainer.repairguy.transition().duration(displaycontainer.speed*0.7)
+                    .attr("x", function(d){return d.x;})
+                    .attr("y", function(d){return d.y;});
+            
+        } else {
+            var otherServer=servers.p[repairguy.jobs[0]];
+             displaycontainer.repairguy.transition().duration(displaycontainer.speed / 2)
+                    .attr("x", otherServer.x + servers.picWidth - 10)
+                    .attr("y", otherServer.y + 10);
+            setTimeout(function () {
+                startRepair(otherServer.name);
+            }, displaycontainer.speed / 2 + 2);
+        }
+    }
+
+    function endServedCustomer(serverid) {
+        if (!servers.p[serverid].idle) {
+            // create the product and sent the product away
+            var productNumber = getFirstInactiveProduct();
+            if (productNumber !== -1) {
+                products.p[productNumber].status = 1;
+                displaycontainer.products[productNumber].attr("x", servers.p[serverid].x + servers.picWidth - products.picWidth).attr("y", displaycontainer.machineH[serverid]).style("visibility", "visible");
+                displaycontainer.products[productNumber].transition().duration(displaycontainer.speed).attr("y", function () {
+                    if (serverid === 0)
+                        return 0;
+                    else
+                        return displaycontainer.height;
+                }).style("visibility", "visible");
+
+                setTimeout(function () {
+                    displaycontainer.products[productNumber].style("visibility", "hidden");
+                    products.p[productNumber].status = -1;
+                }, displaycontainer.speed + 22);
+            }
+            servers.p[serverid].idle = true;
+
+            // sent first to server and move the queue
+            if (servers.p[serverid].queuedCustomers.length > 0) {
+                if (servers.p[serverid].queuedCustomers[0].status === 2) {
+                    moveToMachine(serverid);
+                }
+                //else arriveInQueuePosition(serverid, servers.p[serverid].queuedCustomers[0].name);
+            }
+        }
+    }
+
+
+    function createObjects() {
+
+        displaycontainer.svg = d3.select("body").append("svg").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+
+        for (var n = 0; n < 2; n++) {
+            displaycontainer.svg.append("rect").attr("x", displaycontainer.machineV[n] - 20).attr("y", displaycontainer.machineH[n] - 5).attr("width", 5).attr("height", customers.picHeight + 5).attr("fill", "#49494A");
+            displaycontainer.svg.append("rect").attr("x", Math.max(2 * customers.picWidth, displaycontainer.width / 5)).attr("y", displaycontainer.machineH[n] - 5).attr("width", (displaycontainer.machineV[n] - 20) - Math.max(2 * customers.picWidth, displaycontainer.width / 5) + 5).attr("height", 5).attr("fill", "#49494A");
+            displaycontainer.svg.append("rect").attr("x", Math.max(2 * customers.picWidth, displaycontainer.width / 5)).attr("y", displaycontainer.machineH[n] + customers.picHeight).attr("width", (displaycontainer.machineV[n] - 20) - Math.max(2 * customers.picWidth, displaycontainer.width / 5) + 5).attr("height", 5).attr("fill", "#49494A");
+        }
+
+        var showitems = [];
+        for (var n = 0; n < customers.storedbufferSize; n++)
+        {
+            var c = {name: n, kind: "customer", x: 0, y: 0, status: -1, image: customers.image, picWidth: customers.picWidth, picHeight: customers.picHeight};
+            customers.p.push(c);
+            showitems.push(c);
+        }
+        for (var n = 0; n < products.storedbufferSize; n++)
+        {
+            var c = {name: n, kind: "product", x: 0, y: 0, status: -1, image: products.image, picWidth: products.picWidth, picHeight: products.picHeight};
+            products.p.push(c);
+            showitems.push(c);
+        }
+        for (var n = 0; n < servers.nr; n++)
+        {
+
+            var c = {name: n, kind: "server", idle: true, x: displaycontainer.machineV[n], y: displaycontainer.machineH[n], image: servers.image, picWidth: servers.picWidth, picHeight: servers.picHeight};
+            c.queuedisplayPosition = [];
+            c.queuedCustomers = [];
+            for (var s = 0; s < servers.maxQueueLength; s++)
+            {
+                var pos = [displaycontainer.machineV[n] - customers.picWidth * 1.1 * (s + 1) - 20, displaycontainer.machineH[n]];
+                c.queuedisplayPosition.push(pos);
+            }
+            servers.p.push(c);
+            showitems.push(c);
+        }
+
+        var r = {name: "guy", kind: "Repair", x: Math.floor(displaycontainer.width * 0.8), y: Math.floor(displaycontainer.height / 2) - repairguy.picHeight, image: repairguy.image, picWidth: repairguy.picWidth, picHeight: repairguy.picHeight};
+        showitems.push(r);
+
+
+        displaycontainer.node = displaycontainer.svg.selectAll(".node").data(showitems);
+        displaycontainer.node.enter().append("image").attr("class", function (d) {
+            return "node " + d.kind + d.name;
+        }).attr("xlink:href", function (d) {
+            return d.image;
+        })
+                .attr("width", function (d) {
+                    return d.picWidth + "px";
+                })
+                .attr("height", function (d) {
+                    return d.picHeight + "px";
+                })
+                .attr("x", function (d) {
+                    return d.x
+                }).attr("y", function (d) {
+            return d.y
+        })
+                .style("visibility", function (d) {
+                    if ((d.kind === "customer") || (d.kind === "product"))
+                        return "hidden";
+                    else
+                        return "visible"
+                });
+        displaycontainer.customers = [];
+        for (var n = 0; n < customers.storedbufferSize; n++) {
+            displaycontainer.customers.push(displaycontainer.svg.selectAll(".node").filter(function (d) {
+                if (d.kind === "customer" && d.name === n)
+                    return d;
+            }));
+        }
+        displaycontainer.products = [];
+        for (var n = 0; n < products.storedbufferSize; n++)
+        {
+            displaycontainer.products.push(displaycontainer.svg.selectAll(".node").filter(function (d) {
+                if (d.kind === "product" && d.name === n)
+                    return d;
+            }));
+        }
+        displaycontainer.servers = [];
+        for (var n = 0; n < servers.nr; n++) {
+            displaycontainer.servers.push(displaycontainer.svg.selectAll(".node").filter(function (d) {
+                if (d.kind === "server" && d.name === n)
+                    return d;
+            }));
+        }
+
+        displaycontainer.repairguy = displaycontainer.svg.selectAll(".node").filter(function (d) {
+            if (d.kind === "Repair")
+                return d;
+        });
+    }
+
+
+
+
+    function deactivateCustomer(customerNumber) {
+        displaycontainer.customers[customerNumber].style("visibility", "hidden");
+        setTimeout(function () {
+            customers.p[customerNumber].status = -1;
+        }, 20);
+    }
+
+    function getFirstInactiveCustomer() {
+        for (i = 0; i < customers.p.length; i++)
+            if (customers.p[i].status === -1)
+                return i;
+        return -1;
+    }
+
+    function getFirstInactiveProduct() {
+        for (i = 0; i < products.p.length; i++)
+            if (products.p[i].status === -1)
+                return i;
+        return -1;
+    }
+
+
+    function getExponential(lambda)
+    {
+        return -1 * Math.log(Math.random()) / lambda;
+    }
+
+    function getPoison(lambda)
+    {
+        var L = Math.exp(-lambda);
+        var k = 0, p = 1;
+        do {
+            k++;
+            p = p * Math.random();
+        } while (p > L)
+        return k - 1;
+    }
+
+    // Standard Normal variate using Box-Muller transform.
+    function getSTNormal() {
+        var u = 1 - Math.random(); // Subtraction to flip [0, 1) to (0, 1].
+        var v = 1 - Math.random();
+        return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+    }
+
+
+    d3.select("input[id=ServiceTime]").on("change", function () {
+        if (this.value < 0)
+            alert("The average time does not make sense.");
+        else {
+            displaycontainer.serviceTimeAVG = this.value;
+        }
+    });
+
+
+    d3.select("input[id=RepairTime]").on("change", function () {
+        if (this.value < 0)
+            alert("The average time does not make sense.");
+        else {
+            displaycontainer.repairTimeAVG = this.value;
+        }
+    });
+
+    d3.select("input[id=BreakdownTime]").on("change", function () {
+        if (this.value < 0)
+            alert("The average time does not make sense.");
+        else {
+            displaycontainer.breakdownTimeAVG = this.value;
+        }
+    });
+
+
+    </script>
+
+    
+    
+    <!---
+    no overlapping customers
+    first arrival fixed, service time random
+    from enterposition directly to queue.
+    -->

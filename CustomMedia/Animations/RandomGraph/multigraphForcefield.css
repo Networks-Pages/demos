@@ -1,0 +1,41 @@
+    .link {
+        stroke: #555;
+        fill: none;
+    }
+    .count1 {
+        stroke: #000;
+    }
+    .count2 {
+        stroke: #F00;
+    }
+    .count3 {
+        stroke: #0F0;
+    }
+    .count4 {
+        stroke: #0FF;
+    }
+
+    .node circle {
+        stroke: #000;
+        stroke-width: 1.5px;
+    }
+     .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border-radius: 2px;
+    }
+    .bar rect {
+        fill: steelblue;
+        shape-rendering: crispEdges;
+    }
+    .bar rect:hover{
+        fill: rgba(170,0,0,1);
+    }
+    .axis path, .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }

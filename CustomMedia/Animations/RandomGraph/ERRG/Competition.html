@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke:  #555;
+        stroke-opacity: 1.2;
+    }
+    .d3-tip {
+        line-height: 1;
+        font-weight: bold;
+        padding: 12px;
+        background: rgba(0, 0, 0, 0.8);
+        color: #fff;
+        border-radius: 2px;
+    }
+    .bar rect {
+        fill: steelblue;
+        shape-rendering: crispEdges;
+    }
+    .bar rect:hover{
+        fill: rgba(170,0,0,1);
+    }
+    .axis path, .axis line {
+        fill: none;
+        stroke: #000;
+        shape-rendering: crispEdges;
+    }
+</style>
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+    <script src="../../SharedResources/d3.tip.v0.6.3.js"></script>
+    <script src="../SharedResources/GraphAlgorithmLibaryFitzner.js"></script>
+    <script src="../SharedResources/VisualFunctionFitzner.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Erdös-Rényi Graph
+    </h2>
+    <table style="position:absolute;top:50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> Nr. of vertices</td> 
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="nrNodes" value="100"></td>
+        </tr>
+        <tr>
+            <td> Lambda (&lambda;) </td>
+            <td> <input style="position:relative;top:3px;width:70px;" type="number"  id="lambda" value="1.5" step="0.05"></td>
+        </tr>
+        <tr>
+            <td> Edge passage time </td>
+            <td>    <input style="position:relative;top:3px;width:70px;" type="number" id="speedOne" value="1" step="0.05" ></td>
+        </tr>
+        <tr>
+            <td> Edge passage time </td>
+            <td>    <input style="position:relative;top:3px;width:70px;" type="number" id="speedTwo" value="1" step="0.05" ></td>
+        </tr>  </table>
+
+    <table style="position:absolute;top:20px; right: 50px;font-size:14px; font-family: Raleway; ">
+        <tr>
+            <td> <p id="CompetitionTitle1"  style="color:blue;font-size:20px" ></p></td> 
+            <td> <p id="CompetitionField1"  style="color:blue;font-size:20px" ></p> </td>
+        </tr>
+        <tr>
+            <td> <p id="CompetitionTitle2"  style="color:red;font-size:20px"></p></td> 
+            <td> <p id="CompetitionField2"  style="color:red;font-size:20px"></p> </td>
+        </tr>
+        <tr>
+            <td>  <div id="buttonFieldSelect"> </div> </td> 
+            <td>  <div id="buttonFieldRedo"> </div> </td>
+        </tr>
+    </table>
+
+
+
+    <script>
+
+
+    var width = -30+window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = -40+window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            color = d3.scale.category20(),
+            nrOfNodes = 100,
+            lambda = 1.5,
+            distanceStorage = {};
+    distanceStorage.origin = {};
+    distanceStorage.origin2 = {};
+    distanceStorage.origin1selected = false;
+    distanceStorage.origin2selected = false;
+    distanceStorage.speedType1 = 1;
+    distanceStorage.speedType2 = 1.2;
+
+    var graph = createERgraph(nrOfNodes, lambda * 1.0 / nrOfNodes);
+    var force, svg, link, node;
+    var chartNotShown, chartelement = [], nameTag = {}, chartType = "CompetitionType", modelTag = "ERRG";
+    var competitiondisplay = {};
+
+    function draw() {
+        document.getElementById("speedOne").value = distanceStorage.speedType1;
+        document.getElementById("speedTwo").value = distanceStorage.speedType2;
+        document.getElementById("lambda").value = lambda;
+        document.getElementById("nrNodes").value = nrOfNodes;
+        competitiondisplay = {};
+        competitiondisplay.intialised = false;
+        competitiondisplay.unSelectBottonintialised = false;
+        competitiondisplay.RedoSelectBottonintialised = false;
+        competitiondisplay.unselectButtom = {};
+        competitiondisplay.redoButtom = {};
+        competitiondisplay.nrRed = 0;
+        competitiondisplay.nrBlue = 0;
+        competitiondisplay.transition = 2000;
+        chartNotShown = true;
+        initializeForceFullscreen();
+        addLogo();
+    }
+    ;
+
+    function startCompetition() {
+        computeContactStructureDeterministic();
+        competitiondisplay.intervalID = [];
+        competitiondisplay.timerEdge = 0;
+        competitiondisplay.timerNode = 0;
+        competitiondisplay.intialised = true;
+
+        competitiondisplay.nredges = 0;
+
+        // ===================================================
+        // Change the standard coloring before starting the animation
+        link.style("stroke", "#888888").attr("stroke-width", "1px");
+        // Changee the initial style of all verticies
+        svg.selectAll(".node").style("fill", function (e)
+        {
+            if (graph.nodes[e.name].distance === distanceStorage.infty) {
+                return "#888888";
+            } else if (e.name === distanceStorage.origin2.name) {
+                return "red";
+            } else if (e.name === distanceStorage.origin.name) {
+                return "blue";
+            } else if (graph.nodes[e.name].distance > 0) {
+                return "#70AA90";
+            } else {
+                return "#70AA90";
+            }
+        }).attr("r", function (e) {
+            if (graph.nodes[e.name].distance === distanceStorage.infty) {
+                return 3;
+            } else
+            if ((e.name === distanceStorage.origin2.name) || (e.name === distanceStorage.origin.name)) {
+                return 9;
+            } else {
+                return 4;
+            }
+        });
+
+        competitiondisplay.nrRed=0;
+        competitiondisplay.nrBlue=0;
+        
+        document.getElementById("CompetitionTitle1").innerHTML = "First kind: ";
+        document.getElementById("CompetitionField1").innerHTML = "1";
+        document.getElementById("CompetitionTitle2").innerHTML = "Second kind: ";
+        document.getElementById("CompetitionField2").innerHTML = "1";
+    
+        competitiondisplay.currentIndexEdge = 0;
+        competitiondisplay.nextDurationEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth - competitiondisplay.timerEdge;
+        competitiondisplay.timerEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth;
+        
+        competitiondisplay.intervalID.push( setTimeout(function () {
+            animateLink();
+        }, competitiondisplay.nextDurationEdge * 1000));
+        
+    }
+
+    function animateLink() {
+        var edge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge];
+        //var name="line count1#" + "links" +edge.source+"t"+ edge.target;
+        var useColor="green";
+        if (graph.nodes[edge.source].type===graph.nodes[edge.target].type){
+            if (edge.type === 1) useColor = "blue";
+            else useColor = "red";
+        }
+        console.log(svg.selectAll(edge.id));
+        svg.selectAll(edge.id).transition().duration(1000 * edge.transmissionTime).style("stroke", useColor).attr("stroke-width", "7px");
+
+        if (!graph.nodes[edge.target].animated) {
+                competitiondisplay.intervalID.push(setTimeout(function () {
+                animateNode(graph.nodes[edge.target]);
+            }, 750 * edge.transmissionTime));
+        }
+
+
+        competitiondisplay.intervalID.push(setTimeout(function () {
+            svg.selectAll(edge.id).transition().duration(2000).style("stroke", useColor).attr("stroke-width", "3px");
+        }, 1000 * edge.transmissionTime));
+
+
+        competitiondisplay.currentIndexEdge++;
+        if (competitiondisplay.currentIndexEdge < distanceStorage.checkOrder.length) {
+            competitiondisplay.nextDurationEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth - competitiondisplay.timerEdge;
+            competitiondisplay.timerEdge = distanceStorage.checkOrder[competitiondisplay.currentIndexEdge].birth;
+            if(competitiondisplay.nextDurationEdge>0){
+            competitiondisplay.intervalID.push( setTimeout(function () {
+                animateLink();
+            }, competitiondisplay.nextDurationEdge * 1000));
+            }else animateLink();
+        } else showRedoButton();
+    }
+    ;
+    
+    function animateNode(node) {
+       node.animate=true;
+       
+       if (node.type===1){
+            competitiondisplay.nrBlue++;
+            document.getElementById("CompetitionField1").innerHTML = ""+competitiondisplay.nrBlue;
+       } else {
+           competitiondisplay.nrRed++;
+           document.getElementById("CompetitionField2").innerHTML = ""+competitiondisplay.nrRed;
+       }
+    
+       var useColor;
+        if (node.type === 1) useColor = "blue";   else useColor = "red";
+        svg.selectAll(node.id).transition().duration(1000).style("fill", useColor).attr("r", 8);
+        
+        competitiondisplay.intervalID.push(setTimeout(function () {
+            svg.selectAll(node.id).transition().duration(1000).attr("r", 5);
+        }, 1000));
+
+    };
+    
+
+    function showRedoButton() {
+        if (!competitiondisplay.RedoSelectBottonintialised) {
+            competitiondisplay.RedoSelectBottonintialised = true;
+            competitiondisplay.redoButtom = document.createElement("input");
+            competitiondisplay.redoButtom.type = "button";
+            competitiondisplay.redoButtom.onclick = function () {
+                startCompetition();
+            };
+
+            competitiondisplay.redoButtom.value = "Show once more";
+            var placeHolder = document.getElementById("buttonFieldRedo");
+            placeHolder.appendChild(competitiondisplay.redoButtom);
+        }
+    }
+
+
+    function showUnselectButton() {
+        if (!competitiondisplay.unSelectSelectBottonintialised) {
+            competitiondisplay.unSelectSelectBottonintialised = true;
+
+            competitiondisplay.unselectButtom = document.createElement("input");
+            competitiondisplay.unselectButtom.type = "button";
+            competitiondisplay.unselectButtom.onclick = function () {
+                unShowCompetition();
+            };
+
+            competitiondisplay.unselectButtom.value = "Remove selection";
+            var placeHolder = document.getElementById("buttonFieldSelect");
+            placeHolder.appendChild(competitiondisplay.unselectButtom);
+        }
+    }
+
+    function unShowRedoButton() {
+        competitiondisplay.RedoSelectBottonintialised = false;
+        var placeHolder = document.getElementById("buttonFieldRedo");
+        placeHolder.removeChild(competitiondisplay.redoButtom);
+        competitiondisplay.redoButtom = {};
+    }
+
+    function unShowUnselectButton() {
+        competitiondisplay.unSelectSelectBottonintialised = false;
+        var placeHolder = document.getElementById("buttonFieldSelect");
+        placeHolder.removeChild(competitiondisplay.unselectButtom);
+        competitiondisplay.unselectButtom = {};
+    }
+
+
+    function unShowCompetition() {
+        distanceStorage.origin1selected = null;
+        distanceStorage.origin2selected = null;
+        if (competitiondisplay.unSelectSelectBottonintialised)
+            unShowUnselectButton();
+
+        if (competitiondisplay.RedoSelectBottonintialised)
+            unShowRedoButton();
+
+        if (competitiondisplay.intialised) {
+            competitiondisplay.intialised = false;
+            document.getElementById("CompetitionTitle1").innerHTML = "";
+            document.getElementById("CompetitionField1").innerHTML = "";
+            document.getElementById("CompetitionTitle2").innerHTML = "";
+            document.getElementById("CompetitionField2").innerHTML = "";
+
+            competitiondisplay.nrRed = 0;
+            competitiondisplay.nrBlue = 0;
+            for(i=0;i<competitiondisplay.intervalID.length;i++)
+                clearInterval(competitiondisplay.intervalID[i]);
+            competitiondisplay.intervalID=[];
+
+            setTimeout(function () {
+                link.style("stroke", "#888888").attr("stroke-width", "1px");
+                svg.selectAll(".node").style("fill", function (e) {
+                    return color(e.group);
+                }).attr("r", 5);
+                svg.selectAll(".node").style("fill", function (e) {
+                    return color(e.group);
+                }).attr("r", 5);
+            }, 2100);
+        } else {
+            link.style("stroke", "#888888").attr("stroke-width", "1px");
+            svg.selectAll(".node").style("fill", function (e) {
+                return color(e.group);
+            }).attr("r", 5);
+            svg.selectAll(".node").style("fill", function (e) {
+                return color(e.group);
+            }).attr("r", 5);
+        }
+    }
+
+
+
+
+
+
+    d3.select("input[id=nrNodes]").on("change", function () {
+        if (this.value < 0)
+            alert("The number of sites was selected to be negative. This does not make sense.");
+        else if (this.value > 2000)
+            alert("The number of sites is a bit high. I'm sorry Dave, I'm afraid I can't do that.");
+        else {
+            nrOfNodes = this.value;
+            if (competitiondisplay.intialised)
+                unShowCompetition();
+            d3.select("svg").remove();
+            distanceStorage.origin = {};
+            distanceStorage.origin2 = {};
+            distanceStorage.origin1selected = false;
+            distanceStorage.origin2selected = false;
+
+            graph = createERgraph(nrOfNodes, lambda / nrOfNodes);
+            draw();
+        }
+    });
+
+    d3.select("input[id=lambda]").on("change", function () {
+        if (this.value < 0) {
+            alert("The parameter lambda, needs to be positive.");
+        }
+        else {
+            lambda = this.value;
+            if (competitiondisplay.intialised)
+                unShowCompetition();
+            d3.select("svg").remove();
+            distanceStorage.origin = {};
+            distanceStorage.origin2 = {};
+            distanceStorage.origin1selected = false;
+            distanceStorage.origin2selected = false;
+
+            graph = createERgraph(nrOfNodes, lambda / nrOfNodes);
+            draw();
+        }
+    });
+
+    d3.select("input[id=speedOne]").on("change", function () {
+        if ((this.value < 0)) {
+            alert("A negative speed make not sense.");
+        }
+        else {
+            distanceStorage.speedType1 = Number(this.value);
+        }
+    });
+
+
+    d3.select("input[id=speedTwo]").on("change", function () {
+        if ((this.value < 0)) {
+            alert("A negative passage time makes no sense.");
+        }
+        else {
+            distanceStorage.speedType2 = Number(this.value);
+        }
+    });
+
+
+
+    </script>

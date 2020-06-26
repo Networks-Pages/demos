@@ -1,0 +1,394 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+    .node {
+        -webkit-transition: linear;
+        -moz-transition: linear;
+        -o-transition: linear;
+        -ms-transition: linear;       
+        transition: linear;
+    }
+</style>
+<body onload="draw()">
+     <script src="../SharedResources/d3.min.js"></script>
+    
+
+    <script>
+    //  <h2 style="font-family: Raleway">
+    //  Interacting particles confined in a box
+    //</h2>
+    var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            //color = d3.scale.category20(),
+            particles = {},
+            frame = {},
+            displaycontainer = {};
+    frame.boundary = 5;
+    frame.height = Math.min(400, height-30);
+    frame.width = Math.min(800, width-30);
+    displaycontainer.animationTime = 500;
+    particles.number = 40;
+    particles.maxenergy = 200;
+    particles.radi = 8;
+    particles.boundartypoint = -1;
+    particles.collisionpart1 = -1;
+    particles.collisionpart2 = -1;
+    particles.justcollided1 = -1;
+    particles.justcollided2 = -1;
+    particles.nextIsStatus = 0; //0  nothing, 1 boundary, 2 collision
+    particles.lastStatus = 0; //0  nothing, 1 boundary, 2 collision
+    particles.lasthit = [];
+    particles.lasthit[0] = -1;
+    frame.bufferwidth = frame.boundary + particles.radi;
+    frame.firstx = frame.bufferwidth;
+    frame.firsty = frame.bufferwidth;
+    frame.lastx = frame.width - frame.bufferwidth;
+    frame.lasty = frame.height - frame.bufferwidth;
+    frame.timeStep = 0;
+
+    function createParticles() {
+        particles.points = [];
+        for (i = 0; i < particles.number; i++) {
+            var point = {};
+            particles.points[i] = point;
+            point.name = i;
+            var collisionfound = true;
+            while (collisionfound) {
+                point.x = Math.random() * (frame.lastx - frame.firstx) + frame.firstx;
+                point.y = Math.random() * (frame.lasty - frame.firsty) + frame.firsty;
+                collisionfound = false;
+                for (j = 0; (j < i) && !collisionfound; j++) {
+                    collisionfound = collission(i, j);
+                }
+            }
+            point.speed = particles.maxenergy * (Math.random() * 0.9 + 0.1);
+            var direction = Math.PI * 2 * Math.random();
+            point.xspeed = Math.cos(direction) * point.speed;
+            point.yspeed = Math.sin(direction) * point.speed;
+            point.oldx = point.x;
+            point.oldy = point.y;
+            point.oldxspeed = point.xspeed;
+            point.oldyspeed = point.yspeed;
+        }
+    }
+
+    function distanceBetween(i, j) {
+        return Math.sqrt(
+                (particles.points[i].x - particles.points[j].x) * (particles.points[i].x - particles.points[j].x)
+                + (particles.points[i].y - particles.points[j].y) * (particles.points[i].y - particles.points[j].y));
+    }
+
+    function collission(i, j) {
+        return (distanceBetween(i, j) < 2 * particles.radi);
+    }
+
+    function timeToBoundary() {
+        var mintime = 100000;
+        for (i = 0; i < particles.number; i++) {
+            var point = particles.points[i];
+            var thistime = 100000;
+            if (point.xspeed > 0) {
+                //console.log(i+"  going E from " +point.x+" to "+frame.lastx+" with "+xspeed+" taking "+(frame.lastx-point.x)/xspeed);
+                if ((frame.lastx - point.x) / point.xspeed < mintime) {
+                    mintime = (frame.lastx - point.x) / point.xspeed;
+                    particles.boundartypoint = i;
+                }
+                thistime = (frame.lastx - point.x) / point.xspeed;
+            } else {
+                //console.log(i+"  going W from " +point.x+" to "+frame.firstx+" with "+xspeed+" taking "+(point.x-frame.firstx)/xspeed);
+                if ((frame.firstx - point.x) / point.xspeed < mintime) {
+                    mintime = (frame.firstx - point.x) / point.xspeed;
+                    particles.boundartypoint = i;
+                }
+                thistime = (frame.firstx - point.x) / point.xspeed;
+            }
+            if (point.yspeed > 0) {
+                //console.log(i+"  going S from " +point.y+" to "+frame.lasty+" with "+yspeed+" taking "+(frame.lasty-point.y)/yspeed);
+                if ((frame.lasty - point.y) / point.yspeed < mintime) {
+                    mintime = (frame.lasty - point.y) / point.yspeed;
+                    particles.boundartypoint = i;
+                }
+                thistime = Math.min((frame.lasty - point.y) / point.yspeed, thistime);
+            } else {
+                //console.log(i+"  going N from " +point.y+" to "+frame.firsty+" with "+yspeed+" taking "+(point.y-frame.firsty)/yspeed);
+                if ((frame.firsty - point.y) / point.yspeed < mintime) {
+                    mintime = (frame.firsty - point.y) / point.yspeed;
+                    particles.boundartypoint = i;
+                }
+                thistime = Math.min((frame.firsty - point.y) / point.yspeed, thistime);
+            }
+            if (thistime < 0)
+                console.log("Ill boundary computation px=" + point.x + " py=" + point.y + " going to xspeed=" + point.xspeed + " yspeed=" + point.yspeed
+                        + "). Boundary box (" + frame.firstx + "," + frame.firsty + "," + frame.lastx + "," + frame.lasty + ").");
+        }
+        return mintime;
+    }
+
+
+    // In this method we check whether there is a collision of two verticies
+    // The given time is supposted to represent the time until the next reflection of the boundary.
+    function timeToHit() {
+        var mintime = 10000000;
+        for (i = 1; i < particles.number; i++) {
+            var p1 = particles.points[i];
+            for (j = 0; j < i; j++) {
+                var p2 = particles.points[j];
+                // we consider the function EucleadianDistance(p1,p2), which is a quadratic function.
+                // To save time we first check an easy conditions. Are they approaching each other in the x and y coordinate
+                var qx = (p1.x - p2.x) * (p1.xspeed - p2.xspeed);
+                var qy = (p1.y - p2.y) * (p1.yspeed - p2.yspeed);
+                if ((qx <= 0) && (qy <= 0)) {
+                    var dspeed = Math.pow(p1.xspeed - p2.xspeed, 2) + Math.pow(p1.yspeed - p2.yspeed, 2);
+                    // Thus, they apporach each other. Will the distance of the center of the point ever be smaller than 2*particles.radi?
+                    // Solving the quadratic equation, we see that a collision/solution is only possible if the root of its solution is positive\\
+                    // We now compute the term in the root of a possible solution.
+                    var sqrtelem = 4 * Math.pow(particles.radi, 2) * dspeed -
+                            Math.pow((p1.x - p2.x) * (p1.yspeed - p2.yspeed) - (p1.y - p2.y) * (p1.xspeed - p2.xspeed), 2);
+                    if (sqrtelem > 0) {
+                        // the we use the smaller of the times as our solutions.
+                        //var hittime1 = -1*(qx +qy + Math.sqrt(sqrtelem)) / dspeed;
+                        //var hittime2 = -1*(qx +qy - Math.sqrt(sqrtelem)) / dspeed;
+                        var hittime =-1*(qx +qy + Math.sqrt(sqrtelem)) / dspeed;
+                        if(hittime>0){
+                            if (hittime < mintime) {
+                                particles.collisionpart1 = i;
+                                particles.collisionpart2 = j;
+                                mintime = hittime;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return mintime;
+    }
+
+
+    function bounceAtBoundary() {
+        if (particles.boundartypoint !== -1) {
+            var p = particles.points[particles.boundartypoint];
+            if (p.x < frame.firstx + 0.1) {
+                p.x += 0.01;
+                p.oldxspeed = p.xspeed;
+                p.xspeed = -p.xspeed;
+            }
+            if (p.y < frame.firsty + 0.1) {
+                p.y += 0.01;
+                p.oldyspeed = p.yspeed;
+                p.yspeed = -p.yspeed;
+            }
+            if (p.x > frame.lastx - 0.1) {
+                p.x += -0.01;
+                p.oldxspeed = p.xspeed;
+                p.xspeed = -p.xspeed;
+            }
+            if (p.y > frame.lasty - 0.1) {
+                p.y += -0.01;
+                p.oldyspeed = p.yspeed;
+                p.yspeed = -p.yspeed;
+            }
+            particles.boundartypoint = -1;
+        }
+    }
+
+
+    function collideTwoBalls() {
+        if ((particles.collisionpart1 !== -1) && (particles.collisionpart2 !== -1)) {
+            // We begin with a change of coordinates.
+            // We consider all movement to be relative to nodes1
+            var p1 = particles.points[particles.collisionpart1];
+            var p2 = particles.points[particles.collisionpart2];
+            beta = {};
+            beta.x = p2.x - p1.x;
+            beta.y = p2.y - p1.y;
+            beta.xspeed = p2.xspeed - p1.xspeed;
+            beta.yspeed = p2.yspeed - p1.yspeed;
+            beta.cosangle = (beta.x * beta.xspeed + beta.y * beta.yspeed) /
+                    (Math.sqrt(beta.x * beta.x + beta.y * beta.y) * Math.sqrt(beta.xspeed * beta.xspeed + beta.yspeed * beta.yspeed));
+            if (beta.cosangle === -1) {
+                // Ball beta want to go directly into the ball at the origin --> straight hit --> exchange the speed of the points.*)
+                // opposite direction are not possible as they would not have hit in this case
+                var tmp = p1.xspeed;
+                p1.xspeed = p2.xspeed;
+                p2.xspeed = tmp;
+                var tmp = p1.yspeed;
+                p1.yspeed = p2.yspeed;
+                p2.yspeed = tmp;
+            } else {
+                var newOne = {}, newTwo = {};
+                newOne.directionx = -beta.x;
+                newOne.directiony = -beta.y;
+                if (beta.cosangle < 0) {
+                    newTwo.directionx = beta.y;
+                    newTwo.directiony = -beta.x;
+                } else {
+                    newTwo.directionx = -beta.y;
+                    newTwo.directiony = beta.x;
+                }
+                newOne.scale = -1 * (newTwo.directiony * beta.xspeed - newTwo.directionx * beta.yspeed) / (newTwo.directionx * newOne.directiony - newOne.directionx * newTwo.directiony);
+                newTwo.scale = -1 * (-newOne.directiony * beta.xspeed + newOne.directionx * beta.yspeed) / (newTwo.directionx * newOne.directiony - newOne.directionx * newTwo.directiony);
+
+                newOne.directionx = newOne.directionx * newOne.scale;
+                newOne.directiony = newOne.directiony * newOne.scale;
+                newTwo.directionx = newTwo.directionx * newTwo.scale;
+                newTwo.directiony = newTwo.directiony * newTwo.scale;
+                p2.xspeed = p1.xspeed + newTwo.directionx;
+                p2.yspeed = p1.yspeed + newTwo.directiony;
+                p1.xspeed = p1.xspeed + newOne.directionx;
+                p1.yspeed = p1.yspeed + newOne.directiony;
+            }
+            p1.speed=Math.sqrt(p1.xspeed*p1.xspeed+p1.yspeed*p1.yspeed);
+            p2.speed=Math.sqrt(p2.xspeed*p2.xspeed+p2.yspeed*p2.yspeed);
+            particles.collisionpart1 = -1;
+            particles.collisionpart2 = -1;
+        }
+        p1.oldx = p1.x;
+        p1.oldy = p1.y;
+        p1.oldxspeed = p1.xspeed;
+        p1.oldyspeed = p1.yspeed;
+        p2.oldx = p2.x;
+        p2.oldy = p2.y;
+        p2.oldxspeed = p2.xspeed;
+        p2.oldyspeed = p2.yspeed;
+    }
+
+
+function d3_rgb_hex(v) {
+  return v < 0x10
+      ? "0" + Math.max(0, v).toString(16)
+      : Math.min(255, v).toString(16);
+}
+
+    function draw() {
+        createParticles();
+        displaycontainer.svg = d3.select("body")
+                .append("svg").attr("width", frame.width).attr("height", frame.height);
+
+        displaycontainer.svg.append("rect").attr("x", 0).attr("y", 0).attr("width", frame.boundary).attr("height", frame.height).attr("fill", "#49494A");
+        displaycontainer.svg.append("rect").attr("x", frame.width - frame.boundary).attr("y", 0).attr("width", frame.boundary).attr("height", frame.height).attr("fill", "#49494A");
+        displaycontainer.svg.append("rect").attr("x", 0).attr("y", 0).attr("width", frame.width).attr("height", frame.boundary).attr("fill", "#49494A");
+        displaycontainer.svg.append("rect").attr("x", 0).attr("y", frame.height - frame.boundary).attr("width", frame.width).attr("height", frame.boundary).attr("fill", "#49494A");
+
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(particles.points)
+                .enter().append("g")
+                .attr("class", "node");
+
+        displaycontainer.boundaryCycles = displaycontainer.nodes.append("circle")
+                .attr("r", particles.radi).attr("cx", function (d) {
+            return d.x
+        })
+                .attr("cy", function (d) {
+                    return d.y
+                }).attr("fill", "#021944");
+
+        displaycontainer.innerCycles = displaycontainer.nodes.append("circle")
+                .attr("r", particles.radi - 1).attr("cx", function (d) {
+            return d.x
+        })
+                .attr("cy", function (d) {
+                    return d.y
+                }).attr("fill",
+                function (d) { 
+                    var t=Math.min(1,d.speed*1.0/particles.maxenergy);
+                    return "#"+d3_rgb_hex(Math.round(0 + 255 * t)) +"00"+d3_rgb_hex(Math.round(0 + 255 * (1-t)));
+                });
+        addLogo();
+                
+        displaycontainer.intervalID = setTimeout(function () {
+            showAlgorithm();
+        }, displaycontainer.animationTime);
+    }
+
+    function addLogo() {
+        var nameTag = displaycontainer.svg.append("text")
+                .attr("class", "xlabel")
+                .attr("text-anchor", "end   ")
+                .attr("x", frame.lastx+5)
+                .attr("y", frame.lasty+3)
+                .style("font-family", "Raleway")
+                .style("fill", "rgba(0,0,0, 0.5)")
+                .style("font-size", "16px")
+                .text("Fitzner, networkpages.nl")[0][0];
+    }
+    ;
+    
+    function collison(timerB, timerH) {
+        if (Math.min(timerB, timerH) < 0) {
+            if (timerB < timerH) {
+                var p = particles.points[particles.boundartypoint];
+                console.log("Bouncing");
+                console.log(p.x + "  " + p.y + "  " + p.xspeed + "  " + p.yspeed);
+                console.log(p.oldx + "  " + p.oldy + "  " + p.oldxspeed + "  " + p.oldyspeed);
+            } else {
+
+                console.log("Collision");
+                var p = particles.points[particles.collisionpart1];
+                console.log(p.x + "  " + p.y + "  " + p.xspeed + "  " + p.yspeed);
+                console.log(p.oldx + "  " + p.oldy + "  " + p.oldxspeed + "  " + p.oldyspeed);
+                p = particles.points[particles.collisionpart2];
+                console.log(p.x + "  " + p.y + "  " + p.xspeed + "  " + p.yspeed);
+                console.log(p.oldx + "  " + p.oldy + "  " + p.oldxspeed + "  " + p.oldyspeed);
+
+            }
+            console.log("Last time " + frame.timeStep);
+            return false;
+        }
+        else
+            return true;
+    }
+
+    function showAlgorithm() {
+
+        if (particles.nextIsStatus === 1)
+        {
+            bounceAtBoundary();
+        }
+        if (particles.nextIsStatus === 2)
+        {
+            collideTwoBalls();
+        }
+        var timerB = timeToBoundary();
+        var timerH = timeToHit();
+        var timer = Math.min(timerB, timerH);
+        //if (collison(timerB, timerH)) {
+        if(timer>0){
+            frame.timeStep = timer;
+            particles.lastStatus = particles.nextIsStatus;
+            if (timerB < timerH) {
+                particles.nextIsStatus = 1;
+            } else {
+                particles.nextIsStatus = 2;
+            }
+            //}
+            displaycontainer.animationTime = timer * 750;
+            displaycontainer.boundaryCycles.transition().duration(displaycontainer.animationTime).attr("cx", function (d) {
+                d.x = d.x + d.xspeed * timer;
+                return d.x;
+            }).attr("cy", function (d) {
+                d.y = d.y + d.yspeed * timer;
+                return d.y;
+            });
+            displaycontainer.innerCycles.transition().duration(displaycontainer.animationTime).attr("cx", function (d) {
+                return d.x;
+            }).attr("cy", function (d) {
+                return d.y;
+            }).attr("fill",
+                function (d) { 
+                    var t=Math.min(1,d.speed*1.0/particles.maxenergy);
+                    return "#"+d3_rgb_hex(Math.round(0 + 255 * t)) +"00"+d3_rgb_hex(Math.round(0 + 255 * (1-t)));
+                });
+            displaycontainer.intervalID = setTimeout(function () {
+                showAlgorithm();
+            }, displaycontainer.animationTime);
+        }
+        //}
+    }
+
+    </script>

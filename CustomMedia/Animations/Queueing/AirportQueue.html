@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<body onload="start()">
+    <table style="position:absolute;top:0px;font-size:24px; font-family: Raleway; ">
+        <tr>
+            <td> Average service time</td> 
+            <td> <input style="position:relative;top:3px;width:70px; " type="number"  id="ServiceTime" value="2" step="0.2" min="0.2"></td>
+        </tr>
+        <tr>
+            <td> Display speed </td> 
+            <td> <input style="width:16vmin;" type="range" id="speed" value="50"></td>
+        </tr>
+
+    </table>
+    
+    
+    <script src="../SharedResources/d3.min.js"></script>
+    <script>
+    var displaycontainer = {}, customers = {}, servers = {}, queue = {};
+
+    //displaycontainer.width = Math.min(800, window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth),
+    //displaycontainer.height = M   ath.min(600, window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight),
+    
+    displaycontainer.width = Math.min(1000, window.innerWidth-20),
+    displaycontainer.height = Math.min(800, window.innerHeight-20),
+
+    displaycontainer.speed = 1000;
+    if (displaycontainer.width*1.0/displaycontainer.height<10500/7450){
+        displaycontainer.height=Math.round(displaycontainer.width*7450.0/10500);
+    } else 
+        displaycontainer.width=Math.round(displaycontainer.height*10500.0/7450);
+    
+    displaycontainer.timeTonewCustomer=1;
+    displaycontainer.serviceTimeAVG=2;
+    displaycontainer.activeGate=0;
+    
+    customers={};
+    customers.picWidth = displaycontainer.width/12,
+    customers.picHeight = customers.picWidth/1045*745;
+      
+    customers.p = [],
+    customers.activeAllTime=0;
+
+    servers.nr = 4,
+    servers.picWidth = displaycontainer.width/10,
+    servers.picHeight = servers.picWidth/1045*745,
+    servers.p = [],
+    servers.displayPosition = [];
+    queue.lineWidht=9; // assumed to be odd
+    queue.offset=1.1;
+    queue.maxQueueLength = (queue.lineWidht+1)/2+queue.lineWidht*3+1;
+    var enterPosition = [];
+    var enterIndex = [];
+    enterIndex[0]=(queue.lineWidht+1)/2+1;
+    enterIndex[1]=enterIndex[0]+queue.lineWidht;
+    enterIndex[2]=enterIndex[1]+queue.lineWidht;
+    enterIndex[3]=enterIndex[2]+queue.lineWidht;
+    customers.maxNr = queue.maxQueueLength+4;
+
+    function start( ) {
+        createObjects();
+        document.getElementById("ServiceTime").value = displaycontainer.serviceTimeAVG ;
+        activateCustomers();
+    }
+
+    function createObjects() {
+        displaycontainer.svg = d3.select("body").append("svg").attr("width", displaycontainer.width).attr("height", displaycontainer.height);
+        // ===================Travelers===================
+        var showitems = [];
+        for (var n = 0; n < customers.maxNr; n++) {
+            var c = {name: n, kind: "customer", x: 0, y: 0, status: -1, positioninList:-1 , targetPosition: -1, personID:1, luggageTag:"a"};
+            // status =-1 not initialised
+            // status = 0 initialised waiting
+            // status = 1 walking to first target position;
+            // status = 2 staying in line
+            // status = 3 walking in line
+            // status = 4 walking to server
+            // status = 5 being at server
+            // status = 6 leaving the scene
+            
+            c.personID=1+Math.floor(Math.random()*3);
+            var id=Math.floor(Math.random()*3);
+            if (id===0) c.luggageTag="a";
+            else if (id===1) c.luggageTag="b";
+            else c.luggageTag="c"; 
+            customers.p.push(c);
+            showitems.push(c);
+        }
+        // ===================Create the objects for Travelers===================
+        
+        // ===================Queues===================
+        queue.waitingCustomers = [];
+        queue.displayPosition = [];
+        
+        var d=(queue.lineWidht-1)/2;
+        for (var n = 0; n < d+1; n++) {
+            var pos = { x: displaycontainer.width / 2 + customers.picWidth *  queue.offset * n, y: y=displaycontainer.height / 3};
+            queue.displayPosition.push(pos); // 0,, d=
+        }
+
+        for (var n = 0; n < queue.lineWidht; n++) {
+            var pos = { x:displaycontainer.width / 2 - customers.picWidth *  queue.offset * (-d + n), y: displaycontainer.height / 3 + customers.picHeight * queue.offset};
+            queue.displayPosition.push(pos);
+        }
+
+        for (var n = 0; n < queue.lineWidht; n++) {
+            var pos = { x:displaycontainer.width / 2 - customers.picWidth *  queue.offset * (d - n), y: displaycontainer.height / 3 + customers.picHeight * queue.offset*2};
+            queue.displayPosition.push(pos);
+        }
+
+        for (var n = 0; n < queue.lineWidht; n++) {
+            var pos = { x:displaycontainer.width / 2 - customers.picWidth *  queue.offset * (-d + n), y: displaycontainer.height / 3 + customers.picHeight * queue.offset*3};
+            queue.displayPosition.push(pos);
+        }
+        var pos = { x: displaycontainer.width / 2 - customers.picWidth *  queue.offset * d, y: displaycontainer.height / 3 + customers.picHeight * queue.offset*4};
+        queue.displayPosition.push(pos);
+          
+        for (var n = 0; n < servers.nr; n++) {
+            var c = {name: n, kind: "server", x: (n + 0.5) * displaycontainer.width / (servers.nr) - (servers.picWidth+customers.picWidth) / 2,
+                y: customers.picHeight * 1.5, idle: true,  xcustom: (n + 0.5) * displaycontainer.width / (servers.nr) -(servers.picWidth+customers.picWidth) / 2+ (servers.picWidth) , 
+                ycustom: customers.picHeight * 1.5};
+            servers.p.push(c);
+            showitems.push(c);
+        }
+
+        displaycontainer.node = displaycontainer.svg.selectAll(".node").data(showitems);
+        displaycontainer.node.enter().append("image").attr("class", function (d) {
+            return "node " + c.kind + d.name;
+        }).attr("xlink:href", function (d) {
+            if (d.kind === "customer"){
+                return "images/Traveler"+d.personID+d.luggageTag+".png";
+            }
+            else
+                return "images/Checkin.png"
+        }).attr("width", function (d) {
+                    if (d.kind === "customer")
+                        return customers.picWidth + "px";
+                    else
+                        return servers.picWidth + "px"
+        }).attr("height", function (d) {
+                    if (d.kind === "customer")
+                        return customers.picHeight + "px";
+                    else
+                        return servers.picHeight + "px"
+        }).attr("x", function (d) {
+            return d.x
+        }).attr("y", function (d) {
+            return d.y
+        }).style("visibility", function (d) {
+                    if (d.kind === "customer")
+                        return "hidden";
+                    else
+                        return "visible" 
+        });
+        displaycontainer.customers = [];
+        for (var n = 0; n < customers.maxNr; n++)
+        {
+            displaycontainer.customers.push(displaycontainer.svg.selectAll(".node").filter(function (d) {
+                if (d.kind === "customer" && d.name === n)
+                    return d;
+            }));
+        }
+
+        enterPosition[0] = [displaycontainer.width / 2 + customers.picWidth / 2, displaycontainer.height - customers.picHeight]; // buttom corner
+        enterPosition[1] = [queue.displayPosition[enterIndex[3]-1].x, queue.displayPosition[enterIndex[3]-1].y];
+        enterPosition[2] = [queue.displayPosition[enterIndex[2]-1].x, queue.displayPosition[enterIndex[2]-1].y];
+        enterPosition[3] = [queue.displayPosition[enterIndex[1]-1].x, queue.displayPosition[enterIndex[1]-1].y];
+        enterPosition[4] = [queue.displayPosition[enterIndex[0]-1].x, queue.displayPosition[enterIndex[0]-1].y]
+        enterPosition[5] = [displaycontainer.width / 2, displaycontainer.height / 3];
+ 
+        // =========================draw the background===========================
+        var xll = displaycontainer.width / 2-customers.picWidth * queue.offset*(queue.lineWidht-1)/2;
+        var xlm = displaycontainer.width / 2-customers.picWidth * queue.offset*(queue.lineWidht-3)/2;
+        var xrm = displaycontainer.width / 2+customers.picWidth * queue.offset*(queue.lineWidht-1)/2;
+        var xrr = displaycontainer.width / 2+customers.picWidth * queue.offset*(queue.lineWidht+1)/2;
+        var heightoffstep=customers.picHeight*(queue.offset-1)/2;
+        var lines=[];
+        
+        lines[0]={x1:xrr, y1: displaycontainer.height / 3-heightoffstep ,x2:xrr, y2: displaycontainer.height / 3+4*(queue.offset)*customers.picHeight-heightoffstep,name:0};
+        lines[1]={x1:xll, y1: displaycontainer.height / 3+1*(queue.offset)*customers.picHeight-heightoffstep,x2:xll, y2: displaycontainer.height / 3+4*(queue.offset)*customers.picHeight+heightoffstep,name:0};        
+        lines[2]={x1:displaycontainer.width / 2+customers.picWidth*queue.offset, y1: displaycontainer.height / 3-heightoffstep ,
+            x2: xrr, y2: displaycontainer.height / 3-heightoffstep,name:0};
+        lines[3]={x1:xll, y1: displaycontainer.height / 3+customers.picHeight*queue.offset-heightoffstep ,x2:xrm, y2: displaycontainer.height / 3+customers.picHeight*queue.offset-heightoffstep,name:0};
+        for(var i=2;i<5;i++){
+            lines[i+2]={x1:xlm, y1: displaycontainer.height / 3+customers.picHeight*queue.offset*i-heightoffstep ,x2:xrm, y2: displaycontainer.height / 3+customers.picHeight*queue.offset*i-heightoffstep,name:0};
+        }
+        lines[7]={x1:xrr, y1: displaycontainer.height / 3+2*customers.picHeight*queue.offset-heightoffstep ,x2:xrm, y2: displaycontainer.height / 3+2*customers.picHeight*queue.offset-heightoffstep,name:1};
+        lines[8]={x1:xll, y1: displaycontainer.height / 3+3*customers.picHeight*queue.offset-heightoffstep ,x2:xlm, y2: displaycontainer.height / 3+3*customers.picHeight*queue.offset-heightoffstep,name:2};
+        lines[9]={x1:xrr, y1: displaycontainer.height / 3+4*customers.picHeight*queue.offset-heightoffstep ,x2:xrm, y2: displaycontainer.height / 3+4*customers.picHeight*queue.offset-heightoffstep,name:3};
+        
+        
+        displaycontainer.lines = displaycontainer.svg.selectAll(".line").data(lines);
+        displaycontainer.lines.enter().append("line").attr("class",function (d) { return "line "+d.name}).attr("x1", function (d) {return d.x1}).attr("y1", function (d) {return d.y1}).attr("x2", function (d) {return d.x2}).attr("y2", function (d) {return d.y2}).attr("stroke-width","2").attr("stroke","rgb(72,72,72)");
+                displaycontainer.svg.selectAll(".line").filter(function (d) {
+                if (d.name > 0 ) return d;
+        }).style("visibility", "hidden");
+
+    }
+    
+    function activateCustomers() {
+        activateOneCustomer();
+        customers.activeAllTime++;
+        if(customers.activeAllTime<1){
+            setTimeout(function () {
+                activateCustomers();
+            }, displaycontainer.speed*displaycontainer.timeTonewCustomer/3 );
+        } else {
+            setTimeout(function () {
+                activateCustomers();
+            }, displaycontainer.speed*displaycontainer.timeTonewCustomer );
+        }
+    }
+   
+    function activateOneCustomer() {
+        var customerNumber = getFirstInactiveCustomer();
+
+        if ((customerNumber !== -1) && (queue.waitingCustomers.length < queue.maxQueueLength)) {
+            customers.p[customerNumber].status = 0;// entered 
+            displaycontainer.customers[customerNumber].attr("x", enterPosition[0][0]+displaycontainer.width / 2*(Math.random()-1))
+                    .attr("y", enterPosition[0][1]).style("visibility", "visible");
+            //console.log("Activate "+customerNumber);
+            setTimeout(function () {
+                moveToQueue(customerNumber);
+            }, displaycontainer.speed);
+        }
+    }
+
+    function moveToQueue(customerNumber) {
+        var edID=getEnterIndex();
+        customers.p[customerNumber].status = 1;// going to end of the queue
+        customers.p[customerNumber].targetPosition=getEnterPosition();
+        customers.p[customerNumber].positioninList=queue.waitingCustomers.length;
+        queue.waitingCustomers.push(customers.p[customerNumber]);
+        if ((edID===3)){
+            var ep=enterPosition[1];
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed).attr("x", ep[0]).attr("y", ep[1]);
+            setTimeout(function () {
+                customers.p[customerNumber].targetPosition--;
+                arriveAtPosInQueue(customerNumber);
+            }, displaycontainer.speed );
+        } else if ((edID===2)){
+            var ep=enterPosition[2];
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.7).attr("x", ep[0]).attr("y", ep[1] + customers.picHeight * queue.offset);
+            setTimeout(function () {
+                displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.3).attr("x", ep[0]).attr("y", ep[1]);
+                setTimeout(function () {
+                    customers.p[customerNumber].targetPosition--;
+                    arriveAtPosInQueue(customerNumber);
+                }, displaycontainer.speed*0.3);
+            }, displaycontainer.speed*0.7 );
+        } else if ((edID===1)){
+            var epA=enterPosition[1];
+            var epB=enterPosition[3];
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.6).attr("x", epA[0]).attr("y", epA[1] );
+            setTimeout(function () {
+                displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.4).attr("x", epA[0]).attr("y", epB[1]);
+                setTimeout(function () {
+                    customers.p[customerNumber].targetPosition--;
+                    arriveAtPosInQueue(customerNumber);
+                }, displaycontainer.speed*0.4);
+            }, displaycontainer.speed*0.6 );
+        } else if ((edID===0)){
+            var epA=enterPosition[2];
+            var epB=enterPosition[4];
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.5).attr("x", epA[0]).attr("y", epA[1] + customers.picHeight * queue.offset);
+            setTimeout(function () {
+                displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.5).attr("x", epB[0]).attr("y", epB[1]);
+                setTimeout(function () {
+                    customers.p[customerNumber].targetPosition--;
+                    arriveAtPosInQueue(customerNumber);
+                }, displaycontainer.speed*0.5);
+            }, displaycontainer.speed*0.5 );
+        }
+    }
+
+
+    function getEnterCoordinates() {
+        for(var i=0;i<4;i++)
+            if (queue.waitingCustomers.length<enterIndex[i]) return 4-i;
+        return -1;
+    }
+    
+    function getEnterPosition() {
+        for(var i=0;i<4;i++)
+            if (queue.waitingCustomers.length<enterIndex[i]) return enterIndex[i];
+        return -1;
+    } 
+   
+    function getEnterIndex() {
+        var rVal=-1;
+        for(var i=0;i<4;i++){
+            if (queue.waitingCustomers.length<enterIndex[i]) { rVal=i; i=100000;}
+        }
+        if(rVal!==-1){
+            setTimeout(function () {
+                displaycontainer.svg.selectAll(".line").filter(function (d) {
+                    if ((d.name > rVal )&&(d.name>0)) return d;
+                }).style("visibility", "hidden");
+            }, displaycontainer.speed*0.05);
+            setTimeout(function () {
+                displaycontainer.svg.selectAll(".line").filter(function (d) {
+                    if ((d.name <= rVal )&&(d.name>0)) return d;
+                }).style("visibility", "visible");
+            }, displaycontainer.speed*0.1);
+        }
+        return rVal;
+    } 
+    
+    function arriveAtPosInQueue(customerNumber) {
+        var diffpos= customers.p[customerNumber].targetPosition - customers.p[customerNumber].positioninList;
+        //console.log("arrive in queue  "+customerNumber+" at "+customers.p[customerNumber].targetPosition+" wanting to "+customers.p[customerNumber].positioninList);
+                
+        if (diffpos<0)
+            console.log("Incorrect position to be in list.");
+        if (diffpos===0){
+           // we arrived at the correct point
+            if(customers.p[customerNumber].targetPosition===0){
+                var srNr = getFreeServerNr();
+                if (srNr !== -1) {
+                    moveToServer(customerNumber, srNr);
+                }
+                else customers.p[customerNumber].status = 2; //waiting 
+            }
+            else customers.p[customerNumber].status = 2; //waiting
+        } else {
+            customers.p[customerNumber].status = 3; // walking in queue
+            customers.p[customerNumber].targetPosition--;
+            var pos=queue.displayPosition[customers.p[customerNumber].targetPosition];
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*1.0/4 ).attr("x", pos.x).attr("y", pos.y);
+
+            setTimeout(function () {
+                arriveAtPosInQueue(customerNumber);
+            }, displaycontainer.speed*1.0/4);
+        }
+    }
+
+
+    
+
+    function moveToServer(customerNumber, srnumber) {
+        if (queue.waitingCustomers[0].name !== customerNumber) {
+            console.log("Customer to serve not the first in queue.");
+        } else {
+            var c=queue.waitingCustomers.shift();
+            customers.p[customerNumber].status = 4;// is moving to server
+            customers.p[customerNumber].targetPosition=-1;
+            customers.p[customerNumber].positioninList=-1;
+            
+            servers.p[srnumber].idle = false;// server is now busy
+            
+             displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.2)
+                .attr("x", enterPosition[5][0])
+                .attr("y", enterPosition[5][1]-customers.picHeight*queue.offset);
+            setTimeout(function () {
+                displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.5)
+                    .attr("x", servers.p[srnumber].xcustom)
+                    .attr("y", servers.p[srnumber].ycustom+servers.picHeight);
+                setTimeout(function () {
+                    displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed*0.5-1)
+                            .attr("x", servers.p[srnumber].xcustom)
+                            .attr("y", servers.p[srnumber].ycustom);
+                }, displaycontainer.speed*0.5);
+            }, displaycontainer.speed*0.2);
+
+            setTimeout(function () {
+                startServing(customerNumber, srnumber);
+            }, displaycontainer.speed);
+            
+            for (i = 0; i < queue.waitingCustomers.length; i++) {
+                 queue.waitingCustomers[i].positioninList--;
+                 if (queue.waitingCustomers[i].status === 2)
+                        arriveAtPosInQueue(queue.waitingCustomers[i].name);
+
+              }
+        }
+    }
+
+    function startServing(customerNumber, srnumber) {
+        customers.p[customerNumber].status = 5;// is being servered        
+        var seriveTime=getPoison(displaycontainer.serviceTimeAVG)+2*getSTNormal();
+        setTimeout(function () {            
+            endServedCostomer(customerNumber, srnumber);
+        }, displaycontainer.speed * seriveTime);
+    }
+
+
+
+
+    function endServedCostomer(customerNumber, srnumber) {
+        
+        if (customers.p[customerNumber].status !== 5)
+            console.log("Customer was not in status to be served.");
+        else {
+            // move the served customer out.
+            customers.p[customerNumber].status = 6;// leaving
+            servers.p[srnumber].idle = true;
+            displaycontainer.customers[customerNumber].attr("xlink:href", function (d) {
+                return "images/Traveler"+d.personID+".png";
+            });
+            
+            displaycontainer.customers[customerNumber].transition().duration(displaycontainer.speed).attr("y", -customers.picHeight);
+            arriveAtPosInQueue(queue.waitingCustomers[0].name);
+            setTimeout(function () {
+                deactivateCustomer(customerNumber);
+            }, displaycontainer.speed + 11);
+        }
+    }
+
+
+    function getFreeServerNr() {
+        var canidates = [];
+        for (i = 0; i < servers.nr; i++) {
+            if (servers.p[i].idle)
+                canidates.push(i);
+        }
+        if (canidates.length === 0)
+            return -1;
+        else
+            return canidates[Math.floor(Math.random() * canidates.length)];
+    }
+
+    function deactivateCustomer(customerNumber) {
+        displaycontainer.customers[customerNumber].attr("xlink:href", function (d) {
+                        return "images/Traveler"+d.personID+d.luggageTag+".png";
+                }).style("visibility", "hidden");
+        setTimeout(function () {
+            customers.p[customerNumber].status = -1;
+        }, 200);
+    }
+
+    function getFirstInactiveCustomer() {
+        for (i = 0; i < customers.maxNr; i++)
+            if (customers.p[i].status === -1)
+                return i;
+        return -1;
+    }
+
+
+
+    function getExponential(lambda)
+    {
+        return -1 * Math.log(Math.random()) / lambda;
+    }
+
+    function getPoison(lambda)
+    {
+        var L=Math.exp(-lambda);
+        var k=0,p=1;
+        do{
+            k++;
+            p=p*Math.random();
+        } while (p>L)
+        return k-1;
+    }
+
+    // Standard Normal variate using Box-Muller transform.
+    function getSTNormal() {
+        var u = 1 - Math.random(); // Subtraction to flip [0, 1) to (0, 1].
+        var v = 1 - Math.random();
+        return Math.sqrt( -2.0 * Math.log( u ) ) * Math.cos( 2.0 * Math.PI * v );
+    }
+
+
+    d3.select("input[id=ServiceTime]").on("change", function () {
+        if (this.value < 0)
+            alert("The average time does not make sense.");
+        else {
+            displaycontainer.serviceTimeAVG = Number(this.value);
+        }
+    });
+    
+    
+    d3.select("input[id=speed]").on("change", function () {
+        if (this.value < 0) {
+            alert("The speed should e a positive number.");
+        }
+        else {
+            displaycontainer.speed=Math.max(50,this.value*20);
+        }
+    });
+    
+    </script>
+
