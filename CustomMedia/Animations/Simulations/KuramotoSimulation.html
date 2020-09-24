@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<!--<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>-->
+<style>
+    .node {
+        stroke: #333;
+        stroke-width: 0.7px;
+    }
+
+    .abox .bbox .cbox {
+        height: 50%;
+    }
+
+    .backPan {
+        fill: #fafafa;
+    }
+
+    .square {
+        width: 100%;
+    }
+</style>
+
+<body onload="initialize()">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-lg-8 col-12">
+                <h1>Two-community noisy Kuramoto model</h1>
+                <div class="row">
+                    <div class="col-lg-5 col-12">
+                        <form id="parameters">
+                            <h3>Dynamics</h3>
+                            <div class="form-group row">
+                                <label for="N1" class="col-form-label col-sm-2">N<sub>1</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="N1" value=20>
+                                <div class="col-sm-1"></div>
+                                <label for="N2" class="col-form-label col-sm-2">N<sub>2</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="N2" value=20>
+                            </div>
+                            <div class="form-group row">
+                                <label for="K1" class="col-form-label col-sm-2">K<sub>1</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="K1" value=1>
+                                <div class="col-sm-1"></div>
+                                <label for="K2" class="col-form-label col-sm-2">K<sub>2</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="K2" value=1>
+                            </div>
+                            <div class="form-group row">
+                                <label for="L1" class="col-form-label col-sm-2">L<sub>1</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="L1" value=-1>
+                                <div class="col-sm-1"></div>
+                                <label for="L2" class="col-form-label col-sm-2">L<sub>2</sub>:</label>
+                                <input type="number" class="form-control col-sm-3" id="L2" value=-1>
+                            </div>
+                            <div class="form-group row">
+                                <label for="D" class="col-form-label col-sm-8">Noise strength (D):</label>
+                                <input type="number" class="form-control col-sm-3" id="D" value=-1>
+                            </div>
+                            <h3>Initialization</h3>
+                            <div class="form-group row">
+                                <label for="omegaDistribution" class="col-form-label col-sm-5">Frequencies:</label>
+                                <select class="custom-select col-sm-6" id="omegaDistribution">
+                                    <option selected>Choose...</option>
+                                    <option value="normal">Standard normal</option>
+                                    <option value="zero">Constant zero</option>
+                                </select>
+                            </div>
+                            <div class="form-group row">
+                                <label for="initialAngle1" class="col-form-label col-sm-2">u<sub>1</sub>:</label>
+                                <select class="custom-select col-sm-2" id="initialAngle1">
+                                    <option selected value="0">0</option>
+                                    <option value="pi">&pi;</option>
+                                </select>
+                                <label for="initialSynchronization1" class="col-form-label col-sm-2">r<sub>1</sub>:</label>
+                                <input type="range" value=0 min=0 max=1 step=0.05 class="form-control col-sm-4" id="initialSynchronization1" onchange="sliderChanged(1)" />
+                                <label class="col-sm-1 col-form-label" id="sliderDisplay1">0</label>
+                            </div>
+                            <div class="form-group row">
+                                <label for="initialAngle2" class="col-form-label col-sm-2">u<sub>2</sub>:</label>
+                                <select class="custom-select col-sm-2" id="initialAngle2">
+                                    <option value="0">0</option>
+                                    <option selected value="pi">&pi;</option>
+                                </select>
+                                <label for="initialSynchronization2" class="col-form-label col-sm-2">r<sub>2</sub>:</label>
+                                <input type="range" value=0 min=0 max=1 step=0.05 class="form-control col-sm-4" id="initialSynchronization2" onchange="sliderChanged(2)" />
+                                <label class="col-sm-1 col-form-label" id="sliderDisplay2">0</label>
+                            </div>
+                            <div class="col-auto my-1 row">
+                                <button type="button" id="restart" class="btn btn-primary col-12">Restart simulation</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="abox square col-lg-7 col-12" id="abox"> </div>
+                </div>
+                <h2 hidden>Synchronization level</h2>
+                <div hidden class="bbox" id="bbox"> </div>
+                <br />
+                <h2 hidden>Phase difference</h2>
+                <div hidden class="cbox" id="cbox"> </div>
+
+            </div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v5.js"></script>
+
+    <script>
+        var dc = {};
+
+        //====================Parameters
+        dc.omegaDistribution = 'normal'; // 'zero'/'normal'/
+        dc.N = [30, 20]; // N1, N2,...
+        dc.K = [10, 7]; // K1,K2,...
+        dc.L = [-3, -3]; // L1,L2,...
+        dc.noiseStrength = 0.1; // D
+        dc.initialSynchronization = [0, 0];
+        dc.initialAngle = [0, Math.PI];
+
+        var graph = {};
+        dc.size = 0.92 * document.getElementById("abox").getBoundingClientRect().width;
+        dc.boundary = dc.size * 0.05;
+        dc.radius = dc.size / 2 - 2 * dc.boundary;
+        dc.plotWidth = document.getElementById("bbox").getBoundingClientRect().width;
+        dc.plotHeigth = dc.plotWidth / 3;
+
+        dc.color = ["#f25006", "#80ba01", "#ffb902", "#02a4ef", "#8b1599", "#726906"];
+        dc.intervalID = [];
+        dc.nodes = [];
+        dc.animationTime = 20;
+        dc.restarts = -1;
+
+        function getUrlVars() {
+            var vars = {};
+            var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function(m, key, value) {
+                vars[key] = value;
+            });
+            return vars;
+        }
+
+        function setModelParameters() {
+            var passedParameters = getUrlVars();
+            if (!isNaN(passedParameters.N1))
+                dc.N[0] = parseInt(passedParameters.N1);
+            if (!isNaN(passedParameters.N2))
+                dc.N[1] = parseInt(passedParameters.N2);
+            if (!isNaN(passedParameters.L1))
+                dc.L[0] = parseFloat(passedParameters.L1);
+            if (!isNaN(passedParameters.L2))
+                dc.L[1] = parseFloat(passedParameters.L2);
+            if (!isNaN(passedParameters.K1))
+                dc.K[0] = parseFloat(passedParameters.K1);
+            if (!isNaN(passedParameters.K2))
+                dc.K[1] = parseFloat(passedParameters.K2);
+            if (!isNaN(passedParameters.D))
+                dc.parseFloat = parseInt(passedParameters.D);
+            if (!isNaN(passedParameters.omegaDistribution))
+                dc.omegaDistribution = parseInt(passedParameters.omegaDistribution);
+            if (!isNaN(passedParameters.initialSynchronization1))
+                dc.initialSynchronization[0] = parseFloat(passedParameters.initialSynchronization1);
+            if (!isNaN(passedParameters.initialSynchronization2))
+                dc.initialSynchronization[1] = parseFloat(passedParameters.initialSynchronization2);
+            if (!isNaN(passedParameters.initialAngle1))
+                dc.initialAngle[0] = passedParameters.initialAngle1 == "pi" ? Math.PI : 0;
+            if (!isNaN(passedParameters.initialSynchronization2))
+                dc.initialAngle[1] = passedParameters.initialAngle2 == "pi" ? Math.PI : 0;
+            dc.nrNodes = dc.N.reduce((a, b) => a + b, 0);
+        }
+
+        function initialize() {
+            setModelParameters();
+            document.getElementById("N1").value = dc.N[0];
+            document.getElementById("N2").value = dc.N[1];
+            document.getElementById("K1").value = dc.K[0];
+            document.getElementById("K2").value = dc.K[1];
+            document.getElementById("L1").value = dc.L[0];
+            document.getElementById("L2").value = dc.L[1];
+            document.getElementById("D").value = dc.noiseStrength;
+            document.getElementById("initialSynchronization1").value = dc.initialSynchronization[0];
+            document.getElementById("initialSynchronization2").value = dc.initialSynchronization[1];
+            document.getElementById("initialAngle1").value = dc.initialAngle[0] == 0 ? "0" : "pi";
+            document.getElementById("initialAngle2").value = dc.initialAngle[1] == 0 ? "0" : "pi";
+            document.getElementById("omegaDistribution").value = dc.omegaDistribution;
+
+            start();
+        }
+
+        function sliderChanged(i) {
+            document.getElementById("sliderDisplay" + i).innerHTML = document.getElementById("initialSynchronization" + i).value
+        }
+
+        function readForm() {
+            dc.N[0] = parseInt(document.getElementById("N1").value);
+            dc.N[1] = parseInt(document.getElementById("N2").value);
+            dc.K[0] = parseFloat(document.getElementById("K1").value);
+            dc.K[1] = parseFloat(document.getElementById("K2").value);
+            dc.L[0] = parseFloat(document.getElementById("L1").value);
+            dc.L[1] = parseFloat(document.getElementById("L2").value);
+            dc.noiseStrength = parseFloat(document.getElementById("D").value);
+            dc.omegaDistribution = document.getElementById("omegaDistribution").value;
+            dc.initialSynchronization[0] = document.getElementById("initialSynchronization1").value;
+            dc.initialSynchronization[1] = document.getElementById("initialSynchronization2").value;
+            dc.initialAngle[0] = document.getElementById("initialAngle1").value == "pi" ? Math.PI : 0;
+            dc.initialAngle[1] = document.getElementById("initialAngle2").value == "pi" ? Math.PI : 0;
+            dc.nrNodes = dc.N.reduce((a, b) => a + b, 0);
+        }
+
+        function start() {
+            dc.restarts++;
+            readForm();
+
+            // create the model of the nodes
+            createNodes();
+            // show the nodes
+            initializeGraphic();
+            dc.intervalID.push(setTimeout(function() {
+                moveNodes(dc.restarts);
+            }, dc.animationTime));
+        }
+        document.getElementById('restart').onclick = start;
+
+        function draw() {
+            setModelParameters();
+            // create the model of the nodes
+            createNodes();
+            // show the nodes
+            initializeGraphic();
+            dc.intervalID = [];
+            dc.intervalID.push(setTimeout(function() {
+                moveNodes(dc.restarts);
+            }, dc.animationTime));
+
+        };
+
+        function randomInt(max) {
+            return Math.floor(Math.random() * max);
+        }
+
+        // Standard Normal variate using Box-Muller transform.
+        function random_bm() {
+            var u = 0,
+                v = 0;
+            while (u === 0) u = Math.random(); //Converting [0,1) to (0,1)
+            while (v === 0) v = Math.random();
+            return Math.sqrt(-2.0 * Math.log(u)) * Math.cos(2.0 * Math.PI * v);
+        }
+
+        function random_freq() {
+            switch (dc.omegaDistribution) {
+                case 'normal':
+                    return random_bm();
+                default:
+                    return 0;
+            }
+        }
+
+        //====================Graph creation
+        function createNodes() {
+            dc.nodes = [];
+            var i = 0;
+            for (var g = 0; g < dc.N.length; g++) {
+                for (var j = 0; j < dc.N[g]; j++) {
+                    var node = {
+                        name: i,
+                        id: "circle#id" + i++,
+                        group: g
+                    };
+                    if (dc.initialSynchronization[g] == 0) {
+                        node.angle = Math.random() * Math.PI * 2;
+                    } else {
+                        node.angle = dc.initialAngle[g] + Math.pow(-2 * Math.log(dc.initialSynchronization[g]), 1 / 2) * random_bm();
+                    }
+                    node.naturalFrequency = random_freq(); // rotations/s
+                    node.angularSpeed = 2 * Math.PI * node.naturalFrequency; // Radi/s
+                    node.radi = dc.radius * (0.9 + random_bm() * 0.07); // node's distance to center
+                    node.x = dc.size / 2 + Math.cos(node.angle) * node.radi;
+                    node.y = dc.size / 2 + Math.sin(node.angle) * node.radi;
+                    dc.nodes.push(node);
+                }
+            }
+        }
+
+        //====================================Visual=========================
+        function initializeGraphic() {
+            // Clear visualization
+            document.getElementsByClassName('abox')[0].innerHTML = "";
+            document.getElementsByClassName('bbox')[0].innerHTML = "";
+            document.getElementsByClassName('cbox')[0].innerHTML = "";
+
+            dc.svg = d3.select(".abox").append("svg").attr("width", dc.size).attr("height", dc.size);
+            dc.backpannel = dc.svg.append("rect").attr("class", "backPan").attr("x", 0).attr("y", 0).attr("width", dc.size).attr("height", dc.size);
+            dc.points = dc.svg.selectAll(".node")
+                .data(dc.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("id", function(n) {
+                    return "id" + n.name;
+                }).attr("fill", function(d) {
+                    return dc.color[d.group];
+                }).attr("r", 5).attr("cx", function(d) {
+                    return d.x
+                }).attr("cy", function(d) {
+                    return d.y
+                });
+
+            dc.svg2 = d3.select(".bbox").append("svg").attr("width", dc.plotWidth).attr("height", dc.plotHeigth);
+            dc.backpannel2 = dc.svg2.append("rect").attr("class", "backPan").attr("x", 0).attr("y", 0).attr("width", dc.plotWidth).attr("height", dc.plotHeigth);
+
+            dc.svg3 = d3.select(".cbox").append("svg").attr("width", dc.plotWidth).attr("height", dc.plotHeigth);
+            dc.backpannel2 = dc.svg3.append("rect").attr("class", "backPan").attr("x", 0).attr("y", 0).attr("width", dc.plotWidth).attr("height", dc.plotHeigth);
+
+            dc.anchorx = dc.plotWidth * 0.05;
+            dc.anchory = dc.plotHeigth * 0.95;
+            dc.maxPlotCount = 1000;
+
+            dc.factorx = dc.plotWidth * 0.9 / dc.maxPlotCount;
+            dc.factory = dc.plotHeigth * 0.9;
+            dc.xAxis = dc.svg2.append("line")
+                .attr("class", "axisLine").attr("x1", dc.anchorx - 4).attr("y1", dc.anchory + 2)
+                .attr("x2", dc.plotWidth * 0.9 + dc.anchorx).attr("y2", dc.anchory + 2).attr("id", "xAxis")
+                .style("stroke", "#111");
+            dc.yAxis = dc.svg2.append("line")
+                .attr("class", "axisLine").attr("x1", dc.anchorx - 2).attr("y1", dc.anchory)
+                .attr("x2", dc.anchorx - 2).attr("y2", dc.anchory - dc.plotHeigth * 0.9).attr("id", "yAxis")
+                .style("stroke", "#111");
+
+            dc.xAxis3 = dc.svg3.append("line")
+                .attr("class", "axisLine").attr("x1", dc.anchorx - 4).attr("y1", dc.anchory + 2)
+                .attr("x2", dc.plotWidth * 0.9 + dc.anchorx).attr("y2", dc.anchory + 2).attr("id", "xAxis")
+                .style("stroke", "#111");
+            dc.yAxis3 = dc.svg3.append("line")
+                .attr("class", "axisLine").attr("x1", dc.anchorx - 2).attr("y1", dc.anchory)
+                .attr("x2", dc.anchorx - 2).attr("y2", dc.anchory - dc.plotHeigth * 0.9).attr("id", "yAxis")
+                .style("stroke", "#111");
+
+            dc.data = measure();
+            dc.plotC = 0;
+            dc.plotNodes = [];
+            dc.xpos = dc.anchorx;
+            dc.ypos = [];
+            dc.phaseY = dc.data.phasedif;
+            for (i = 0; i < dc.data.all.length; i++) {
+                dc.ypos.push(dc.anchory - dc.factory * dc.data.all[i]);
+            }
+        };
+
+        function moveNodes(restartID) {
+            // Make sure that we don't continue moving nodes if another simulation has been started.
+            if (restartID != dc.restarts)
+                return;
+            computeNewPosition();
+
+            dc.points.attr("cx", function(d) {
+                return d.x
+            }).attr("cy", function(d) {
+                return d.y
+            });
+
+            dc.data = measure();
+            dc.plotC++;
+            var newxpos = dc.xpos + dc.factorx;
+            var id = "idPlot" + dc.plotC;
+            dc.plotNodes.push(id);
+            for (i = 0; i < dc.data.sync.length; i++) {
+                var yPosOld = dc.ypos[i];
+                dc.ypos[i] = dc.anchory - dc.factory * dc.data.sync[i];
+                dc.svg2.append("line").attr("id", id).attr("x1", dc.xpos).attr("y1", yPosOld)
+                    .attr("x2", newxpos)
+                    .attr("y2", dc.ypos[i]).style("stroke", dc.color[i]).style("stroke-width", "1px");
+            }
+            var yPosOld = dc.phaseY;
+            var id = "phaseY" + dc.plotC;
+            dc.plotNodes.push(id);
+            dc.phaseY = dc.anchory - dc.factory * dc.data.phasedif;
+            dc.svg3.append("line").attr("id", id).attr("x1", dc.xpos).attr("y1", yPosOld)
+                .attr("x2", newxpos)
+                .attr("y2", dc.phaseY).style("stroke", dc.color[dc.color.length - 1]).style("stroke-width", "1px");
+
+            dc.xpos = newxpos;
+            if (dc.plotC % dc.maxPlotCount === dc.maxPlotCount - 1) {
+                dc.plotNodes.forEach(function(id) {
+                    dc.svg2.selectAll("line#" + id).remove();
+                    dc.svg3.selectAll("line#" + id).remove();
+                });
+                dc.xpos = dc.anchorx;
+            }
+            dc.intervalID.push(setTimeout(function() {
+                moveNodes(restartID);
+            }, dc.animationTime));
+        }
+
+        // Computes the argument of real+i*imaginary
+        function argument(real, imaginary) {
+            if (real > 0)
+                return Math.atan(imaginary / real);
+            if (real < 0 && imaginary >= 0)
+                return Math.atan(imaginary / real) + Math.PI;
+            if (real < 0 && imaginary < 0)
+                return Math.atan(imaginary / real) - Math.PI;
+            if (real == 0 && imaginary > 0)
+                return Math.PI / 2;
+            if (real == 0 && imaginary < 0)
+                return -Math.PI / 2;
+            // Undefined, but we'll just return 0
+            return 0;
+        }
+
+        function measure() {
+            var cosines = new Array(dc.N.length).fill(0);
+            var sines = new Array(dc.N.length).fill(0);
+
+            var distancessquare = [5, 5, 5, 5];
+            // Sum the cosines and sines
+            for (var i = 0; i < dc.nrNodes; i++) {
+                cosines[dc.nodes[i].group] += Math.cos(dc.nodes[i].angle);
+                sines[dc.nodes[i].group] += Math.sin(dc.nodes[i].angle);
+            }
+
+            var syncLevel = [];
+            var phase = [];
+            var normPhase = [];
+            for (var g = 0; g < sines.length; g++) {
+                // Complex modulus
+                var mod = Math.sqrt(cosines[g] * cosines[g] + sines[g] * sines[g]) / dc.N[g];
+                syncLevel.push(mod);
+                var arg = argument(cosines[g], sines[g]);
+                //console.log(cosines[g]+" "+sines[g]+" "+arg);
+                phase.push(arg);
+                normPhase.push(0.5 + 0.5 * arg / Math.PI);
+            }
+
+            phasedif = Math.abs(phase[1] - phase[0]);
+            phasedif = Math.min(phasedif, 2 * Math.PI - phasedif);
+
+            return {
+                "sync": syncLevel,
+                "phase": phase,
+                "phasedif": phasedif / Math.PI,
+                "all": syncLevel.concat(normPhase)
+            };
+        }
+
+        function computeNewPosition() {
+            var dt = dc.animationTime / 1000;
+
+            // Update node positions
+            for (var i = 0; i < dc.nrNodes; i++) {
+                var node = dc.nodes[i];
+
+                // compute d_angle
+                var d_angle = node.naturalFrequency * dt;
+                var sumSines = new Array(dc.N.length).fill(0);
+                // Compute the sum of the sines of the difference in angular speeds for each community
+                for (var j = 0; j < dc.nrNodes; j++) {
+                    // Compute sine of difference between angularSpeeds
+                    sumSines[dc.nodes[j].group] += Math.sin(dc.nodes[j].angle - node.angle);
+                }
+                // Add the sines
+                for (var g = 0; g < dc.N.length; g++) {
+                    var factor = (g == node.group ? dc.K[node.group] : dc.L[node.group]); // L_g or K_g.
+                    d_angle += factor * sumSines[g] * dt / dc.nodes.length;
+                }
+                // Add noise
+                var dW = dt * random_bm(); // Brownian motion
+                d_angle += Math.sqrt(dc.noiseStrength) * dW;
+
+                // Change position
+                node.angle += d_angle;
+                node.x = dc.size / 2 + Math.cos(node.angle) * node.radi;
+                node.y = dc.size / 2 + Math.sin(node.angle) * node.radi;
+            }
+        }
+    </script>
