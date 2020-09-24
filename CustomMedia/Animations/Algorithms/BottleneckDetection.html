@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<style>
+    .links line {
+      stroke: #999;
+      stroke-opacity: 0.6;
+      stroke-width: 5px;
+    }
+    .links line.selected {
+      stroke: #28a745;
+    }
+    .links line.disabled {
+      stroke: #dc3545;
+    }
+    .nodes circle {
+      stroke-width: 3px;
+    }
+    .axis-hline {
+      marker-end: url(#arrow);
+      stroke: #212529;
+      stroke-width: 3px;
+      orient: auto;
+    }
+    #graph {
+      width: 100%;
+      height: 500px;
+      margin: auto;
+    }
+</style>
+
+<body onload="initialize()">
+    <div class="container">
+        <div class="row">
+          <div class="col-md-12">
+            <div id="graph"></div>
+          </div>
+        </div>
+        <div class="row" hidden id="buttons">
+          <button type="button" class="col-md-6 btn btn-primary" onclick="restart()">Initialize weights</button>
+          <button type="button" class="col-md-6 btn btn-primary" onclick="updateWeights()" id="updateButton" disabled>Update weights</button>
+        </div>
+        <div class="row" hidden id="instructions">
+          <div class="col-md-12">
+            <p style="text-align: center;">Drag the nodes with your mouse to control their vertical positions.</p>
+            <p style="text-align: center;">Two non-adjacent edges can be switched by selecting them consecutively.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script>
+        // OPTIONS:
+        var updatePositions = true; // Whether nodes can be moved (by dragging or updating)
+        var updateColors = true; // Whether colors are updated
+        var rescaleWeights = true; // Whether weights are rescaled at each update
+        var obviousBottleneck = false; // Initially position nodes such that the bottleneck is obvious
+        var allowSwitching = true; // Allow edge switching
+        var highlightSolution = false; // Highlight bottleneck in green and color nodes by their cluster
+        var hideButtons = false; // Whether buttons are hidden
+        var hideInstructions = true; // Whether instructions below buttons are visible
+        var showRiver = false;
+        var markEverything = false; // Mark node X and encircle sets
+
+        document.getElementById("buttons").hidden = hideButtons;
+        document.getElementById("instructions").hidden = hideInstructions;
+        var weightsSet = false;
+        var id = "graph";
+        var container = document.getElementById(id);
+        var width = container.offsetWidth;
+        var height = container.offsetHeight;
+        var size = width<height?width:height;
+
+        var nNodes = 14;
+        var nodes = [];
+        for (var i=0; i<nNodes; i++) {
+          nodes.push(i)
+        }
+        var init_edges = [
+          [0, 1],
+          [0, 2],
+          [0, 7],
+          [1, 2],
+          [1, 6],
+          [2, 3],
+          [3, 4],
+          [3, 5],
+          [4, 5],
+          [4, 6],
+          [5, 6],
+          [7, 10],
+          [7, 13],
+          [8, 9],
+          [8, 11],
+          [8, 13],
+          [9, 10],
+          [9, 12],
+          [10, 11],
+          [11, 12],
+          [12, 13]
+        ];
+
+
+        var xs = [];
+        var ys = [];
+        if (obviousBottleneck) {
+          // Place each side on its own oval
+          for (var i=0; i<nNodes/2; i++) {
+            var angle = Math.PI * 3*i/3.5; // 3*i looks better than i
+            var x = width * (1/4 + Math.cos(angle)/6);
+            var y = height * (1/2 + Math.sin(angle)/4);
+            xs.push(x);
+            ys.push(y);
+          }
+          for (var i=nNodes/2; i<nNodes; i++) {
+            var angle = Math.PI * (3.5+3*i)/3.5; // 3*i looks better than i
+            var x = width * (3/4 + Math.cos(angle)/6);
+            var y = height * (1/2 + Math.sin(angle)/4);
+            xs.push(x);
+            ys.push(y);
+          }
+        } else {
+          // Initialize positions on an oval.
+          for (var i=0; i<nNodes; i++) {
+            var angle = Math.PI * (3*i % 14) / 7.0;
+            var x = width * (1/2 + Math.cos(angle)/4);
+            var y = height * (1/2 + Math.sin(angle)/4);
+            xs.push(x);
+            ys.push(y);
+          }
+        }
+
+        var graph = {
+          "nodes": [],
+          "links": []
+        };
+
+        // A function that gives the id of the link/edge.
+        var linkId = e=> e.source+"-"+e.target;
+
+        // Transforms a node pair to a link with source and target.
+        function pair2link(p) {
+          return {
+            "source": Math.min(p[0],p[1]),
+            "target": Math.max(p[0],p[1])
+          };
+        }
+
+        nodes.forEach(i => graph["nodes"].push({
+          "name": i,
+          "x": xs[i],
+          "y": ys[i],
+          "degree": 0
+        }))
+        init_edges.forEach(function(e) {
+          graph.links.push(pair2link(e))
+          graph.nodes[e[0]].degree++;
+          graph.nodes[e[1]].degree++;
+        });
+
+        // The box will have x values from -xScale to xScale and the maximum
+        // axis-values will be xMax (and -xMax)
+        var xScale = 5;
+        var xMax = 3;
+        function weight2x(weight) {
+          return width * (1/2 + weight/(2*xScale));
+        }
+
+        // Randomly choose half of the nodes to have weight +1 and set the other
+        // weights to -1.
+        function initializeWeights() {
+          var T = 0;
+          var positive = [];
+          if (rescaleWeights) {
+            while (T < nNodes/2) {
+              var newPositive = Math.floor(nNodes*Math.random());
+              if (!positive.includes(newPositive)) {
+                positive.push(newPositive);
+                T += 1
+              }
+            }
+          } else {
+            positive = [0,1,2,3,4,10,11];
+            T = 7;
+          }
+          iPositive = 0;
+          iNegative = 0;
+          for (var i=0; i<nNodes; i++) {
+            graph.nodes[i].weight = (positive.includes(i) ? 1 : -1);
+            graph.nodes[i].x = weight2x(graph.nodes[i].weight);
+            if (positive.includes(i)) {
+              graph.nodes[i].y = height * (1/4+(iPositive++ % (nNodes/2))/nNodes);
+            } else {
+              graph.nodes[i].y = height * (1/4+(iNegative++ % (nNodes/2))/nNodes);
+            }
+          }
+        }
+
+        function updateWeights() {
+          if (!weightsSet) {
+            // If the update button is pressed before the initialization button,
+            // we simply initialize.
+            restart();
+            return;
+          }
+          var newWeights = [];
+          var S = 0;
+          graph.nodes.forEach(i => newWeights.push(0));
+          graph.links.forEach(function(e) {
+            newWeights[e.source] += graph.nodes[e.target].weight/graph.nodes[e.source].degree;
+            newWeights[e.target] += graph.nodes[e.source].weight/graph.nodes[e.target].degree;
+            S += (graph.nodes[e.target].weight/graph.nodes[e.source].degree + graph.nodes[e.source].weight/graph.nodes[e.target].degree)/ nNodes;
+          })
+          if (rescaleWeights) {
+            // Make sure weights are centered around 0.
+            nodes.forEach(i => newWeights[i] -= S);
+            var T = 0;
+            nodes.forEach(i => T += Math.max(newWeights[i],0));
+            nodes.forEach(i => graph.nodes[i].weight = graph.nodes[i].weight/2 + newWeights[i] * nNodes / (4*T));
+          } else {
+            nodes.forEach(i => graph.nodes[i].weight = graph.nodes[i].weight/2 + newWeights[i]/2);
+          }
+          nodes.forEach(i => graph.nodes[i].x = weight2x(graph.nodes[i].weight));
+
+          updateGraph();
+        }
+
+        // Given a d3 selector, this initializes a line for each (enter-) element.
+        function initLinks(selector) {
+          var links = selector.append("line")
+                         .attr("id", linkId)
+                         .attr("x1", e=>graph.nodes[e.source].x)
+                         .attr("y1", e=>graph.nodes[e.source].y)
+                         .attr("x2", e=>graph.nodes[e.target].x)
+                         .attr("y2", e=>graph.nodes[e.target].y);
+          if (allowSwitching) {
+            links = links.on("click",clickLink);
+          }
+          if (highlightSolution) {
+            links = links.attr("class",e=> e.source==0 && e.target==7 ? "selected" : "");
+          }
+          return links;
+        }
+
+        var selectedLink = null;
+        var disabledLinks = [];
+        // Called when a link is clicked
+        function clickLink(link) {
+          if (!selectedLink) {
+            selectedLink = link;
+            var neighbors = {};
+            // Find disallowedLinks by looking for the amount of links from
+            // selectedLink to each other link (should be one at most)
+            var pair = [selectedLink.source,selectedLink.target];
+            graph.links.forEach(function (e) {
+              if (e==selectedLink) {
+                return;
+              }
+              if (pair.includes(e.source)) {
+                neighbors[e.target] = neighbors[e.target] ? neighbors[e.target]+1 : 1;
+                disabledLinks.push(e);
+              }
+              if (pair.includes(e.target)) {
+                neighbors[e.source] = neighbors[e.source] ? neighbors[e.source]+1 : 1;
+                disabledLinks.push(e);
+              }
+            });
+            // If 3 of the 4 nodes form a triangle, we cannot switch.
+            graph.links.forEach(function(e) {
+              if (e==selectedLink || disabledLinks.includes(e)) {
+                return;
+              }
+              console.log(e);
+              if ((neighbors[e.source] && (neighbors[e.source] > 1)) || (neighbors[e.target] && (neighbors[e.target] > 1))) {
+                console.log("disabled");
+                disabledLinks.push(e);
+              }
+            });
+            d3Links.attr("class",function(d) {
+              if (d==link) {
+                return "selected";
+              }
+              if (disabledLinks.includes(d)) {
+                return "disabled";
+              }
+              return "";
+            })
+          } else if (link==selectedLink) {
+            // Cancel selection
+            selectedLink = null;
+            disabledLinks = [];
+            d3Links.attr("class","");
+          } else if (!disabledLinks.includes(link)) {
+            // Switch link and selectedLink
+            var newLink1 = pair2link([selectedLink.source,link.source]);
+            var newLink2 = pair2link([selectedLink.target,link.target]);
+            // Check whether edge doesn't already exist.
+            graph.links.forEach(function(l) {
+              if (l.source==newLink1.source && l.target==newLink1.target || l.source==newLink2.source && l.target==newLink2.target) {
+                // Switch the other way around.
+                newLink1 = pair2link([selectedLink.source,link.target]);
+                newLink2 = pair2link([selectedLink.target,link.source]);
+                // Note that our choice of disabledLinks ensures that at least one option is possible.
+              }
+            });
+
+            // Update graph.links. First delete selectedLink and link.
+            for (var i=0; i<graph.links.length; i++) {
+              var e = graph.links[i];
+              if (e.source==selectedLink.source && e.target==selectedLink.target
+                  || e.source==link.source && e.target==link.target) {
+                graph.links.splice(i,1);
+              }
+            }
+            // Add new links
+            graph.links.push(newLink1);
+            graph.links.push(newLink2);
+
+            // Update visualization
+            var updateLinks = d3.select(".links").selectAll("line").data(graph.links,linkId);
+            initLinks(updateLinks.enter());
+            updateLinks.exit().remove();
+            d3Links = d3.selectAll(".links line")
+                        .data(graph.links,linkId);
+            d3Links.attr("class","");
+
+            selectedLink = null;
+            disabledLinks = [];
+          }
+        }
+
+        var svg;
+        var defs;
+        var colorScale;
+        var colorbar;
+        var line1;
+        var line2;
+        var axisTicks;
+        function initContainer() {
+          if (!d3.select("#"+id+" svg").empty()) {
+        		return;
+        	}
+        	svg = d3.select("#"+id).append("svg")
+        							   .attr("width", width)
+        							   .attr("height", height);
+
+          if (showRiver) {
+            svg.style("background-image","url(river.png)")
+          }
+
+          defs = svg.append("defs");
+          // Define arrowhead
+          defs.append("marker")
+      				.attr("id","arrow")
+          		.attr("viewBox","0 -5 10 10")
+          		.attr("refX",5)
+          		.attr("refY",0)
+          		.attr("markerWidth",4)
+          		.attr("markerHeight",4)
+          		.attr("orient","auto")
+      				.append("path")
+      					.attr("d", "M0,-5L10,0L0,5")
+      					.attr("class","arrowHead");
+
+          colorScale = d3.scaleLinear().domain([-3,-0.6,0,3]).range(["#0000ff","#555599","#ffff4d","#ff0000"]);
+          if (updateColors) {
+            var legend = defs
+              .append("svg:linearGradient")
+              .attr("id", "gradient")
+              .attr("x1", "0%")
+              .attr("y1", "100%")
+              .attr("x2", "100%")
+              .attr("y2", "100%")
+              .attr("spreadMethod", "pad");
+            legend.append("stop")
+              .attr("offset", "0%")
+              .attr("stop-color", "#0000ff") //#000099
+              .attr("stop-opacity", 1);
+            legend.append("stop")
+              .attr("offset", "40%")
+              .attr("stop-color", "#555599")
+              .attr("stop-opacity", 1);
+            legend.append("stop")
+              .attr("offset", "50%")
+              .attr("stop-color", "#ffff4d")
+              .attr("stop-opacity", 1);
+            legend.append("stop")
+              .attr("offset", "100%")
+              .attr("stop-color", "#ff0000")
+              .attr("stop-opacity", 1);
+            colorbar = svg.append('rect')
+              .attr("width",width*xMax/xScale)
+              .attr("height",height/16)
+              .attr("fill","url(#gradient)")
+              .attr("transform", "translate("+width*(xScale-xMax)/(2*xScale)+","+height*(13/16)+")")
+              .style("visibility","hidden");
+          }
+          if (updatePositions || updateColors) {
+            // Add lines for x-axis.
+            line1 = svg.append('line')
+               .attr("class", "axis-hline")
+               .attr("x1",  width/2)
+               .attr("y1", height*(7/8))
+               .attr("x2", width*(1+(xMax+0.5)/xScale)/2)
+               .attr("y2", height*(7/8))
+               .style("visibility","hidden");
+           line2 = svg.append('line')
+              .attr("class", "axis-hline")
+              .attr("x1",  width/2)
+              .attr("y1", height*(7/8))
+              .attr("x2", width*(1-(xMax+0.5)/xScale)/2)
+              .attr("y2", height*(7/8))
+              .style("visibility","hidden");
+            // Add the ticks
+            var scale = d3.scaleLinear();
+            scale.domain([-xMax,xMax]).range([width*(1-xMax/xScale)/2,width*(1+xMax/xScale)/2]);
+            var x_axis = d3.axisBottom().scale(scale).ticks(6);
+            axisTicks = svg.append("g")
+               .call(x_axis)
+               .attr("transform","translate(0,"+height*(7/8)+")")
+               .style("visibility","hidden");
+          }
+        }
+
+        var d3Nodes;
+        var d3Links;
+        var selectedLink;
+        function createGraph() {
+        	//draw lines for the links
+        	d3Links = initLinks(svg.append("g")
+                      				   .attr("class", "links")
+                      				   .selectAll("line")
+                      				   .data(graph.links)
+                      				   .enter());
+
+        	//draw circles for the nodes
+        	d3Nodes = svg.append("g")
+        				  .attr("stroke", "#fff")
+            			  .attr("stroke-width", 1.5)
+        				  .selectAll("circle")
+        				  .data(graph.nodes)
+        				  .join("circle")
+        					  .attr("r", 10);
+          if (updatePositions) {
+            // Allow y-positions to be controlled by dragging.
+            d3Nodes.call(d3.drag().on("drag", function(d) {
+              d3.select(this).attr("cy", d.y = d3.event.y);
+              // Uncomment this line to also allow dragging the x-pos
+              //d3.select(this).attr("cx", d.x = d3.event.x);
+              // Update all link positions.
+              d3Links
+                .attr("x1", function(d) { return graph.nodes[d.source].x; })
+                .attr("y1", function(d) { return graph.nodes[d.source].y; })
+                .attr("x2", function(d) { return graph.nodes[d.target].x; })
+                .attr("y2", function(d) { return graph.nodes[d.target].y; });
+            }))
+          }
+          // Highlight X and show circles around two groups
+          if (markEverything) {
+            svg.append('ellipse')
+                .attr('cx', width*3/4)
+                .attr('cy', height/2)
+                .attr('rx', width/6+20)
+                .attr('ry', height/4+20)
+                .style("fill","transparent")
+                .style("stroke","black")
+                .style("stroke-width",2);
+            svg.append('ellipse')
+                .attr('cx', width*1/4)
+                .attr('cy', height/2)
+                .attr('rx', width/6+20)
+                .attr('ry', height/4+20)
+                .style("fill","transparent")
+                .style("stroke","black")
+                .style("stroke-width",2);
+            svg.append('text')
+               .attr("x",width/4)
+               .attr("y",height/4-30)
+               .text("A");
+             svg.append('text')
+                .attr("x",width*3/4)
+                .attr("y",height/4-30)
+                .text("B");
+            // Mark node 10 with an X
+            var x = graph.nodes[5];
+            svg.append('text').attr("x",x.x+10)
+                              .attr("y",x.y-5)
+                              .text("X");
+          }
+
+        }
+
+        function restart() {
+          if (!weightsSet) {
+            // Show colorbar and axis.
+            if (updateColors) {
+              colorbar.transition().style("visibility","visible");
+            }
+            if (updateColors || updatePositions) {
+              line1.transition().style("visibility","visible");
+              line2.transition().style("visibility","visible");
+              axisTicks.transition().style("visibility","visible");
+            }
+            document.getElementById("updateButton").disabled=false;
+          }
+          initializeWeights();
+          weightsSet = true;
+          updateGraph();
+        }
+
+        function updateGraph() {
+          // To allow to update color and position separately
+          node_trans = d3Nodes.transition()
+          if (updatePositions) {
+            node_trans
+        			.attr("cx", function(d) { return d.x; })
+        			.attr("cy", function(d) { return d.y; });
+            d3Links.transition()
+        			.attr("x1", function(d) { return graph.nodes[d.source].x; })
+        			.attr("y1", function(d) { return graph.nodes[d.source].y; })
+        			.attr("x2", function(d) { return graph.nodes[d.target].x; })
+        			.attr("y2", function(d) { return graph.nodes[d.target].y; });
+          }
+          if (updateColors) {
+            node_trans.style("fill", d=>colorScale(d.weight));
+          }
+        }
+
+        function initialize() {
+          initContainer();
+          //initializeWeights();
+          createGraph();
+          d3Nodes
+      			.attr("cx", function(d) { return d.x; })
+      			.attr("cy", function(d) { return d.y; });
+          if (highlightSolution) {
+            d3Nodes.style("fill",d => colorScale(d.name < 7 ? -3 : 3))
+          }
+          d3Links
+      			.attr("x1", function(d) { return graph.nodes[d.source].x; })
+      			.attr("y1", function(d) { return graph.nodes[d.source].y; })
+      			.attr("x2", function(d) { return graph.nodes[d.target].x; })
+      			.attr("y2", function(d) { return graph.nodes[d.target].y; });
+        }
+
+    </script>
