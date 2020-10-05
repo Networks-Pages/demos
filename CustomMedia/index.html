@@ -6,7 +6,7 @@
     <style>
    	body {
 		margin: 40px;
-	}   
+	}
 	.box {
 		border-radius: 20px;
 		padding: 10px;
@@ -30,9 +30,9 @@
 		background-color: #fff;
 		grid-area: centerBox;
 	}
-	@supports (display: grid) {            
+	@supports (display: grid) {
             @media screen and (min-width: 600px) {
-            .centerBox {  
+            .centerBox {
                         display: grid;
 		    	grid-gap: 25px;
 		    	grid-template-columns: 1fr 2fr;
@@ -78,14 +78,14 @@
 
 
    </style>
-   
+
     <meta charset="utf-8">
 </head>
  <body style="font-family:Roboto">
 	<div class="wrapper">
             <div class="titleBanner" style="color: #296082 ">
-            <h1>Media create for the  <a href="http://www.networkpages.nl/"> networkpages.nl</a></h1> 
-            
+            <h1>Media create for the  <a href="http://www.networkpages.nl/"> networkpages.nl</a></h1>
+
             </div>
 
             <div class="centerField">
@@ -101,7 +101,7 @@
                     </div>
                     <div >
                     <p>
-                        This shows how the Dijkstra algorithm works. This algorithm is used to compute the shortest paths between location. 
+                        This shows how the Dijkstra algorithm works. This algorithm is used to compute the shortest paths between location.
                         As example we use the streets of the Dutch town of Brielle. Used <a href="http://www.networkpages.nl/finding-the-shortest-route-to-your-holiday-destination-dijkstras-algorithm/">here</a>.
                     </p>
                     </div>
@@ -127,84 +127,112 @@
                     <div >
                     <p> An example of machine learning using the idea of a very simple AI.                     </p>
 		    <ul style="list-style-type:square">
-                        <li><a href="Animations/AutomatedLearning/StupidAI.html"> Simple trail and error to jump on top</a></li>  
-                        <li><a href="Animations/AutomatedLearning/DrivenAI.html"> Trail and error, but by using the best previous failure as initial point</a></li>  
-                        <li><a href="Animations/AutomatedLearning/DrivenAIOpt.html"> Improvement of the previous by removing bounces as good failure and 
-we continue looking after finding a valid solution to find an optimal solution</a></li>  
+                        <li><a href="Animations/AutomatedLearning/StupidAI.html"> Simple trail and error to jump on top</a></li>
+                        <li><a href="Animations/AutomatedLearning/DrivenAI.html"> Trail and error, but by using the best previous failure as initial point</a></li>
+                        <li><a href="Animations/AutomatedLearning/DrivenAIOpt.html"> Improvement of the previous by removing bounces as good failure and
+we continue looking after finding a valid solution to find an optimal solution</a></li>
                     </ul>
                     </div>
                 </div>
-                
+
                 <div class="box centerBox" >
                     <div >
                     Advanced traffic flow animation
                     </div>
                     <div >
-                    Animation of the flow on a network, this includes advanced methodes to read the flow and network data from input files. 
+                    Animation of the flow on a network, this includes advanced methodes to read the flow and network data from input files.
                     <a href="Animations/Algorithms/FlowTest.html"> link. </a>
                     </div>
-                    
+
                 </div>
-            
+
+                <div class="box centerBox" >
+                    <div >
+                    <a href="https://www.networkpages.nl/stopping-network-bottlenecks-before-they-stop-you/">
+                      <img align="middle" src="files/OneBridgeCity.png"  style="width:100%;">  </a>
+                    </a>
+                    </div>
+                    <div >
+                      A spectral partitioning algorithm that is used to detect bottlenecks in networks.
+                      Used in <a href="https://www.networkpages.nl/stopping-network-bottlenecks-before-they-stop-you/">this article</a>.
+                    </div>
+                </div>
+
+                <h2 style="background-color: #eef;"> Simulations  </h2>
+
+                <div class="box centerBox" >
+                  <div >
+                    <a href="Animations/Simulations/Janusz.html" target="_blank">
+                      <img align="middle" src="files/TwoCommunityKuramoto.png"  style="width:100%;">
+                    </a>
+                  </div>
+                  <div>
+                    <p>
+                       Simulation of the two-community Kuramoto model for synchronization of the body clock.
+                       Used in <a href="https://www.networkpages.nl/synchronization-in-the-body-clock/">this article by Janusz Meylahn</a>.
+                    </p>
+                  </div>
+                  </div>
+
                 <h2 style="background-color: #eef;">Queueing systems</h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/Queueing/TwoLayedTwoServer.html">
-                    <img align="middle" src="files/TwoLayer.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/TwoLayer.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
-                        <li><a href="Animations/Queueing/TwoLayedTwoServer.html"> Two layed server, nice looking rates</a></li>  
+                        <li><a href="Animations/Queueing/TwoLayedTwoServer.html"> Two layed server, nice looking rates</a></li>
                         <li><a href="Animations/Queueing/TwoLayedTwoServerExponentialRates.html"> Two layed server, exponential times</a></li>
                     </ul>
                        Used in articles.
                     </div>
                 </div>
-                
+
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/Queueing/AirportQueue.html">
-                    <img align="middle" src="files/AirportQueue.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/AirportQueue.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
-                        <li><a href="Animations/Queueing/AirportQueue.html"> Airport queue</a></li>  
+                        <li><a href="Animations/Queueing/AirportQueue.html"> Airport queue</a></li>
                         <li><a href="Animations/Queueing/Supermarket.html"> Supermarket queue</a></li>
                     </ul>
                         To be used in future articles.
                     </div>
                 </div>
-                
+
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/Queueing/AirportBoarding.html">
-                    <img align="middle" src="files/AirBoarding.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/AirBoarding.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div>
                         Not used in an article.
                     </div>
                 </div>
-                
+
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/Queueing/Wireless.html">
-                    <img align="middle" src="files/WirelessInteraction.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/WirelessInteraction.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div>
-                        Not used in an article. Warning, very early programming style. 
+                        Not used in an article. Warning, very early programming style.
                     </div>
                 </div>
-                
-                           
+
+
               <h2 style="background-color: #eef;"> Erdös-Rényi Graph </h2>
-              
-              
+
+
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/ERRG/AddoneEdgepATime.html">
-                    <img align="middle" src="files/ERdef.gif"  style="width:100%;"> 
+                    <img align="middle" src="files/ERdef.gif"  style="width:100%;">
                     </a>
                     </div>
                     <div>
@@ -216,7 +244,7 @@ we continue looking after finding a valid solution to find an optimal solution</
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/ERRG/ShowDistance.html">
-                    <img align="middle" src="files/ERDDegreePlot.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/ERDDegreePlot.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div>
@@ -229,13 +257,13 @@ we continue looking after finding a valid solution to find an optimal solution</
                                 <li><a href="Animations/RandomGraph/ERRG/CycleLayout.html">Drawn in a circle</a></li>
                                 <li><a href="Animations/RandomGraph/ERRG/GrowingVersion.html">Design to shown the growth, latest Style package</a></li>
                                 <li><a href="Animations/RandomGraph/ERRG/GrowingVersion_withPlot.html"> added with Plot of the two large components.</a></li>
-                            </ul>       
+                            </ul>
                     </div>
                 </div>
 
-              
+
               <h2 style="background-color: #eef;"> Configuration model  </h2>
-              
+
               <div class="box centerBox" >
                     <div >
                     <a href="Animations/RandomGraph/CM/CmCreation.html" target="_blank">
@@ -251,11 +279,11 @@ we continue looking after finding a valid solution to find an optimal solution</
                     </p>
                     </div>
                 </div>
-              
+
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/CM/FixedDegree.html">
-                    <img align="middle" src="files/ERDDegreePlot.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/ERDDegreePlot.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div>
@@ -270,17 +298,17 @@ we continue looking after finding a valid solution to find an optimal solution</
                         Not used in articles.
                     </div>
                 </div>
-              
-              
+
+
                 <h2 style="background-color: #eef;"> Inhomogeneous random graph  </h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/GeneralizedRG/GeneralRG_DegreeDistribution.html">
-                    <img align="middle" src="files/GeneralDegree.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/GeneralDegree.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div>
-                        
+
                     <ul style="list-style-type:square">
                     <li><a href="Animations/RandomGraph/GeneralizedRG/GeneralRG.html">Plain simulation</a></li>
                     <li><a href="Animations/RandomGraph/GeneralizedRG/GeneralRG_DegreeDistribution.html">With degree histogram</a></li>
@@ -289,13 +317,13 @@ we continue looking after finding a valid solution to find an optimal solution</
                         Not used in articles.
                     </div>
                 </div>
-                
-                
+
+
                 <h2 style="background-color: #eef;">Preferential Attachment</h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/PrefentialModel/ShowDistance.html">
-                    <img align="middle" src="files/PrefDist.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/PrefDist.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
@@ -307,45 +335,45 @@ we continue looking after finding a valid solution to find an optimal solution</
                         Not used in articles.
                     </div>
                 </div>
-                
+
                 <h2 style="background-color: #eef;">Competition</h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/RandomGraph/CM/PowerLaw_Competition.html">
-                    <img align="middle" src="files/ConfComp.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/ConfComp.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
-                        <li><a href="Animations/RandomGraph/CM/PowerLaw_Competition.html"> Configuration model, power law</a></li>  
+                        <li><a href="Animations/RandomGraph/CM/PowerLaw_Competition.html"> Configuration model, power law</a></li>
                         <li><a href="Animations/RandomGraph/ERRG/Competition.html"> Erdös-Rényi Graph </a></li>
                     </ul>
                        Planned to be used.
                     </div>
                 </div>
-                
-                
+
+
                 <h2 style="background-color: #eef;">Vaccination</h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/Vaccination/Vaccination.html">
-                    <img align="middle" src="files/Vaccination.jpg"  style="width:100%;"> 
+                    <img align="middle" src="files/Vaccination.jpg"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
-                        <li><a href="Animations/Vaccination/Vaccination.html"> One a small 15x10 network</a></li>  
+                        <li><a href="Animations/Vaccination/Vaccination.html"> One a small 15x10 network</a></li>
                         <li><a href="Animations/Vaccination/VaccinationLarge.html"> One a hugh 120x80 network</a></li>
                     </ul>
                        Not used in an article. Please write an article about head immunity.
                     </div>
                 </div>
-                
-                
-                
+
+
+
                 <h2 style="background-color: #eef;">Ideal gas particle system</h2>
                 <div class="box centerBox" >
                     <div >
                         <a href="Animations/ParticleSystems/Interacting.html">
-                    <img align="middle" src="files/particles.JPG"  style="width:100%;"> 
+                    <img align="middle" src="files/particles.JPG"  style="width:100%;">
                     </a>
                     </div>
                     <div><ul style="list-style-type:square">
@@ -356,11 +384,8 @@ we continue looking after finding a valid solution to find an optimal solution</
                        Used an article.
                     </div>
                 </div>
-                
+
               <!--- a href="http://www.networkpages.nl/CustomMedia/Animations/RandomGraph/CM/PowerLaw_Competition.html">Simulation with power-law degrees: competition of two infections with deterministic speeds</a-->
        </div>
 </body>
 </html>
-
-
-
