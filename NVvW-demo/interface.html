@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<style>
+.links line {
+  stroke: #999;
+  stroke-opacity: 0.6;
+}
+
+.nodes circle {
+  stroke: #000;
+  stroke-width: 1.5px;
+}
+
+
+</style>
+<body>
+  <div class="row">
+    <div id="canvas" height="100%" class="col-md-8"></div>
+    <div class="col-md-4">
+      <div class="row">
+        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(1)">Select first neighbor</button>
+        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(2)">Select second neighbor</button>
+      </div>
+      <div class="row">
+        <label class="col-md-6" id="neighbor1">Select a node</label>
+        <label class="col-md-6" id="neighbor2">Select a node</button>
+      </div>
+      <div class="row">
+        <label class="col-md-3" for="name">Your name:</label>
+        <input type="text" class="col-md-9" id="name"></input>
+      </div>
+      <div class="row">
+        <button type="button" class="col-md-12 btn btn-primary" onclick="addNode()">Add node</button>
+      </div>
+      <div class="row">
+        <button type="button" class="col-md-12 btn btn-primary" onclick="updateNetwork()">Refresh network</button>
+      </div>
+    </div>
+  </div>
+</body>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<script>
+var graph;
+var id = "canvas";
+var container = document.getElementById(id);
+var width = container.offsetWidth,
+	height = container.offsetHeight;
+if (height<width) height=width;
+// Variables for selecting neighbors
+var neighbor2select = false;
+var neighbors = {neighbor1: true, neighbor2: true};
+// When one of the select-buttons is pressed
+function selectNeighbor(i) {
+  if (i==1 || i==2) {
+    neighbor2select = "neighbor"+i;
+  }
+}
+// Change the label below the select-button to the node name.
+function nodeSelected(e,node) {
+  if (neighbors[neighbor2select] && !([neighbors["neighbor1"],neighbors["neighbor2"]].includes(node.name))) {
+    neighbors[neighbor2select] = node.name;
+    var label = document.getElementById(neighbor2select);
+    label.innerHTML = node.name;
+  }
+}
+function addNode() {
+  var name = document.getElementById("name").value;
+  var addNodeHttp = new XMLHttpRequest();
+  addNodeHttp.open("GET","http://localhost:8080/addnode?name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
+  addNodeHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 400) {
+      console.log(this.getResponseHeader("errorfield"));
+      // TODO make errorfield red
+    } else if (this.readyState == 4 && this.status == 200) {
+      updateNetwork();
+    }
+  }
+  addNodeHttp.send();
+}
+
+
+// Retrieve all newly added nodes and update the visualization
+function updateNetwork() {
+  var n = graph.nodes.length;
+  var addNodeHttp = new XMLHttpRequest();
+  addNodeHttp.open("GET","http://localhost:8080/updatedata?n="+n);
+  addNodeHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+        data = JSON.parse(this.responseText);
+        data.nodes.forEach(addNodesFromName);
+        data.neighbors.forEach(addLinksFromNeighbors);
+        updateVisualization();
+    }
+  }
+  addNodeHttp.send();
+}
+
+// A mapping from node/link to its id name
+var node2id = v=>v.name;
+var link2id = function(e) {
+  var id = e.source.name+"-"+e.target.name;
+  return id;
+}
+
+// Update the visualization after graph is changed.
+var nodes,circles,labels,links,drag,simulation,svg;
+function updateVisualization() {
+
+  links = d3.select("#links").selectAll("line").data(graph.links,link2id);
+  var linkEnter = links.enter()
+                       .append("line")
+                       .attr("id",link2id)
+                       .attr("x1",e=>e.x1)
+                       .attr("y1",e=>e.y1)
+                       .attr("x2",e=>e.x2)
+                       .attr("y2",e=>e.y2)
+                       .attr("stroke-width", 1.5);
+  links = linkEnter.merge(links);
+  links.exit().remove();
+
+  nodes = d3.select("#nodes").selectAll("g").data(graph.nodes,node2id);
+  var nodeEnter = nodes.enter()
+                       .append("g")
+                       .attr("id",node2id)
+                       .attr("transform", d => "translate("+d.x+","+d.y+")")
+                       .call(drag(simulation));
+  circles = nodeEnter.append("circle")
+                 .attr("r", 12)
+                 .attr("stroke", "black")
+                 .attr("fill", "red")
+                 .on("click",nodeSelected);
+  labels = nodeEnter.append("text")
+                .attr("stroke","black")
+                .attr("stroke-width",0.5)
+                .text(d => d.name)
+                .attr('x', 14)
+                .attr('y', 0);
+  nodes = nodeEnter.merge(nodes);
+  nodes.exit().remove();
+  // Update the simulation elements and restart
+  simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(d => d.name));
+  simulation.alpha(1).restart();
+}
+
+function showGraph() {
+  drag = simulation => {
+    function dragstarted(event) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    }
+
+    function dragged(event) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
+
+    function dragended(event) {
+      if (!event.active) simulation.alphaTarget(0);
+      event.subject.fx = null;
+      event.subject.fy = null;
+    }
+
+    return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
+  }
+
+  simulation = d3.forceSimulation(graph.nodes)
+                 .force("link", d3.forceLink(graph.links).id(d => d.name))
+                 .force("charge", d3.forceManyBody().strength(-800))
+                 .force("center", d3.forceCenter(width / 2, height / 2));
+
+	svg = d3.select("#"+id).append("svg")
+							   .attr("width", width)
+							   .attr("height", height);
+
+  links = svg.append("g").attr("id","links")
+      .attr("stroke", "#999")
+      .attr("stroke-opacity", 0.6);
+
+  nodes = svg.append("g").attr("id","nodes")
+                  .attr("stroke", "#fff")
+                  .attr("stroke-width", 1.5);
+  updateVisualization();
+  simulation.on("tick", () => {
+    links
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+
+    nodes.attr("transform", d => "translate("+d.x+","+d.y+")");
+  });
+
+}
+
+function addNodesFromName(n) {
+  graph.nodes.push({name: n, x: width/2, y: height/2})
+}
+
+function addLinksFromNeighbors(v) {
+  graph.links.push({
+    source: graph.nodes[v.id],
+    target: graph.nodes[v.neighbor1],
+    x1: graph.nodes[v.id].x,
+    y1: graph.nodes[v.id].x,
+    x2: graph.nodes[v.neighbor1].x,
+    y2: graph.nodes[v.neighbor1].y,
+  });
+  graph.links.push({
+    "source": graph.nodes[v.id],
+    "target": graph.nodes[v.neighbor2]
+  });
+}
+
+// Retrieve graph
+var xmlHttp = new XMLHttpRequest();
+xmlHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+        data = JSON.parse(this.responseText);
+		graph = {
+			nodes: [],
+			links: [],
+		}
+		data.nodes.forEach(function(v) {
+			graph.nodes.push({"name": v});
+		});
+		data.neighbors.forEach(addLinksFromNeighbors);
+        showGraph();
+    }
+};
+xmlHttp.open("GET", "http://localhost:8080/getdata");
+xmlHttp.send();
+
+</script>
