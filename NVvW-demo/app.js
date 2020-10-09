@@ -2,18 +2,20 @@ var http = require('http');
 var fs = require('fs');
 var url = require('url');
 
+var urlPrefix = '/network';
+
 var nodes = ['a','b'];
 var neighbors = [];
 var nStartNodes = nodes.length;
 
-http.createServer(function (req, res) {
-  if (req.url.startsWith("/getdata")) {
+function redirect(req, res) {
+  if (req.url.startsWith(urlPrefix+"/getdata")) {
     res.setHeader('Content-Type', 'application/json');
     return res.end(JSON.stringify({
   		"nodes": nodes,
   		"neighbors": neighbors
   	}));
-  } else if (req.url.startsWith("/updatedata")) {
+  } else if (req.url.startsWith(urlPrefix+"/updatedata")) {
     var data = url.parse(req.url,true).query;
     if (!data.n) {
       return res.writeHead(400,{message: "Missing parameter n."}).end()
@@ -28,7 +30,7 @@ http.createServer(function (req, res) {
       "nodes": newNodes,
       "neighbors": newNeighbors
     }));
-  } else if (req.url.startsWith("/addnode")) {
+  } else if (req.url.startsWith(urlPrefix+"/addnode")) {
 	  var data = url.parse(req.url,true).query;
 	  if (data.name) {
   		// Add a node:
@@ -54,9 +56,18 @@ http.createServer(function (req, res) {
   }
   console.log(req.url)
 
-  fs.readFile('interface.html', function(err, data) {
+  fs.readFile('NVvW-demo/interface.html', function(err, data) {
     res.writeHead(200, {'Content-Type': 'text/html'});
     res.write(data);
     return res.end();
   });
-}).listen(8080);
+}
+
+module.exports = {
+  "redirect": redirect
+};
+
+var DEBUG = false;
+if (DEBUG) {
+  http.createServer(redirect).listen(8080)
+}

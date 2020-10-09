@@ -67,7 +67,7 @@ function nodeSelected(e,node) {
 function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","http://localhost:8080/addnode?name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
+  addNodeHttp.open("GET","http://localhost:8080/network/addnode?name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {
       console.log(this.getResponseHeader("errorfield"));
@@ -84,7 +84,7 @@ function addNode() {
 function updateNetwork() {
   var n = graph.nodes.length;
   var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","http://localhost:8080/updatedata?n="+n);
+  addNodeHttp.open("GET","http://localhost:8080/network/updatedata?n="+n);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
         data = JSON.parse(this.responseText);
@@ -232,7 +232,7 @@ xmlHttp.onreadystatechange = function() {
         showGraph();
     }
 };
-xmlHttp.open("GET", "http://localhost:8080/getdata");
+xmlHttp.open("GET", "http://localhost:8080/network/getdata");
 xmlHttp.send();
 
 </script>
