@@ -1,6 +1,7 @@
-var http = require('http');
-var fs = require('fs');
-var url = require('url');
+const http = require('http');
+const fs = require('fs');
+const url = require('url');
+const path = require("path");
 
 var urlPrefix = '/network';
 
@@ -55,8 +56,7 @@ function redirect(req, res) {
 	  }
   }
   console.log(req.url)
-
-  fs.readFile('NVvW-demo/interface.html', function(err, data) {
+  fs.readFile(path.resolve(__dirname, './interface.html'), function(err, data) {
     res.writeHead(200, {'Content-Type': 'text/html'});
     res.write(data);
     return res.end();
