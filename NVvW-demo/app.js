@@ -3,7 +3,7 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const DEBUG = ((typeof process.env.DEBUG === 'undefined') || (process.env.DEBUG === 'true'));
+const DEBUG = (process.env.DEBUG === 'true');
 const URL_PREFIX = '/network';
 var MAX_DEGREE = 5;
 
@@ -160,7 +160,7 @@ module.exports = {
 };
 
 if (DEBUG) {
-  let port = process.env.PORT || 8080;
+  let port = process.env.PORT;
   http.createServer(route).listen(port);
   console.log(`Running on port ${port}`);
 }
