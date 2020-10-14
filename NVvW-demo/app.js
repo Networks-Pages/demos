@@ -3,10 +3,13 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const DEBUG = (process.env.DEBUG === 'true');
+const DEBUG = ((typeof process.env.DEBUG === 'undefined') || (process.env.DEBUG === 'true'));
 const URL_PREFIX = '/network';
+var MAX_DEGREE = 5;
 
 var nodes = ['a','b'];
+var degrees = {};
+nodes.forEach(n => degrees[n] = 0);
 var neighbors = [];
 
 
@@ -26,10 +29,16 @@ function _addnode(req, res) {
           errorfield: "neighbor1"
         }).end();
     }
-    if (!nodes.includes(data.neighbor2)) {
+    if (!nodes.includes(data.neighbor2)>=MAX_DEGREE) {
         return res.writeHead(400, {
-          message: `neighbor1 ${data.neighbor2} not present`,
+          message: `neighbor1 ${data.neighbor2} already has ${MAX_DEGREE} connections`,
           errorfield: "neighbor2"
+        }).end();
+    }
+    if (degrees[data.neighbor1]>=MAX_DEGREE) {
+        return res.writeHead(400, {
+          message: `neighbor1 ${data.neighbor1} already has ${MAX_DEGREE} connections`,
+          errorfield: "neighbor1"
         }).end();
     }
 
@@ -41,6 +50,9 @@ function _addnode(req, res) {
         "neighbor1": nodes.indexOf(data.neighbor1),
         "neighbor2": nodes.indexOf(data.neighbor2),
     });
+    degrees[id] = 2;
+    degrees[data.neighbor1]++;
+    degrees[data.neighbor2]++;
     return res.end('okay');
   }
 }
@@ -91,5 +103,7 @@ module.exports = {
 };
 
 if (DEBUG) {
-  http.createServer(route).listen(process.env.PORT);
+  let port = process.env.PORT || 8080;
+  http.createServer(route).listen(port);
+  console.log(`Running on port ${port}`);
 }
