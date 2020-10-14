@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
+
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 <style>
 .links line {
@@ -40,10 +41,13 @@
   </div>
 </body>
 <script src="https://d3js.org/d3.v6.min.js"></script>
+<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
+var userID = new URLSearchParams(window.location.search).get('id');
+
 var graph;
-var id = "canvas";
-var container = document.getElementById(id);
+var containerID = "canvas";
+var container = document.getElementById(containerID);
 var width = container.offsetWidth,
 	height = container.offsetHeight;
 if (height<width) height=width;
@@ -58,8 +62,8 @@ function selectNeighbor(i) {
 }
 // Change the label below the select-button to the node name.
 function nodeSelected(e,node) {
-  if (neighbors[neighbor2select] && !([neighbors["neighbor1"],neighbors["neighbor2"]].includes(node.name))) {
-    neighbors[neighbor2select] = node.name;
+  if (neighbors[neighbor2select] && !([neighbors["neighbor1"],neighbors["neighbor2"]].includes(node.id))) {
+    neighbors[neighbor2select] = node.id;
     var label = document.getElementById(neighbor2select);
     label.innerHTML = node.name;
   }
@@ -67,7 +71,7 @@ function nodeSelected(e,node) {
 function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","/network/addnode?name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
+  addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {
       console.log(this.getResponseHeader("errorfield"));
@@ -83,25 +87,21 @@ function addNode() {
 // Retrieve all newly added nodes and update the visualization
 function updateNetwork() {
   var n = graph.nodes.length;
-  var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","/network/updatedata?n="+n);
-  addNodeHttp.onreadystatechange = function() {
+  var updateHttp = new XMLHttpRequest();
+  updateHttp.open("GET","/network/updatedata?n="+n);
+  updateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
         data = JSON.parse(this.responseText);
-        data.nodes.forEach(addNodesFromName);
         data.neighbors.forEach(addLinksFromNeighbors);
         updateVisualization();
     }
   }
-  addNodeHttp.send();
+  updateHttp.send();
 }
 
 // A mapping from node/link to its id name
-var node2id = v=>v.name;
-var link2id = function(e) {
-  var id = e.source.name+"-"+e.target.name;
-  return id;
-}
+var node2id = v=>`node${v.id}`;
+var link2id = e=>`e${e.source.name}-${e.target.name}`;
 
 // Update the visualization after graph is changed.
 var nodes,circles,labels,links,drag,simulation,svg;
@@ -116,8 +116,8 @@ function updateVisualization() {
                        .attr("x2",e=>e.x2)
                        .attr("y2",e=>e.y2)
                        .attr("stroke-width", 1.5);
-  links = linkEnter.merge(links);
   links.exit().remove();
+  links = linkEnter.merge(links);
 
   nodes = d3.select("#nodes").selectAll("g").data(graph.nodes,node2id);
   var nodeEnter = nodes.enter()
@@ -136,10 +136,10 @@ function updateVisualization() {
                 .text(d => d.name)
                 .attr('x', 14)
                 .attr('y', 0);
-  nodes = nodeEnter.merge(nodes);
   nodes.exit().remove();
+  nodes = nodeEnter.merge(nodes);
   // Update the simulation elements and restart
-  simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(d => d.name));
+  simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(node2id));
   simulation.alpha(1).restart();
 }
 
@@ -169,11 +169,16 @@ function showGraph() {
   }
 
   simulation = d3.forceSimulation(graph.nodes)
-                 .force("link", d3.forceLink(graph.links).id(d => d.name))
+                 .force("link", d3.forceLink(graph.links).id(node2id))
+                 .force("boundary", forceBoundary(15,15,width-15, height-15))
+                 .force("charge", d3.forceManyBody().strength(-400))
+                 .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
+  /*simulation = d3.forceSimulation(graph.nodes)
+                 .force("link", d3.forceLink(graph.links).id(node2id))
                  .force("charge", d3.forceManyBody().strength(-800))
-                 .force("center", d3.forceCenter(width / 2, height / 2));
+                 .force("center", d3.forceCenter(width / 2, height / 2));*/
 
-	svg = d3.select("#"+id).append("svg")
+	svg = d3.select("#"+containerID).append("svg")
 							   .attr("width", width)
 							   .attr("height", height);
 
@@ -202,6 +207,12 @@ function addNodesFromName(n) {
 }
 
 function addLinksFromNeighbors(v) {
+  graph.nodes.push({
+    'id': v.id,
+    'name': v.name,
+    'x': width/2,
+    'y': height/2
+  });
   graph.links.push({
     source: graph.nodes[v.id],
     target: graph.nodes[v.neighbor1],
@@ -212,7 +223,11 @@ function addLinksFromNeighbors(v) {
   });
   graph.links.push({
     "source": graph.nodes[v.id],
-    "target": graph.nodes[v.neighbor2]
+    "target": graph.nodes[v.neighbor2],
+    x1: graph.nodes[v.id].x,
+    y1: graph.nodes[v.id].x,
+    x2: graph.nodes[v.neighbor2].x,
+    y2: graph.nodes[v.neighbor2].y,
   });
 }
 
@@ -220,17 +235,21 @@ function addLinksFromNeighbors(v) {
 var xmlHttp = new XMLHttpRequest();
 xmlHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-        data = JSON.parse(this.responseText);
-		graph = {
-			nodes: [],
-			links: [],
-		}
-		data.nodes.forEach(function(v) {
-			graph.nodes.push({"name": v});
+        graph = JSON.parse(this.responseText);
+		graph.nodes.forEach(function(v) {
+			v.x = width/2;
+      v.y = height/2;
 		});
-		data.neighbors.forEach(addLinksFromNeighbors);
-        showGraph();
-    }
+    graph.links.forEach(function(e) {
+      e.source = graph.nodes[e.source];
+      e.target = graph.nodes[e.target];
+      e.x1 = e.source.x;
+      e.y1 = e.source.y;
+      e.x2 = e.target.x;
+      e.y2 = e.target.y;
+    });
+    showGraph();
+  }
 };
 xmlHttp.open("GET", "/network/getdata");
 xmlHttp.send();
