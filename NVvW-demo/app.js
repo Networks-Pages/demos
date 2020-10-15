@@ -2,8 +2,6 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const url = require('url');
-process.env.DEBUG='true';
-process.env.PORT = 8080;
 
 const DEBUG = (process.env.DEBUG === 'true');
 const URL_PREFIX = '/network';
