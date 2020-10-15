@@ -2,10 +2,13 @@ const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const url = require('url');
+process.env.DEBUG='true';
+process.env.PORT = 8080;
 
 const DEBUG = (process.env.DEBUG === 'true');
 const URL_PREFIX = '/network';
-var MAX_DEGREE = 5;
+const MAX_DEGREE = 5;
+const SURVIVAL_P = 0.5;
 
 var id2node = {
   'START_A': {
@@ -139,6 +142,55 @@ function _updatedata(req, res) {
   }));
 }
 
+function _percolate(req,res) {
+  let remainingLinks = [];
+  let node2component = {};
+  // Assign each node to a component consisting only of itself
+  for (let i=0; i<presentNodes.length; i++) {
+    let node = id2node[presentNodes[i]];
+    node2component[i] = {
+      members: [i]
+    };
+  }
+  // (Randomly) decide which links remain and merge connected components of remaining links
+  for (let i=0; i<presentNodes.length; i++) {
+    let node = id2node[presentNodes[i]];
+    node.neighbors.forEach(function(nID) {
+      let j = presentNodes.indexOf(nID);
+      // Direct links as i>j
+      if (j<i && Math.random()<SURVIVAL_P) {
+        remainingLinks.push({
+          source: i,
+          target: j
+        });
+        // Merge connected components when necessary.
+        if (node2component[i]!=node2component[j]) {
+          node2component[j].members.forEach(function(m){
+            node2component[m] = node2component[i];
+            node2component[i].members.push(m);
+          });
+        }
+      }
+    });
+  }
+  // Find the size of the largest component
+  let largestComponent = 0;
+  for (let i=0; i<presentNodes.length; i++) {
+    largestComponent = Math.max(node2component[i].members.length, largestComponent);
+  }
+  // Find nodes which are in components of this size
+  let winners = [];
+  for (let i=0; i<presentNodes.length; i++) {
+    if (node2component[i].members.length == largestComponent) {
+      winners.push(i);
+    }
+  }
+  return res.end(JSON.stringify({
+    "winners": winners,
+    "remainingLinks": remainingLinks
+  }));
+
+}
 
 function route(req, res) {
   if (req.url.startsWith(`${URL_PREFIX}/getdata`)) {
@@ -147,6 +199,8 @@ function route(req, res) {
     return _updatedata(req, res);
   } else if (req.url.startsWith(`${URL_PREFIX}/addnode`)) {
     return _addnode(req, res);
+  } else if (req.url.startsWith(`${URL_PREFIX}/percolate`)) {
+    return _percolate(req, res);
   }
   fs.readFile(path.resolve(__dirname, './interface.html'), function(err, data) {
     res.writeHead(200, {'Content-Type': 'text/html'});

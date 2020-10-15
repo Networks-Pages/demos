@@ -3,41 +3,54 @@
 
 <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
 <style>
-.links line {
+#links line {
   stroke: #999;
   stroke-opacity: 0.6;
 }
 
-.nodes circle {
+#nodes circle {
   stroke: #000;
   stroke-width: 1.5px;
 }
+
+#nodes g.win circle {
+  fill: green;
+}
+
+
 
 
 </style>
 <body>
   <div class="row">
-    <div id="canvas" height="100%" class="col-md-8"></div>
-    <div class="col-md-4">
+    <div class="col-md-8">
       <div class="row">
+        <label class="col-md-3">First neighbor:</label>
+        <label class="col-md-3" id="neighbor1"></label>
         <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(1)">Select first neighbor</button>
+      </div>
+      <div class="row">
+        <label class="col-md-3">Second neighbor:</label>
+        <label class="col-md-3" id="neighbor2"></label>
         <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(2)">Select second neighbor</button>
       </div>
       <div class="row">
-        <label class="col-md-6" id="neighbor1">Select a node</label>
-        <label class="col-md-6" id="neighbor2">Select a node</button>
-      </div>
-      <div class="row">
         <label class="col-md-3" for="name">Your name:</label>
-        <input type="text" class="col-md-9" id="name"></input>
-      </div>
-      <div class="row">
-        <button type="button" class="col-md-12 btn btn-primary" onclick="addNode()">Add node</button>
-      </div>
-      <div class="row">
-        <button type="button" class="col-md-12 btn btn-primary" onclick="updateNetwork()">Refresh network</button>
+        <input type="text" class="col-md-3" id="name"></input>
+        <button class="col-md-6 btn btn-primary" onclick="addNode()">
+          Add node
+        </button>
       </div>
     </div>
+    <button class="col-md-2 col-sm-6 btn btn-primary" onclick="updateNetwork()">
+      Refresh
+    </button>
+    <button class="col-md-2 col-sm-6 btn btn-danger" onclick="percolate()">
+      Percolate
+    </button>
+  </div>
+  <div class="row">
+    <div id="canvas" height="100%" class="col-md-12"></div>
   </div>
 </body>
 <script src="https://d3js.org/d3.v6.min.js"></script>
@@ -51,6 +64,7 @@ var container = document.getElementById(containerID);
 var width = container.offsetWidth,
 	height = container.offsetHeight;
 if (height<width) height=width;
+if (height>window.innerHeight) height = window.innerHeight;
 // Variables for selecting neighbors
 var neighbor2select = false;
 var neighbors = {neighbor1: true, neighbor2: true};
@@ -81,6 +95,22 @@ function addNode() {
     }
   }
   addNodeHttp.send();
+}
+
+function percolate() {
+  var percolateHttp = new XMLHttpRequest();
+  percolateHttp.open("GET","/network/percolate");
+  percolateHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      data = JSON.parse(this.responseText);
+      console.log(data);
+      graph.links = data.remainingLinks;
+      graph.links.forEach(addLink);
+      nodes.classed("win",n=>data.winners.includes(n.id));
+      updateVisualization();
+    }
+  }
+  percolateHttp.send();
 }
 
 
@@ -231,6 +261,15 @@ function addLinksFromNeighbors(v) {
   });
 }
 
+function addLink(e) {
+  e.source = graph.nodes[e.source];
+  e.target = graph.nodes[e.target];
+  e.x1 = e.source.x;
+  e.y1 = e.source.y;
+  e.x2 = e.target.x;
+  e.y2 = e.target.y;
+}
+
 // Retrieve graph
 var xmlHttp = new XMLHttpRequest();
 xmlHttp.onreadystatechange = function() {
@@ -240,14 +279,7 @@ xmlHttp.onreadystatechange = function() {
 			v.x = width/2;
       v.y = height/2;
 		});
-    graph.links.forEach(function(e) {
-      e.source = graph.nodes[e.source];
-      e.target = graph.nodes[e.target];
-      e.x1 = e.source.x;
-      e.y1 = e.source.y;
-      e.x2 = e.target.x;
-      e.y2 = e.target.y;
-    });
+    graph.links.forEach(addLink);
     showGraph();
   }
 };
