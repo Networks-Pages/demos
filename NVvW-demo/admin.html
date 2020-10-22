@@ -17,15 +17,24 @@
   fill: green;
 }
 
+#links line.percolating {
+  stroke-width: 5px;
+  stroke: blue;
+}
 
+#links line.survived {
+  stroke-width: 3px;
+  stroke: green;
+}
 
 
 </style>
 <body>
   <div class="row">
-    <button class="col-md-12 col-sm-12 btn btn-danger" onclick="percolate()">
+    <button class="col-md-9 col-sm-12 btn btn-danger" onclick="percolate()">
       DO PERCOLATION
     </button>
+    <input type="range" class="custom-range col-md-3" min="1" max="10" id="speed" value="1" onchange="updateSpeed(this.value)">
   </div>
   <div class="row">
     <div id="canvas" height="100%" class="col-md-12"></div>
@@ -41,35 +50,69 @@ var width = container.offsetWidth,
 	height = container.offsetHeight;
 if (height<width) height=width;
 if (height>window.innerHeight) height = window.innerHeight;
+var tensionTime = 1000;
+var winners;
+
+function updateSpeed(speed) {
+  tensionTime = 1000 / speed;
+}
 
 function percolate() {
-  var percolateHttp = new XMLHttpRequest();
+  let originalIDs = [];
+  let source2remaining = [];
+  graph.links.forEach(e => originalIDs.push(link2id(e)));
+  graph.nodes.forEach(n => source2remaining.push([]));
+
+  let percolateHttp = new XMLHttpRequest();
   percolateHttp.open("GET","./percolate");
   percolateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       data = JSON.parse(this.responseText);
-      console.log(data);
-      graph.links = data.remainingLinks;
-      graph.links.forEach(addLink);
-      nodes.classed("win",n=>data.winners.includes(n.id));
-      updateVisualization();
-      let percolateEndedHttp = new XMLHttpRequest();
-      percolateEndedHttp.open("GET","./finishPercolation");
-      percolateEndedHttp.send();
+      winners = data.winners;
+      data.remainingLinks.forEach(e => source2remaining[e.source].push(e.target));
+      dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
     }
   }
   percolateHttp.send();
+}
 
+function dramaticallyRemoveLinks(source2remaining,originalIDs,idx) {
+  if (idx>=originalIDs.length) {
+    // Notify the server that the percolation has ended
+    let percolateEndedHttp = new XMLHttpRequest();
+    percolateEndedHttp.open("GET","./finishPercolation");
+    percolateEndedHttp.send();
+    // Make winners green
+    nodes.classed("win",n=>winners.includes(n.id));
+    return;
+  }
+  let id = originalIDs[idx];
+  let source = parseInt(id.substr(1).split('-')[0]);
+  let target = parseInt(id.substr(1).split('-')[1]);
+  let remove = !source2remaining[source].includes(target);
+  let elem = document.getElementById(id);
+  elem.classList.add('percolating');
+  setTimeout(function() {
+    if (remove) {
+      graph.links.splice(graph.links.indexOf(elem.__data__),1);
+      d3.select("#links").selectAll("line").data(graph.links,link2id).exit().remove();
+      simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(d => d.name));
+      simulation.alpha(1).restart();
+    } else {
+      elem.classList.remove('percolating');
+      elem.classList.add('survived');
+    }
+    dramaticallyRemoveLinks(source2remaining,originalIDs,idx+1);
+  }, tensionTime);
 }
 
 // A mapping from node/link to its id name
 var node2id = v=>`node${v.id}`;
-var link2id = e=>`e${e.source.name}-${e.target.name}`;
+var link2id = e=>`e${e.source.id}-${e.target.id}`;
 
 // Update the visualization after graph is changed.
 var nodes,circles,labels,links,drag,simulation,svg;
 function updateVisualization() {
-
   links = d3.select("#links").selectAll("line").data(graph.links,link2id);
   var linkEnter = links.enter()
                        .append("line")

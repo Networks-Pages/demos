@@ -162,7 +162,7 @@ function updateNetwork() {
 
 // A mapping from node/link to its id name
 var node2id = v=>`node${v.id}`;
-var link2id = e=>`e${e.source.name}-${e.target.name}`;
+var link2id = e=>`e${e.source.id}-${e.target.id}`;
 
 // Update the visualization after graph is changed.
 var nodes,circles,labels,links,drag,simulation,svg;
