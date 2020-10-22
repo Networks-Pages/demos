@@ -23,27 +23,8 @@
 </style>
 <body>
   <div class="row">
-    <div class="col-md-8">
-      <div class="row">
-        <label class="col-md-3">First neighbor:</label>
-        <label class="col-md-3" id="neighbor1"></label>
-        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(1)">Select first neighbor</button>
-      </div>
-      <div class="row">
-        <label class="col-md-3">Second neighbor:</label>
-        <label class="col-md-3" id="neighbor2"></label>
-        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(2)">Select second neighbor</button>
-      </div>
-      <div class="row">
-        <label class="col-md-3" for="name">Your name:</label>
-        <input type="text" class="col-md-3" id="name"></input>
-        <button class="col-md-6 btn btn-primary" onclick="addNode()">
-          Add node
-        </button>
-      </div>
-    </div>
-    <button class="col-md-2 col-sm-6 btn btn-primary" onclick="updateNetwork()">
-      Refresh
+    <button class="col-md-12 col-sm-12 btn btn-danger" onclick="percolate()">
+      DO PERCOLATION
     </button>
   </div>
   <div class="row">
@@ -53,8 +34,6 @@
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
-var userID = new URLSearchParams(window.location.search).get('id');
-
 var graph;
 var containerID = "canvas";
 var container = document.getElementById(containerID);
@@ -62,59 +41,25 @@ var width = container.offsetWidth,
 	height = container.offsetHeight;
 if (height<width) height=width;
 if (height>window.innerHeight) height = window.innerHeight;
-// Variables for selecting neighbors
-var neighbor2select = false;
-var neighbors = {neighbor1: true, neighbor2: true};
-// When one of the select-buttons is pressed
-function selectNeighbor(i) {
-  if (i==1 || i==2) {
-    neighbor2select = "neighbor"+i;
-  }
-}
-// Change the label below the select-button to the node name.
-function nodeSelected(e,node) {
-  if (neighbors[neighbor2select] && !([neighbors["neighbor1"],neighbors["neighbor2"]].includes(node.id))) {
-    neighbors[neighbor2select] = node.id;
-    var label = document.getElementById(neighbor2select);
-    label.innerHTML = node.name;
-  }
-}
-function addNode() {
-  var name = document.getElementById("name").value;
-  var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
-  addNodeHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 400) {
-      console.log(this.getResponseHeader("errorfield"));
-      // TODO make errorfield red
-    } else if (this.readyState == 4 && this.status == 200) {
-      updateNetwork();
-    }
-  }
-  addNodeHttp.send();
-}
 
-function showPercolation(data) {
-  graph.links = data.remainingLinks;
-  graph.links.forEach(addLink);
-  nodes.classed("win",n=>data.winners.includes(n.id));
-  updateVisualization();
-}
-
-
-// Retrieve all newly added nodes and update the visualization
-function updateNetwork() {
-  var n = graph.nodes.length;
-  var updateHttp = new XMLHttpRequest();
-  updateHttp.open("GET","/network/updatedata?n="+n);
-  updateHttp.onreadystatechange = function() {
+function percolate() {
+  var percolateHttp = new XMLHttpRequest();
+  percolateHttp.open("GET","./percolate");
+  percolateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-        data = JSON.parse(this.responseText);
-        data.neighbors.forEach(addLinksFromNeighbors);
-        updateVisualization();
+      data = JSON.parse(this.responseText);
+      console.log(data);
+      graph.links = data.remainingLinks;
+      graph.links.forEach(addLink);
+      nodes.classed("win",n=>data.winners.includes(n.id));
+      updateVisualization();
+      let percolateEndedHttp = new XMLHttpRequest();
+      percolateEndedHttp.open("GET","./finishPercolation");
+      percolateEndedHttp.send();
     }
   }
-  updateHttp.send();
+  percolateHttp.send();
+
 }
 
 // A mapping from node/link to its id name
@@ -146,8 +91,7 @@ function updateVisualization() {
   circles = nodeEnter.append("circle")
                  .attr("r", 12)
                  .attr("stroke", "black")
-                 .attr("fill", "red")
-                 .on("click",nodeSelected);
+                 .attr("fill", "red");
   labels = nodeEnter.append("text")
                 .attr("stroke","black")
                 .attr("stroke-width",0.5)
@@ -269,9 +213,6 @@ xmlHttp.onreadystatechange = function() {
 		});
     graph.links.forEach(addLink);
     showGraph();
-    if (graph.percolation) {
-      showPercolation(graph.percolation);
-    }
   }
 };
 xmlHttp.open("GET", "/network/getdata");

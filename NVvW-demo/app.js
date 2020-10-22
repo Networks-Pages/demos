@@ -3,6 +3,12 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
+const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
+if (!process.env.DEBUG) {
+  process.env.DEBUG = 'true';
+  process.env.PORT = 8080;
+}
+
 const DEBUG = (process.env.DEBUG === 'true');
 const URL_PREFIX = '/network';
 const MAX_DEGREE = 5;
@@ -20,6 +26,8 @@ var id2node = {
     'neighbors': []
   }
 };
+var percolationResult;
+var percolationDone = false;
 var presentNodes = ['START_A','START_B'];
 var nStartNodes = presentNodes.length;
 
@@ -30,6 +38,13 @@ var neighbors = [];
 
 
 function _addnode(req, res) {
+  if (percolationResult) {
+    return res.writeHead(400, {
+      message: "Cannot add nodes anymore, percolation has started.",
+      errorfield: "id"
+    }).end();
+  }
+
   var data = url.parse(req.url, true).query;
   if (data.name && data.id) {
     // Check parameters
@@ -74,6 +89,8 @@ function _addnode(req, res) {
           errorfield: "neighbor2"
         }).end();
     }
+
+
 
     // Add node:
     id2node[newID] = {
@@ -120,10 +137,14 @@ function _getdata(req, res) {
       }
     });
   }
-  return res.end(JSON.stringify({
+  let data = {
     "nodes": nodes,
     "links": links
-  }));
+  };
+  if (percolationDone) {
+    data.percolation = percolationResult;
+  }
+  return res.end(JSON.stringify(data));
 }
 
 function _updatedata(req, res) {
@@ -141,6 +162,7 @@ function _updatedata(req, res) {
 }
 
 function _percolate(req,res) {
+  percolationDone = false;
   let remainingLinks = [];
   let node2component = {};
   // Assign each node to a component consisting only of itself
@@ -183,11 +205,12 @@ function _percolate(req,res) {
       winners.push(i);
     }
   }
-  return res.end(JSON.stringify({
+
+  percolationResult = {
     "winners": winners,
     "remainingLinks": remainingLinks
-  }));
-
+  };
+  return res.end(JSON.stringify(percolationResult));
 }
 
 function route(req, res) {
@@ -197,14 +220,26 @@ function route(req, res) {
     return _updatedata(req, res);
   } else if (req.url.startsWith(`${URL_PREFIX}/addnode`)) {
     return _addnode(req, res);
-  } else if (req.url.startsWith(`${URL_PREFIX}/percolate`)) {
-    return _percolate(req, res);
+  } else if (req.url.startsWith(`${URL_PREFIX}/${ADMIN_PAGE}`)) {
+    // Admin page
+    if (req.url.endsWith('/finishPercolation')) {
+      percolationDone = true;
+      return res.end('okay');
+    } else if (req.url.endsWith('/percolate')) {
+      return _percolate(req, res);
+    }
+    fs.readFile(path.resolve(__dirname, './admin.html'), function(err, data) {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.write(data);
+      return res.end();
+    });
+  } else {
+    fs.readFile(path.resolve(__dirname, './interface.html'), function(err, data) {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.write(data);
+      return res.end();
+    });
   }
-  fs.readFile(path.resolve(__dirname, './interface.html'), function(err, data) {
-    res.writeHead(200, {'Content-Type': 'text/html'});
-    res.write(data);
-    return res.end();
-  });
 }
 
 module.exports = {
