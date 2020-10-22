@@ -1,49 +1,28 @@
+// --- libraries ---------------------------------------------------------------
+const _ = require('underscore');
 const fs = require('fs');
 const http = require('http');
 const path = require('path');
 const url = require('url');
 
-const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
-if (!process.env.DEBUG) {
-  process.env.DEBUG = 'true';
-  process.env.PORT = 8080;
-}
 
+// --- constants ---------------------------------------------------------------
+const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
+    '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
 const DEBUG = (process.env.DEBUG === 'true');
 const URL_PREFIX = '/network';
 const MAX_DEGREE = 5;
 const SURVIVAL_P = 0.5;
 
-var id2node;
-var percolationResult;
-var percolationDone;
-var presentNodes;
-var nStartNodes;
-var neighbors;
-function _restart() {
-  id2node = {
-    'START_A': {
-      'id': 'START_A',
-      'name': 'A',
-      'neighbors': []
-    },
-    'START_B': {
-      'id': 'START_B',
-      'name': 'B',
-      'neighbors': []
-    }
-  };
-  percolationResult = undefined;
-  percolationDone = false;
-  presentNodes = ['START_A','START_B'];
-  nStartNodes = presentNodes.length;
-  for (var i=0; i<500;i++) {
-    id2node[`ID${i}`] = null;
-  }
-  neighbors = [];
-}
-_restart();
+// --- globals -----------------------------------------------------------------
+const db = require('./db');
+const nodes = {};
+const links = [];
 
+var percolationDone = false;
+
+
+// --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
   if (percolationResult) {
     return res.writeHead(400, {
@@ -55,65 +34,58 @@ function _addnode(req, res) {
   var data = url.parse(req.url, true).query;
   if (data.name && data.id) {
     // Check parameters
-    let newID = data.id;
-    let n1idx = parseInt(data.neighbor1);
-    let n2idx = parseInt(data.neighbor2);
-    console.log(`ID: ${newID}, neighbors: ${n1idx},${n2idx}`)
-    if (!id2node.hasOwnProperty(newID)) {
-      return res.writeHead(400, {
-        message: `The id ${newID} is not valid`,
-        errorfield: "id"
-      }).end();
-    }
-    if (id2node[newID] != null) {
+    const newID = data.id;
+    const n1ID = parseInt(data.neighbor1, 10);
+    const n2ID = parseInt(data.neighbor2, 10);
+    debug(`ID: ${newID}, neighbors: ${n1ID},${n2ID}`);
+    
+//     if (!nodes.hasOwnProperty(newID)) {
+//       return res.writeHead(400, {
+//         message: `The id ${newID} is not valid`,
+//         errorfield: "id"
+//       }).end();
+//     }
+    if (nodes[newID] != null) {
       return res.writeHead(400, {
         message: `The id ${newID} has already been taken.`,
         errorfield: "id"
       }).end();
     }
-    if (n1idx >= presentNodes.length) {
+    if (!nodes.hasOwnProperty(n1ID)) {
         return res.writeHead(400, {
-          message: `neighbor1 ${n1idx} does not exist`,
+          message: `neighbor1 ${n1ID} does not exist`,
           errorfield: "neighbor1"
         }).end();
     }
-    if (n2idx >= presentNodes.length) {
+    if (!nodes.hasOwnProperty(n2ID)) {
         return res.writeHead(400, {
-          message: `neighbor2 ${n2idx} does not exist`,
+          message: `neighbor2 ${n2ID} does not exist`,
           errorfield: "neighbor2"
         }).end();
     }
-    let n1ID = presentNodes[n1idx], n2ID = presentNodes[n2idx];
-    if (id2node[presentNodes[n1idx]].neighbors.length>=MAX_DEGREE) {
+    if (nodes[n1ID].degree >= MAX_DEGREE) {
         return res.writeHead(400, {
-          message: `neighbor1 ${n1idx} already has ${MAX_DEGREE} connections`,
+          message: `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`,
           errorfield: "neighbor1"
         }).end();
     }
-    if (id2node[presentNodes[n2idx]].neighbors.length>=MAX_DEGREE) {
+    if (nodes[n2ID].degree >= MAX_DEGREE) {
         return res.writeHead(400, {
-          message: `neighbor2 ${n2idx} already has ${MAX_DEGREE} connections`,
+          message: `neighbor2 ${n2ID} already has ${MAX_DEGREE} connections`,
           errorfield: "neighbor2"
         }).end();
     }
 
-
-
-    // Add node:
-    id2node[newID] = {
-      'id': newID,
-      'name': data.name,
-      'neighbors': [n1ID,n2ID]
-    }
-    neighbors.push({
-      'id': presentNodes.length,
-      'name': data.name,
-      'neighbor1': n1idx,
-      'neighbor2': n2idx
-    });
-    presentNodes.push(newID);
-    id2node[n1ID].neighbors.push(newID);
-    id2node[n2ID].neighbors.push(newID);
+    // Add node, update metadata
+    nodes[newID] = {
+      name: data.name,
+      degree: 2
+    };
+    links.push([n1ID, newID]);
+    links.push([n2ID, newID]);
+    nodes[n1ID].degree++;
+    nodes[n2ID].degree++;
+    
     return res.end('okay');
   } else {
     return res.writeHead(400, {
@@ -125,29 +97,7 @@ function _addnode(req, res) {
 
 function _getdata(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  let nodes = [];
-  let links = [];
-  for (let i = 0; i<presentNodes.length; i++) {
-    let node = id2node[presentNodes[i]]
-    nodes.push({
-      name: node.name,
-      id: i
-    });
-    // Only add nodes with i>j because they are directed in that way
-    node.neighbors.forEach(function(nID) {
-      let j = presentNodes.indexOf(nID);
-      if (j < i) {
-        links.push({
-          source: i,
-          target: j
-        });
-      }
-    });
-  }
-  let data = {
-    "nodes": nodes,
-    "links": links
-  };
+  var data = {nodes, links};
   if (percolationDone) {
     data.percolation = percolationResult;
   }
@@ -155,69 +105,81 @@ function _getdata(req, res) {
 }
 
 function _updatedata(req, res) {
-  var data = url.parse(req.url,true).query;
+  var data = url.parse(req.url, true).query;
   if (!data.n) {
-    return res.writeHead(400,{message: "Missing parameter n."}).end()
-  }
-  var newNeighbors = [];
-  for (var i=data.n-nStartNodes; i<neighbors.length; i++) {
-    newNeighbors.push(neighbors[i]);
+    return res.writeHead(400, {message: "Missing parameter n."}).end()
   }
   return res.end(JSON.stringify({
-    "neighbors": newNeighbors
+    neighbors: [], // TODO nodes.slice(data.n)
   }));
 }
 
-function _percolate(req,res) {
+function _percolate(req, res) {
   percolationDone = false;
-  let remainingLinks = [];
-  let node2component = {};
+  const node2component = {};
   // Assign each node to a component consisting only of itself
-  for (let i=0; i<presentNodes.length; i++) {
-    let node = id2node[presentNodes[i]];
-    node2component[i] = {
-      members: [i]
+  for (const id in nodes) {
+    node2component[id] = {
+      members: [id]
     };
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
-  for (let i=0; i<presentNodes.length; i++) {
-    let node = id2node[presentNodes[i]];
-    node.neighbors.forEach(function(nID) {
-      let j = presentNodes.indexOf(nID);
-      // Direct links as i>j
-      if (j<i && Math.random()<SURVIVAL_P) {
-        remainingLinks.push({
-          source: i,
-          target: j
-        });
-        // Merge connected components when necessary.
-        if (node2component[i]!=node2component[j]) {
-          node2component[j].members.forEach(function(m){
-            node2component[m] = node2component[i];
-            node2component[i].members.push(m);
-          });
-        }
-      }
-    });
+  const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
+  for (const link in remainingLinks) {
+    const [i, j] = link;
+    // Merge connected components when necessary.
+    if (node2component[i] != node2component[j]) {
+      node2component[j].members.forEach(function(m) {
+        node2component[m] = node2component[i];
+        node2component[i].members.push(m);
+      });
+    }
   }
   // Find the size of the largest component
-  let largestComponent = 0;
-  for (let i=0; i<presentNodes.length; i++) {
-    largestComponent = Math.max(node2component[i].members.length, largestComponent);
-  }
-  // Find nodes which are in components of this size
-  let winners = [];
-  for (let i=0; i<presentNodes.length; i++) {
-    if (node2component[i].members.length == largestComponent) {
-      winners.push(i);
+  let largestComponentId = null, largestComponentSize = 0;
+  for (const id in nodes) {
+    if (node2component[id].members.length > largestComponentSize) {
+      largestComponentSize = node2component[id].members.length;
+      largestComponentId = id;
     }
   }
 
   percolationResult = {
-    "winners": winners,
+    "winners": node2component[largestComponentId].members,
     "remainingLinks": remainingLinks
   };
   return res.end(JSON.stringify(percolationResult));
+}
+
+
+function close() {
+  db.close();
+}
+
+function debug() {
+  if (DEBUG) {
+    console.log(arguments);
+  }
+}
+
+function open() {
+  db.open(() => {
+    db.query('SELECT * from nodes', function(results) {
+      results.forEach((row) => {
+        nodes[row.id] = {
+          name: row.name,
+          degree: 0
+        };
+      });
+    });
+    db.query('SELECT * from links', function(results) {
+      results.forEach((row) => {
+        links.push([row.id_source, row.id_target]);
+        nodes[row.id_source].degree++;
+        nodes[row.id_target].degree++;
+      });
+    });
+  });
 }
 
 function route(req, res) {
@@ -252,12 +214,22 @@ function route(req, res) {
   }
 }
 
+
+// --- exports and entry point -------------------------------------------------
 module.exports = {
-  "route": route
+  'close': close,
+  'open': open,
+  'route': route
 };
 
 if (DEBUG) {
   let port = process.env.PORT;
-  http.createServer(route).listen(port);
+  open();
+  let server = http.createServer(route);
+  server.on('close', close);
+  process.on('SIGINT', function() {
+    server.close();
+  });
+  server.listen(port);
   console.log(`Running on port ${port}`);
 }

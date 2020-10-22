@@ -1,41 +1,48 @@
 <!DOCTYPE html>
-<meta charset="utf-8">
+<head>
+  <meta charset="utf-8">
+  <title>NVvW netwerk spel</title>
 
-<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
-<style>
-#links line {
-  stroke: #999;
-  stroke-opacity: 0.6;
-}
+  <link rel="stylesheet"
+        href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+        crossorigin="anonymous">
 
-#nodes circle {
-  stroke: black;
-  fill: yellow;
-  stroke-width: 1.5px;
-}
+  <style>
+    #links line {
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
 
-#nodes g.selected circle {
-  fill: blue;
-}
+    #nodes circle {
+      stroke: black;
+      fill: yellow;
+      stroke-width: 1.5px;
+    }
 
-#nodes g.max-degree circle {
-  fill: purple;
-}
+    #nodes g.selected circle {
+      fill: blue;
+    }
 
-#nodes g.lost circle {
-  fill: red;
-}
+    #nodes g.max-degree circle {
+      fill: purple;
+    }
 
-#nodes g.win circle {
-  fill: green;
-}
+    #nodes g.lost circle {
+      fill: red;
+    }
 
-#explanation p, #explanation h1 {
-  text-align: center;
-  width: 100%;
-  margin: auto;
-}
-</style>
+    #nodes g.win circle {
+      fill: green;
+    }
+
+    #explanation p, #explanation h1 {
+      text-align: center;
+      width: 100%;
+      margin: auto;
+    }
+  </style>
+</head>
 <body>
   <div class="row">
     <div class="col-md-12">
@@ -302,13 +309,15 @@ function addLink(e) {
 // Retrieve graph
 var xmlHttp = new XMLHttpRequest();
 xmlHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-        graph = JSON.parse(this.responseText);
-		graph.nodes.forEach(function(v) {
-			v.x = width/2;
-      v.y = height/2;
-		});
+  if (this.readyState == 4 && this.status == 200) {
+    graph = JSON.parse(this.responseText);
+    for (const id in graph.nodes) {
+      const n = graph.nodes[id];
+      n.x = width/2;
+      n.y = height/2;
+    }
     graph.links.forEach(addLink);
+    console.log(graph);
     showGraph();
     recomputeDegrees();
     if (graph.percolation) {
