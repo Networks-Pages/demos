@@ -9,43 +9,69 @@
 }
 
 #nodes circle {
-  stroke: #000;
+  stroke: black;
+  fill: yellow;
   stroke-width: 1.5px;
+}
+
+#nodes g.selected circle {
+  fill: blue;
+}
+
+#nodes g.max-degree circle {
+  fill: purple;
+}
+
+#nodes g.lost circle {
+  fill: red;
 }
 
 #nodes g.win circle {
   fill: green;
 }
 
-
-
-
+#explanation p, #explanation h1 {
+  text-align: center;
+  width: 100%;
+  margin: auto;
+}
 </style>
 <body>
   <div class="row">
-    <div class="col-md-8">
-      <div class="row">
-        <label class="col-md-3">First neighbor:</label>
-        <label class="col-md-3" id="neighbor1"></label>
-        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(1)">Select first neighbor</button>
-      </div>
-      <div class="row">
-        <label class="col-md-3">Second neighbor:</label>
-        <label class="col-md-3" id="neighbor2"></label>
-        <button type="button" class="col-md-6 btn btn-primary" onclick="selectNeighbor(2)">Select second neighbor</button>
-      </div>
-      <div class="row">
-        <label class="col-md-3" for="name">Your name:</label>
-        <input type="text" class="col-md-3" id="name"></input>
-        <button class="col-md-6 btn btn-primary" onclick="addNode()">
-          Add node
-        </button>
+    <div class="col-md-12">
+      <div style="max-width:1000px;margin:auto;">
+        <div class="row">
+          <div class="col-md-12" id="explanation">
+            <h1>Instructions</h1>
+            <p>
+              In this game, each participant adds a single node to the network and chooses two neighbors that this node connects to.
+              You can only connect to nodes that have <b>less than 5 neighbors</b>.
+              At the end of the game, we will percolate the graph: each link will be removed with probability <i>0.5</i> (independently).
+            </p>
+            <p>
+              The game is won by the players whose nodes end up in the largest connected component after percolation. When two components have equal size, both components win.
+            </p>
+            <p>
+              You can add your node by clicking the two neighbors that you want to connect to, typing your name in the textfield and clicking the button "Add node".
+            </p>
+          </div>
+        </div>
+        <div class="row" style="height:30px"></div>
+        <div class="row">
+          <label class="col-md-2" for="name" style="text-align:right;">Your name:</label>
+          <input type="text" class="col-md-4" id="name"></input>
+          <button class="col-md-3 btn btn-primary" onclick="addNode()">
+            Add node
+          </button>
+          <button class="col-md-3 btn btn-primary" onclick="updateNetwork()">
+            Refresh
+          </button>
+        </div>
       </div>
     </div>
-    <button class="col-md-2 col-sm-6 btn btn-primary" onclick="updateNetwork()">
-      Refresh
-    </button>
+
   </div>
+
   <div class="row">
     <div id="canvas" height="100%" class="col-md-12"></div>
   </div>
@@ -53,6 +79,7 @@
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
+var MAX_DEGREE = 5;
 var userID = new URLSearchParams(window.location.search).get('id');
 
 var graph;
@@ -61,28 +88,30 @@ var container = document.getElementById(containerID);
 var width = container.offsetWidth,
 	height = container.offsetHeight;
 if (height<width) height=width;
-if (height>window.innerHeight) height = window.innerHeight;
+if (height>0.8*window.innerHeight) height = 0.8*window.innerHeight;
 // Variables for selecting neighbors
 var neighbor2select = false;
 var neighbors = {neighbor1: true, neighbor2: true};
+var selectionCursor = 0;
+var selected = [false,false];
 // When one of the select-buttons is pressed
-function selectNeighbor(i) {
-  if (i==1 || i==2) {
-    neighbor2select = "neighbor"+i;
-  }
-}
 // Change the label below the select-button to the node name.
 function nodeSelected(e,node) {
-  if (neighbors[neighbor2select] && !([neighbors["neighbor1"],neighbors["neighbor2"]].includes(node.id))) {
-    neighbors[neighbor2select] = node.id;
-    var label = document.getElementById(neighbor2select);
-    label.innerHTML = node.name;
+  if (!selected.includes(node.id) && node.degree<MAX_DEGREE) {
+    selectionCursor = (selectionCursor+1)%2;
+    if (selected[selectionCursor]!==false) {
+      document.getElementById('node'+selected[selectionCursor]).classList.remove("selected");
+    }
+    selected[selectionCursor] = node.id;
+    console.log(e);
+    console.log(selected);
+    document.getElementById(node2id(node)).classList.add("selected");
   }
 }
 function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+neighbors["neighbor1"]+"&neighbor2="+neighbors["neighbor2"]);
+  addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1]);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {
       console.log(this.getResponseHeader("errorfield"));
@@ -98,7 +127,17 @@ function showPercolation(data) {
   graph.links = data.remainingLinks;
   graph.links.forEach(addLink);
   nodes.classed("win",n=>data.winners.includes(n.id));
+  nodes.classed("lost",n=>!data.winners.includes(n.id));
   updateVisualization();
+}
+
+function recomputeDegrees() {
+  graph.nodes.forEach(n => n.degree=0);
+  graph.links.forEach(function(e) {
+    e.source.degree++;
+    e.target.degree++;
+  });
+  nodes.classed("max-degree",n=>n.degree>=MAX_DEGREE);
 }
 
 
@@ -112,6 +151,7 @@ function updateNetwork() {
         data = JSON.parse(this.responseText);
         data.neighbors.forEach(addLinksFromNeighbors);
         updateVisualization();
+        recomputeDegrees();
     }
   }
   updateHttp.send();
@@ -145,8 +185,6 @@ function updateVisualization() {
                        .call(drag(simulation));
   circles = nodeEnter.append("circle")
                  .attr("r", 12)
-                 .attr("stroke", "black")
-                 .attr("fill", "red")
                  .on("click",nodeSelected);
   labels = nodeEnter.append("text")
                 .attr("stroke","black")
@@ -269,6 +307,7 @@ xmlHttp.onreadystatechange = function() {
 		});
     graph.links.forEach(addLink);
     showGraph();
+    recomputeDegrees();
     if (graph.percolation) {
       showPercolation(graph.percolation);
     }
