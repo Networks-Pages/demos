@@ -58,7 +58,7 @@
         </div>
         <div class="row" style="height:30px"></div>
         <div class="row">
-          <label class="col-md-2" for="name" style="text-align:right;">Your name:</label>
+          <label class="col-md-2" for="name" style="display:flex;align-content:center;">Your name:</label>
           <input type="text" class="col-md-4" id="name"></input>
           <button class="col-md-3 btn btn-primary" onclick="addNode()">
             Add node
@@ -117,6 +117,9 @@ function addNode() {
       console.log(this.getResponseHeader("errorfield"));
       // TODO make errorfield red
     } else if (this.readyState == 4 && this.status == 200) {
+      document.getElementById('node'+selected[0]).classList.remove('selected');
+      document.getElementById('node'+selected[1]).classList.remove('selected');
+      selected = [false,false]
       updateNetwork();
     }
   }
