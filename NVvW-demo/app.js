@@ -14,28 +14,35 @@ const URL_PREFIX = '/network';
 const MAX_DEGREE = 5;
 const SURVIVAL_P = 0.5;
 
-var id2node = {
-  'START_A': {
-    'id': 'START_A',
-    'name': 'A',
-    'neighbors': []
-  },
-  'START_B': {
-    'id': 'START_B',
-    'name': 'B',
-    'neighbors': []
-  }
-};
+var id2node;
 var percolationResult;
-var percolationDone = false;
-var presentNodes = ['START_A','START_B'];
-var nStartNodes = presentNodes.length;
-
-for (var i=0; i<500;i++) {
-  id2node[`ID${i}`] = null;
+var percolationDone;
+var presentNodes;
+var nStartNodes;
+var neighbors;
+function _restart() {
+  id2node = {
+    'START_A': {
+      'id': 'START_A',
+      'name': 'A',
+      'neighbors': []
+    },
+    'START_B': {
+      'id': 'START_B',
+      'name': 'B',
+      'neighbors': []
+    }
+  };
+  percolationResult = undefined;
+  percolationDone = false;
+  presentNodes = ['START_A','START_B'];
+  nStartNodes = presentNodes.length;
+  for (var i=0; i<500;i++) {
+    id2node[`ID${i}`] = null;
+  }
+  neighbors = [];
 }
-var neighbors = [];
-
+_restart();
 
 function _addnode(req, res) {
   if (percolationResult) {
@@ -227,6 +234,9 @@ function route(req, res) {
       return res.end('okay');
     } else if (req.url.endsWith('/percolate')) {
       return _percolate(req, res);
+    } else if (req.url.endsWith('/restart')) {
+      _restart();
+      return res.end('okay');
     }
     fs.readFile(path.resolve(__dirname, './admin.html'), function(err, data) {
       res.writeHead(200, {'Content-Type': 'text/html'});
