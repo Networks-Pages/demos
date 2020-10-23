@@ -86,7 +86,7 @@ function _addnode(req, res) {
       name: data.name,
       degree: 2
     });
-    db.query(`INSERT INTO nodes (id, name) VALUES (${newIDi}, '${data.name}')`);
+    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}')`);
     links.push([n1ID, newIDi]);
     db.query(`INSERT INTO links VALUES (${n1ID}, ${newIDi})`);
     links.push([n2ID, newIDi]);
@@ -151,39 +151,52 @@ function _updatedata(req, res) {
 
 function _percolate(req, res) {
   percolationDone = false;
-  const node2component = {};
+  const node2component = new Map();
   // Assign each node to a component consisting only of itself
   for (const id of nodes.keys()) {
-    node2component[id] = {
+    node2component.set(id, {
       members: [id]
-    };
+    });
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
   for (const link in remainingLinks) {
     const [i, j] = link;
     // Merge connected components when necessary.
-    if (node2component[i] != node2component[j]) {
-      node2component[j].members.forEach(function(m) {
-        node2component[m] = node2component[i];
-        node2component[i].members.push(m);
+    if (node2component.get(i) != node2component.get(j)) {
+      node2component.get(j).members.forEach(function(m) {
+        node2component.get(m) = node2component.get(i);
+        node2component.get(i).members.push(m);
       });
     }
   }
   // Find the size of the largest component
   let largestComponentId = null, largestComponentSize = 0;
   for (const id of nodes.keys()) {
-    if (node2component[id].members.length > largestComponentSize) {
-      largestComponentSize = node2component[id].members.length;
+    if (node2component.get(id).members.length > largestComponentSize) {
+      largestComponentSize = node2component.get(id).members.length;
       largestComponentId = id;
     }
   }
 
   percolationResult = {
-    "winners": node2component[largestComponentId].members,
+    "winners": node2component.get(largestComponentId).members,
     "remainingLinks": remainingLinks
   };
   return res.end(JSON.stringify(percolationResult));
+}
+
+function _restart() {
+  db.query(`SET FOREIGN_KEY_CHECKS = 0;
+            TRUNCATE links;
+            TRUNCATE nodes;
+            SET FOREIGN_KEY_CHECKS = 1`);
+  nodes.clear();
+  links.length = 0;
+
+  db.query("INSERT INTO nodes VALUES (1, 'A'), (2, 'B')");
+  db.query("INSERT INTO links VALUES (1, 2)");
+  initFromDB();
 }
 
 
@@ -206,24 +219,26 @@ function getNodesArray() {
   });
 }
 
-function open() {
-  db.open(() => {
-    db.query('SELECT * from nodes', function(results) {
-      results.forEach((row) => {
-        nodes.set(row.id, {
-          name: row.name,
-          degree: 0
-        });
-      });
-    });
-    db.query('SELECT * from links', function(results) {
-      results.forEach((row) => {
-        links.push([row.id_source, row.id_target]);
-        nodes.get(row.id_source).degree++;
-        nodes.get(row.id_target).degree++;
+function initFromDB() {
+  db.query('SELECT * from nodes', function(results) {
+    results.forEach((row) => {
+      nodes.set(row.id, {
+        name: row.name,
+        degree: 0
       });
     });
   });
+  db.query('SELECT * from links', function(results) {
+    results.forEach((row) => {
+      links.push([row.id_source, row.id_target]);
+      nodes.get(row.id_source).degree++;
+      nodes.get(row.id_target).degree++;
+    });
+  });
+}
+
+function open() {
+  db.open(initFromDB);
 }
 
 function route(req, res) {

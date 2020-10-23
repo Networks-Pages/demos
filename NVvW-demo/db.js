@@ -17,7 +17,8 @@ const db = {
         host: 'localhost',
         database: 'tcasterm_networks',
         user: 'networks',
-        password: 'G6ca#z70'
+        password: 'G6ca#z70',
+        multipleStatements: true
       });
       db.conn.connect(function(err) {
         if (err) {
