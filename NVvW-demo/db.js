@@ -32,7 +32,7 @@ const db = {
     }
   },
   
-  query: function(query, callback) {
+  query: function(query, callback = null) {
     if (!db.active) {
       throw 'DB not connected';
     }
@@ -40,7 +40,9 @@ const db = {
       if (error) {
           throw error;
       }
-      callback(results, fields);
+      if (typeof callback === 'function') {
+        callback(results, fields);
+      }
     });
   }
 };

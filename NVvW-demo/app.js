@@ -86,8 +86,11 @@ function _addnode(req, res) {
       name: data.name,
       degree: 2
     });
+    db.query(`INSERT INTO nodes (id, name) VALUES (${newIDi}, '${data.name}')`);
     links.push([n1ID, newIDi]);
+    db.query(`INSERT INTO links VALUES (${n1ID}, ${newIDi})`);
     links.push([n2ID, newIDi]);
+    db.query(`INSERT INTO links VALUES (${n2ID}, ${newIDi})`);
     nodes.get(n1ID).degree++;
     nodes.get(n2ID).degree++;
     
