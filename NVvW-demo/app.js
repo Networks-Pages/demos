@@ -16,10 +16,11 @@ const SURVIVAL_P = 0.5;
 
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
-const nodes = {};
+const nodes = new Map();
 const links = [];
 
 var percolationDone = false;
+var percolationResult = null;
 
 
 // --- functions ---------------------------------------------------------------
@@ -37,39 +38,42 @@ function _addnode(req, res) {
     const newID = data.id;
     const n1ID = parseInt(data.neighbor1, 10);
     const n2ID = parseInt(data.neighbor2, 10);
+    var idMatch, newIDi;
     debug(`ID: ${newID}, neighbors: ${n1ID},${n2ID}`);
     
-//     if (!nodes.hasOwnProperty(newID)) {
-//       return res.writeHead(400, {
-//         message: `The id ${newID} is not valid`,
-//         errorfield: "id"
-//       }).end();
-//     }
-    if (nodes[newID] != null) {
+    if ((idMatch = newID.match(/^ID(\d+)$/)) === null) {
+      return res.writeHead(400, {
+        message: `The id ${newID} is not valid`,
+        errorfield: "id"
+      }).end();
+    } else {
+      newIDi = parseInt(idMatch[1], 10);
+    }
+    if (nodes.has(newIDi)) {
       return res.writeHead(400, {
         message: `The id ${newID} has already been taken.`,
         errorfield: "id"
       }).end();
     }
-    if (!nodes.hasOwnProperty(n1ID)) {
+    if (!nodes.has(n1ID)) {
         return res.writeHead(400, {
           message: `neighbor1 ${n1ID} does not exist`,
           errorfield: "neighbor1"
         }).end();
     }
-    if (!nodes.hasOwnProperty(n2ID)) {
+    if (!nodes.has(n2ID)) {
         return res.writeHead(400, {
           message: `neighbor2 ${n2ID} does not exist`,
           errorfield: "neighbor2"
         }).end();
     }
-    if (nodes[n1ID].degree >= MAX_DEGREE) {
+    if (nodes.get(n1ID).degree >= MAX_DEGREE) {
         return res.writeHead(400, {
           message: `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`,
           errorfield: "neighbor1"
         }).end();
     }
-    if (nodes[n2ID].degree >= MAX_DEGREE) {
+    if (nodes.get(n2ID).degree >= MAX_DEGREE) {
         return res.writeHead(400, {
           message: `neighbor2 ${n2ID} already has ${MAX_DEGREE} connections`,
           errorfield: "neighbor2"
@@ -77,14 +81,15 @@ function _addnode(req, res) {
     }
 
     // Add node, update metadata
-    nodes[newID] = {
+    debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
+    nodes.set(newIDi, {
       name: data.name,
       degree: 2
-    };
-    links.push([n1ID, newID]);
-    links.push([n2ID, newID]);
-    nodes[n1ID].degree++;
-    nodes[n2ID].degree++;
+    });
+    links.push([n1ID, newIDi]);
+    links.push([n2ID, newIDi]);
+    nodes.get(n1ID).degree++;
+    nodes.get(n2ID).degree++;
     
     return res.end('okay');
   } else {
@@ -97,7 +102,16 @@ function _addnode(req, res) {
 
 function _getdata(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  var data = {nodes, links};
+  const nodesArray = getNodesArray();
+  var data = {
+      nodes: nodesArray,
+      links: links.map((link) => {
+        return {
+          source: nodesArray.findIndex(n => (n.id === link[0])),
+          target: nodesArray.findIndex(n => (n.id === link[1]))
+        }
+      })
+  }; 
   if (percolationDone) {
     data.percolation = percolationResult;
   }
@@ -109,8 +123,26 @@ function _updatedata(req, res) {
   if (!data.n) {
     return res.writeHead(400, {message: "Missing parameter n."}).end()
   }
+  const nodesArray = getNodesArray();
   return res.end(JSON.stringify({
-    neighbors: [], // TODO nodes.slice(data.n)
+    neighbors: Array.from(nodes).slice(data.n).map((nodeInfo) => {
+      var [id, node] = nodeInfo,
+          neighbors = [];
+      for (let link of links) {
+        if (link[1] === id) {
+          neighbors.push(nodesArray.findIndex(n => (n.id === link[0])));
+          if (neighbors.length === 2) {
+            break;
+          }
+        }
+      }
+      return {
+        id: nodesArray.findIndex(n => (n.id === id)),
+        name: node.name,
+        neighbor1: neighbors[0],
+        neighbor2: neighbors[1]
+      }
+    })
   }));
 }
 
@@ -118,7 +150,7 @@ function _percolate(req, res) {
   percolationDone = false;
   const node2component = {};
   // Assign each node to a component consisting only of itself
-  for (const id in nodes) {
+  for (const id of nodes.keys()) {
     node2component[id] = {
       members: [id]
     };
@@ -137,7 +169,7 @@ function _percolate(req, res) {
   }
   // Find the size of the largest component
   let largestComponentId = null, largestComponentSize = 0;
-  for (const id in nodes) {
+  for (const id of nodes.keys()) {
     if (node2component[id].members.length > largestComponentSize) {
       largestComponentSize = node2component[id].members.length;
       largestComponentId = id;
@@ -158,25 +190,34 @@ function close() {
 
 function debug() {
   if (DEBUG) {
-    console.log(arguments);
+    console.log.apply(this, arguments);
   }
+}
+
+function getNodesArray() {
+  return Array.from(nodes).map((nodeInfo) => {
+    return {
+      id: nodeInfo[0],
+      name: nodeInfo[1].name
+    }
+  });
 }
 
 function open() {
   db.open(() => {
     db.query('SELECT * from nodes', function(results) {
       results.forEach((row) => {
-        nodes[row.id] = {
+        nodes.set(row.id, {
           name: row.name,
           degree: 0
-        };
+        });
       });
     });
     db.query('SELECT * from links', function(results) {
       results.forEach((row) => {
         links.push([row.id_source, row.id_target]);
-        nodes[row.id_source].degree++;
-        nodes[row.id_target].degree++;
+        nodes.get(row.id_source).degree++;
+        nodes.get(row.id_target).degree++;
       });
     });
   });
@@ -222,7 +263,7 @@ module.exports = {
   'route': route
 };
 
-if (DEBUG) {
+if (DEBUG && require.main === module) {
   let port = process.env.PORT;
   open();
   let server = http.createServer(route);
@@ -231,5 +272,5 @@ if (DEBUG) {
     server.close();
   });
   server.listen(port);
-  console.log(`Running on port ${port}`);
+  debug(`Running on port ${port}`);
 }
