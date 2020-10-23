@@ -118,6 +118,7 @@ function nodeSelected(e,node) {
 function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
+  addNodeHttp.overrideMimeType("application/json");
   addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1]);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {
@@ -155,6 +156,7 @@ function recomputeDegrees() {
 function updateNetwork() {
   var n = graph.nodes.length;
   var updateHttp = new XMLHttpRequest();
+  updateHttp.overrideMimeType("application/json");
   updateHttp.open("GET","/network/updatedata?n="+n);
   updateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
@@ -308,6 +310,7 @@ function addLink(e) {
 
 // Retrieve graph
 var xmlHttp = new XMLHttpRequest();
+xmlHttp.overrideMimeType("application/json");
 xmlHttp.onreadystatechange = function() {
   if (this.readyState == 4 && this.status == 200) {
     graph = JSON.parse(this.responseText);
