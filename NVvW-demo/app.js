@@ -171,16 +171,22 @@ function _percolate(req, res) {
     }
   }
   // Find the size of the largest component
-  let largestComponentId = null, largestComponentSize = 0;
+  let largestComponentSize = 0;
   for (const id of nodes.keys()) {
     if (node2component.get(id).members.length > largestComponentSize) {
       largestComponentSize = node2component.get(id).members.length;
-      largestComponentId = id;
+    }
+  }
+  // We need to find the winners separately in case their are multiple components of equal size.
+  let winners = [];
+  for (const id of nodes.keys()) {
+    if (node2component.get(id).members.length == largestComponentSize) {
+      winners.push(id);
     }
   }
 
   percolationResult = {
-    "winners": node2component.get(largestComponentId).members,
+    "winners": winners,
     "remainingLinks": remainingLinks
   };
   return res.end(JSON.stringify(percolationResult));
