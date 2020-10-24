@@ -193,6 +193,8 @@ function _restart() {
             SET FOREIGN_KEY_CHECKS = 1`);
   nodes.clear();
   links.length = 0;
+  percolationDone = false;
+  percolationResult = null;
 
   db.query("INSERT INTO nodes VALUES (1, 'A'), (2, 'B')");
   db.query("INSERT INTO links VALUES (1, 2)");
