@@ -61,7 +61,7 @@ function percolate() {
   let originalIDs = [];
   let source2remaining = new Map();
   graph.links.forEach(e => originalIDs.push(link2id(e)));
-  graph.nodes.forEach(n => source2remaining.set(n,[]));
+  graph.nodes.forEach(n => source2remaining.set(n.id,[]));
 
   let percolateHttp = new XMLHttpRequest();
   percolateHttp.open("GET","./percolate");
@@ -69,6 +69,8 @@ function percolate() {
     if (this.readyState == 4 && this.status == 200) {
       data = JSON.parse(this.responseText);
       winners = data.winners;
+      console.log(data.remainingLinks);
+      console.log(source2remaining);
       data.remainingLinks.forEach(e => source2remaining.get(e.source).push(e.target));
       dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
     }
