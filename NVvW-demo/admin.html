@@ -71,7 +71,7 @@ function percolate() {
       winners = data.winners;
       console.log(data.remainingLinks);
       console.log(source2remaining);
-      data.remainingLinks.forEach(e => source2remaining.get(e.source).push(e.target));
+      data.remainingLinks.forEach(e => source2remaining.get(parseInt(e.source)).push(parseInt(e.target)));
       dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
     }
   }

@@ -40,7 +40,7 @@ function _addnode(req, res) {
     const n2ID = parseInt(data.neighbor2, 10);
     var idMatch, newIDi;
     debug(`ID: ${newID}, neighbors: ${n1ID},${n2ID}`);
-    
+
     if ((idMatch = newID.match(/^ID(\d+)$/)) === null) {
       return res.writeHead(400, {
         message: `The id ${newID} is not valid`,
@@ -93,7 +93,7 @@ function _addnode(req, res) {
     db.query(`INSERT INTO links VALUES (${n2ID}, ${newIDi})`);
     nodes.get(n1ID).degree++;
     nodes.get(n2ID).degree++;
-    
+
     return res.end('okay');
   } else {
     return res.writeHead(400, {
@@ -114,7 +114,7 @@ function _getdata(req, res) {
           target: nodesArray.findIndex(n => (n.id === link[1]))
         }
       })
-  }; 
+  };
   if (percolationDone) {
     data.percolation = percolationResult;
   }
@@ -163,7 +163,10 @@ function _percolate(req, res) {
   let formattedLinks = [];
   for (const link in remainingLinks) {
     const [i, j] = link;
-    formattedLinks.push({source: i, target: j});
+    formattedLinks.push({
+      "source": link[0],
+      "target": link[1]
+    });
     // Merge connected components when necessary.
     if (node2component.get(i) != node2component.get(j)) {
       node2component.get(j).members.forEach(function(m) {
