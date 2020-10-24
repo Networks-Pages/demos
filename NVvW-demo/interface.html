@@ -135,7 +135,7 @@ function addNode() {
 }
 
 function showPercolation(data) {
-  graph.links = data.remainingLinks;
+  graph.links = data.remainingLinks.map(e => {source: e[0], target: e[1]});
   graph.links.forEach(addLink);
   nodes.classed("win",n=>data.winners.includes(n.id));
   nodes.classed("lost",n=>!data.winners.includes(n.id));
