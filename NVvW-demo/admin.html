@@ -69,7 +69,7 @@ function percolate() {
     if (this.readyState == 4 && this.status == 200) {
       data = JSON.parse(this.responseText);
       winners = data.winners;
-      data.remainingLinks.forEach(e => source2remaining.get(e[0]).push(e[1]));
+      data.remainingLinks.forEach(e => source2remaining.get(e.source).push(e.target));
       dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
     }
   }
