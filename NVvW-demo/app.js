@@ -160,13 +160,8 @@ function _percolate(req, res) {
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
-  let formattedLinks = [];
   for (const link in remainingLinks) {
     const [i, j] = link;
-    formattedLinks.push({
-      "source": link[0],
-      "target": link[1]
-    });
     // Merge connected components when necessary.
     if (node2component.get(i) != node2component.get(j)) {
       node2component.get(j).members.forEach(function(m) {
@@ -192,7 +187,7 @@ function _percolate(req, res) {
 
   percolationResult = {
     "winners": winners,
-    "remainingLinks": formattedLinks
+    "remainingLinks": remainingLinks
   };
   return res.end(JSON.stringify(percolationResult));
 }
