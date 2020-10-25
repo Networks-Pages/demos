@@ -87,10 +87,10 @@ function _addnode(req, res) {
       degree: 2
     });
     db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}')`);
-    links.push([n1ID, newIDi]);
-    db.query(`INSERT INTO links VALUES (${n1ID}, ${newIDi})`);
-    links.push([n2ID, newIDi]);
-    db.query(`INSERT INTO links VALUES (${n2ID}, ${newIDi})`);
+    links.push([newIDi,n1ID]);
+    db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
+    links.push([newIDi,n2ID]);
+    db.query(`INSERT INTO links VALUES (${newIDi}, ${n2ID})`);
     nodes.get(n1ID).degree++;
     nodes.get(n2ID).degree++;
 
@@ -132,8 +132,8 @@ function _updatedata(req, res) {
       var [id, node] = nodeInfo,
           neighbors = [];
       for (let link of links) {
-        if (link[1] === id) {
-          neighbors.push(nodesArray.findIndex(n => (n.id === link[0])));
+        if (link[0] === id) {
+          neighbors.push(nodesArray.findIndex(n => (n.id === link[1])));
           if (neighbors.length === 2) {
             break;
           }
