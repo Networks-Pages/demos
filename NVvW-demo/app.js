@@ -289,7 +289,7 @@ function route(req, res) {
       return _percolate(req, res);
     } else if (req.url.endsWith('/restart')) {
       _restart();
-      return res.end('okay');
+      return res.end('okay'+req.connection.remoteAddress);
     } else if (req.url.endsWith('/undoPercolation')) {
       percolationDone = false;
       percolationResult = null;
