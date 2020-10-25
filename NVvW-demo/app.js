@@ -33,6 +33,17 @@ function _addnode(req, res) {
     }).end();
   }
 
+  var data = url.parse(req.url, true).query;
+  let ipUnique = true;
+  nodes.forEach(function (n) {
+    if (n.ip == ip) ipUnique = false;
+  });
+  if (!ipUnique && !data.id) {
+    return res.writeHead(400, {
+      message: "You have already added a node to the network.",
+      errorfield: "id"
+    }).end();
+  }
   let newIDi;
   if (!data.id) {
     newIDi = 500+idx2id.length;
@@ -40,7 +51,6 @@ function _addnode(req, res) {
     newIDi = parseInt(data.id, 10);
   }
 
-  var data = url.parse(req.url, true).query;
   if (data.name) {
     // Check parameters
     const n1Idx = parseInt(data.neighbor1, 10);
@@ -51,14 +61,14 @@ function _addnode(req, res) {
         errorfield: "id"
       }).end();
     }
-    if (n1Idx >= idx2id.length) {
+    if (isNaN(n1Idx) || n1Idx >= idx2id.length) {
         return res.writeHead(400, {
           message: `neighbor1 ${n1Idx} does not exist`,
           errorfield: "neighbor1"
         }).end();
     }
     n1ID = idx2id[n1Idx];
-    if (n2Idx >= idx2id.length) {
+    if (isNaN(n2Idx) || n2Idx >= idx2id.length) {
         return res.writeHead(400, {
           message: `neighbor2 ${n2Idx} does not exist`,
           errorfield: "neighbor2"
@@ -84,7 +94,8 @@ function _addnode(req, res) {
     nodes.set(newIDi, {
       name: data.name,
       degree: 2,
-      idx: idx
+      idx: idx,
+      ip: ip
     });
     idx2id.push(newIDi);
     db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}','${ip}')`);
@@ -106,13 +117,13 @@ function _addnode(req, res) {
 
 function _getdata(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  const nodesArray = getNodesArray();
+  let returnNodes = [];
+  nodes.forEach(n => returnNodes.push({
+    id: n.idx,
+    name: n.name
+  }));
   var data = {
-      nodes: nodesArray.map(n => ({
-        id: n.idx,
-        name: n.name,
-        ip: n.ip
-      })),
+      nodes: returnNodes,
       links: links.map((link) => {
         return {
           source: nodes.get(link[0]).idx,
