@@ -107,7 +107,10 @@ function _getdata(req, res) {
   res.setHeader('Content-Type', 'application/json');
   const nodesArray = getNodesArray();
   var data = {
-      nodes: nodesArray,
+      nodes: nodesArray.map(n => ({
+        id: n.idx,
+        name: n.name,
+      })),
       links: links.map((link) => {
         return {
           source: nodesArray.findIndex(n => (n.id === link[0])),
@@ -152,14 +155,18 @@ function _updatedata(req, res) {
 function _percolate(req, res) {
   percolationDone = false;
   const node2component = new Map();
+  const nodesArray = getNodesArray();
+  let id2idx = new Map();
   // Assign each node to a component consisting only of itself
-  for (const id of nodes.keys()) {
-    node2component.set(id, {
-      members: [id]
+  for (const node of nodesArray) {
+    node2component.set(node.id, {
+      members: [node.id]
     });
+    id2idx.set(node.id,node.idx);
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
+  let outputLinks = [];
   for (const link in remainingLinks) {
     const [i, j] = link;
     // Merge connected components when necessary.
@@ -169,6 +176,7 @@ function _percolate(req, res) {
         node2component.get(i).members.push(m);
       });
     }
+    outputLinks.push([id2idx.get(i),id2idx.get(j)]);
   }
   // Find the size of the largest component
   let largestComponentSize = 0;
@@ -179,15 +187,15 @@ function _percolate(req, res) {
   }
   // We need to find the winners separately in case their are multiple components of equal size.
   let winners = [];
-  for (const id of nodes.keys()) {
-    if (node2component.get(id).members.length == largestComponentSize) {
-      winners.push(id);
+  for (const node of nodesArray) {
+    if (node2component.get(node.id).members.length == largestComponentSize) {
+      winners.push(node.idx);
     }
   }
 
   percolationResult = {
     "winners": winners,
-    "remainingLinks": remainingLinks
+    "remainingLinks": outputLinks
   };
   return res.end(JSON.stringify(percolationResult));
 }
@@ -219,9 +227,10 @@ function debug() {
 }
 
 function getNodesArray() {
-  return Array.from(nodes).map((nodeInfo) => {
+  return Array.from(nodes).map((nodeInfo,idx) => {
     return {
       id: nodeInfo[0],
+      idx: idx,
       name: nodeInfo[1].name
     }
   });
