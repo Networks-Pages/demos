@@ -24,7 +24,8 @@ var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
-  let ip = request.connection.remoteAddress;
+  let ip = req.connection.remoteAddress;
+
   if (percolationResult) {
     return res.writeHead(400, {
       message: "Cannot add nodes anymore, percolation has started.",
