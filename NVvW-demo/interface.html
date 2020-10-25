@@ -122,7 +122,7 @@ function addNode() {
   let url = "/network/addnode?name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1];
   if (userID) {
     url += "&id="+userID;
-  })
+  }
   addNodeHttp.open("GET",url);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {

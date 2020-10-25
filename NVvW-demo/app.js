@@ -208,7 +208,7 @@ function _restart() {
   links.length = 0;
   percolationDone = false;
   percolationResult = null;
-  db.query("INSERT INTO nodes VALUES (1, 'A'), (2, 'B')");
+  db.query("INSERT INTO nodes VALUES (1, 'A', null), (2, 'B', null)");
   initFromDB();
 }
 
