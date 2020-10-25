@@ -24,6 +24,7 @@ var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
+  let ip = request.connection.remoteAddress;
   if (percolationResult) {
     return res.writeHead(400, {
       message: "Cannot add nodes anymore, percolation has started.",
@@ -31,40 +32,34 @@ function _addnode(req, res) {
     }).end();
   }
 
+  let newIDi;
+  if (!data.id) {
+    newIDi = 500+idx2id.length;
+  } else {
+    newIDi = parseInt(data.id, 10);
+  }
+
   var data = url.parse(req.url, true).query;
-  if (data.name && data.id) {
+  if (data.name) {
     // Check parameters
-    const newID = data.id;
     const n1Idx = parseInt(data.neighbor1, 10);
     const n2Idx = parseInt(data.neighbor2, 10);
-
-    var idMatch, newIDi;
-    debug(`ID: ${newID}, neighbors: ${n1Idx},${n2Idx}`);
-
-    if ((idMatch = newID.match(/^ID(\d+)$/)) === null) {
-      return res.writeHead(400, {
-        message: `The id ${newID} is not valid`,
-        errorfield: "id"
-      }).end();
-    } else {
-      newIDi = parseInt(idMatch[1], 10);
-    }
     if (nodes.has(newIDi)) {
       return res.writeHead(400, {
-        message: `The id ${newID} has already been taken.`,
+        message: `The id ${newIDi} has already been taken.`,
         errorfield: "id"
       }).end();
     }
     if (n1Idx >= idx2id.length) {
         return res.writeHead(400, {
-          message: `neighbor1 ${n1ID} does not exist`,
+          message: `neighbor1 ${n1Idx} does not exist`,
           errorfield: "neighbor1"
         }).end();
     }
     n1ID = idx2id[n1Idx];
     if (n2Idx >= idx2id.length) {
         return res.writeHead(400, {
-          message: `neighbor2 ${n2ID} does not exist`,
+          message: `neighbor2 ${n2Idx} does not exist`,
           errorfield: "neighbor2"
         }).end();
     }
@@ -91,7 +86,7 @@ function _addnode(req, res) {
       idx: idx
     });
     idx2id.push(newIDi);
-    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}')`);
+    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}','${ip}')`);
     links.push([newIDi,n1ID]);
     db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
     links.push([newIDi,n2ID]);
@@ -102,7 +97,7 @@ function _addnode(req, res) {
     return res.end('okay');
   } else {
     return res.writeHead(400, {
-      message: "Please provide a name and an ID.",
+      message: "Please provide a name.",
       errorfield: "name"
     }).end();
   }
@@ -115,6 +110,7 @@ function _getdata(req, res) {
       nodes: nodesArray.map(n => ({
         id: n.idx,
         name: n.name,
+        ip: n.ip
       })),
       links: links.map((link) => {
         return {
@@ -246,7 +242,8 @@ function initFromDB() {
       nodes.set(row.id, {
         name: row.name,
         degree: 0,
-        idx: idx
+        idx: idx,
+        ip: row.ip_address
       });
       idx2id.push(row.id);
     });

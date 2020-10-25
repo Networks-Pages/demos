@@ -119,7 +119,11 @@ function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
   addNodeHttp.overrideMimeType("application/json");
-  addNodeHttp.open("GET","/network/addnode?id="+userID+"&name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1]);
+  let url = "/network/addnode?name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1];
+  if (userID) {
+    url += "&id="+userID;
+  })
+  addNodeHttp.open("GET",url);
   addNodeHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 400) {
       console.log(this.getResponseHeader("errorfield"));
