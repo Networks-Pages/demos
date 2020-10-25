@@ -213,7 +213,6 @@ function _restart() {
   percolationDone = false;
   percolationResult = null;
   db.query("INSERT INTO nodes VALUES (1, 'A'), (2, 'B')");
-  db.query("INSERT INTO links VALUES (1, 2)");
   initFromDB();
 }
 
