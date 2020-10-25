@@ -5,7 +5,6 @@ const http = require('http');
 const path = require('path');
 const url = require('url');
 
-
 // --- constants ---------------------------------------------------------------
 const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
     '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
@@ -17,11 +16,11 @@ const SURVIVAL_P = 0.5;
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
 const nodes = new Map();
+const idx2id = [];
 const links = [];
 
 var percolationDone = false;
 var percolationResult = null;
-
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
@@ -36,10 +35,11 @@ function _addnode(req, res) {
   if (data.name && data.id) {
     // Check parameters
     const newID = data.id;
-    const n1ID = parseInt(data.neighbor1, 10);
-    const n2ID = parseInt(data.neighbor2, 10);
+    const n1Idx = parseInt(data.neighbor1, 10);
+    const n2Idx = parseInt(data.neighbor2, 10);
+
     var idMatch, newIDi;
-    debug(`ID: ${newID}, neighbors: ${n1ID},${n2ID}`);
+    debug(`ID: ${newID}, neighbors: ${n1Idx},${n2Idx}`);
 
     if ((idMatch = newID.match(/^ID(\d+)$/)) === null) {
       return res.writeHead(400, {
@@ -55,18 +55,20 @@ function _addnode(req, res) {
         errorfield: "id"
       }).end();
     }
-    if (!nodes.has(n1ID)) {
+    if (n1Idx >= idx2id.length) {
         return res.writeHead(400, {
           message: `neighbor1 ${n1ID} does not exist`,
           errorfield: "neighbor1"
         }).end();
     }
-    if (!nodes.has(n2ID)) {
+    n1ID = idx2id[n1Idx];
+    if (n2Idx >= idx2id.length) {
         return res.writeHead(400, {
           message: `neighbor2 ${n2ID} does not exist`,
           errorfield: "neighbor2"
         }).end();
     }
+    n2ID = idx2id[n2Idx];
     if (nodes.get(n1ID).degree >= MAX_DEGREE) {
         return res.writeHead(400, {
           message: `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`,
@@ -82,10 +84,13 @@ function _addnode(req, res) {
 
     // Add node, update metadata
     debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
+    let idx = nodes.size;
     nodes.set(newIDi, {
       name: data.name,
-      degree: 2
+      degree: 2,
+      idx: idx
     });
+    idx2id.push(newIDi);
     db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}')`);
     links.push([newIDi,n1ID]);
     db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
@@ -113,8 +118,8 @@ function _getdata(req, res) {
       })),
       links: links.map((link) => {
         return {
-          source: nodesArray.findIndex(n => (n.id === link[0])),
-          target: nodesArray.findIndex(n => (n.id === link[1]))
+          source: nodes.get(link[0]).idx,
+          target: nodes.get(link[1]).idx
         }
       })
   };
@@ -129,21 +134,20 @@ function _updatedata(req, res) {
   if (!data.n) {
     return res.writeHead(400, {message: "Missing parameter n."}).end()
   }
-  const nodesArray = getNodesArray();
   return res.end(JSON.stringify({
     neighbors: Array.from(nodes).slice(data.n).map((nodeInfo) => {
       var [id, node] = nodeInfo,
           neighbors = [];
       for (let link of links) {
         if (link[0] === id) {
-          neighbors.push(nodesArray.findIndex(n => (n.id === link[1])));
+          neighbors.push(nodes.get(link[1]).idx);
           if (neighbors.length === 2) {
             break;
           }
         }
       }
       return {
-        id: nodesArray.findIndex(n => (n.id === id)),
+        id: nodes.get(id).idx,
         name: node.name,
         neighbor1: neighbors[0],
         neighbor2: neighbors[1]
@@ -155,29 +159,27 @@ function _updatedata(req, res) {
 function _percolate(req, res) {
   percolationDone = false;
   const node2component = new Map();
-  const nodesArray = getNodesArray();
-  let id2idx = new Map();
   // Assign each node to a component consisting only of itself
-  for (const node of nodesArray) {
-    node2component.set(node.id, {
-      members: [node.id]
+  for (const id of nodes.keys()) {
+    node2component.set(id, {
+      members: [id]
     });
-    id2idx.set(node.id,node.idx);
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
+  console.log(remainingLinks);
   let outputLinks = [];
-  for (const link in remainingLinks) {
+  remainingLinks.forEach(function (link) {
     const [i, j] = link;
     // Merge connected components when necessary.
     if (node2component.get(i) != node2component.get(j)) {
       node2component.get(j).members.forEach(function(m) {
-        node2component.get(m) = node2component.get(i);
+        node2component.set(m,node2component.get(i));
         node2component.get(i).members.push(m);
       });
     }
-    outputLinks.push([id2idx.get(i),id2idx.get(j)]);
-  }
+    outputLinks.push([nodes.get(i).idx,nodes.get(j).idx]);
+  });
   // Find the size of the largest component
   let largestComponentSize = 0;
   for (const id of nodes.keys()) {
@@ -187,9 +189,9 @@ function _percolate(req, res) {
   }
   // We need to find the winners separately in case their are multiple components of equal size.
   let winners = [];
-  for (const node of nodesArray) {
-    if (node2component.get(node.id).members.length == largestComponentSize) {
-      winners.push(node.idx);
+  for (const id of nodes.keys()) {
+    if (node2component.get(id).members.length == largestComponentSize) {
+      winners.push(nodes.get(id).idx);
     }
   }
 
@@ -206,10 +208,10 @@ function _restart() {
             TRUNCATE nodes;
             SET FOREIGN_KEY_CHECKS = 1`);
   nodes.clear();
+  idx2id.length = 0;
   links.length = 0;
   percolationDone = false;
   percolationResult = null;
-
   db.query("INSERT INTO nodes VALUES (1, 'A'), (2, 'B')");
   db.query("INSERT INTO links VALUES (1, 2)");
   initFromDB();
@@ -237,12 +239,17 @@ function getNodesArray() {
 }
 
 function initFromDB() {
+  nodes.clear();
+  links.length = 0;
+  idx2id.length = 0;
   db.query('SELECT * from nodes', function(results) {
-    results.forEach((row) => {
+    results.forEach((row, idx) => {
       nodes.set(row.id, {
         name: row.name,
-        degree: 0
+        degree: 0,
+        idx: idx
       });
+      idx2id.push(row.id);
     });
   });
   db.query('SELECT * from links', function(results) {
