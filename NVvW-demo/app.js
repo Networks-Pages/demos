@@ -24,7 +24,11 @@ var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
-  let ip = req.connection.remoteAddress;
+  //let ip = req.connection.remoteAddress;
+  let ip = (req.headers['x-forwarded-for'] || '').split(',').pop().trim() ||
+         req.connection.remoteAddress ||
+         req.socket.remoteAddress ||
+         req.connection.socket.remoteAddress
 
   if (percolationResult) {
     return res.writeHead(400, {
@@ -289,7 +293,11 @@ function route(req, res) {
       return _percolate(req, res);
     } else if (req.url.endsWith('/restart')) {
       _restart();
-      return res.end('okay'+req.connection.remoteAddress);
+      let ip = (req.headers['x-forwarded-for'] || '').split(',').pop().trim() ||
+             req.connection.remoteAddress ||
+             req.socket.remoteAddress ||
+             req.connection.socket.remoteAddress
+      return res.end('okay'+ip);
     } else if (req.url.endsWith('/undoPercolation')) {
       percolationDone = false;
       percolationResult = null;
