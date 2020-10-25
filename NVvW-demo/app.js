@@ -290,6 +290,10 @@ function route(req, res) {
     } else if (req.url.endsWith('/restart')) {
       _restart();
       return res.end('okay');
+    } else if (req.url.endsWith('/undoPercolation')) {
+      percolationDone = false;
+      percolationResult = null;
+      return res.end('okay');
     }
     fs.readFile(path.resolve(__dirname, './admin.html'), function(err, data) {
       res.writeHead(200, {'Content-Type': 'text/html'});
