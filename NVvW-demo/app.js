@@ -25,11 +25,7 @@ var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, res) {
-  //let ip = req.connection.remoteAddress;
-  let ip = (req.headers['x-forwarded-for'] || '').split(',').pop().trim() ||
-         req.connection.remoteAddress ||
-         req.socket.remoteAddress ||
-         req.connection.socket.remoteAddress
+  let ip = getIP(req);
 
   if (percolationResult) {
     return res.writeHead(400, {
@@ -122,11 +118,18 @@ function _addnode(req, res) {
 
 function _getdata(req, res) {
   res.setHeader('Content-Type', 'application/json');
-  let returnNodes = [];
-  nodes.forEach(n => returnNodes.push({
-    id: n.idx,
-    name: n.name
-  }));
+  var ip = getIP(req);
+  var returnNodes = [];
+  nodes.forEach(n => {
+    let newNode = {
+      id: n.idx,
+      name: n.name
+    };
+    if (n.ip === ip) {
+      newNode.yours = true;
+    }
+    returnNodes.push(newNode);
+  });
   var data = {
       nodes: returnNodes,
       links: links.map((link) => {
@@ -240,6 +243,13 @@ function debug() {
   }
 }
 
+function getIP(req) {
+  return ((req.headers['x-forwarded-for'] || '').split(',').pop().trim() ||
+           req.connection.remoteAddress ||
+           req.socket.remoteAddress ||
+           req.connection.socket.remoteAddress);
+}
+
 function getNodesArray() {
   return Array.from(nodes).map((nodeInfo,idx) => {
     return {
@@ -300,10 +310,7 @@ function route(req, res) {
       return _percolate(req, res);
     } else if (req.url.endsWith('/restart')) {
       _restart();
-      let ip = (req.headers['x-forwarded-for'] || '').split(',').pop().trim() ||
-             req.connection.remoteAddress ||
-             req.socket.remoteAddress ||
-             req.connection.socket.remoteAddress
+      let ip = getIP(req);
       return res.end('okay'+ip);
     } else if (req.url.endsWith('/undoPercolation')) {
       percolationDone = false;

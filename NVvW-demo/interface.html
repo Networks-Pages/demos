@@ -41,7 +41,7 @@
   <div class="container">
     <div class="row flex-column align-items-center" id="alerts"></div>
     
-    <div class="row mt-3">
+    <div class="row mt-3" id="instructions-container">
       <div class="col-md-12">
         <h1>Instructions</h1>
       </div>
@@ -62,7 +62,7 @@
       </div>
     </div>
     
-    <div class="row justify-content-center">
+    <div class="row justify-content-center" id="add-node-container">
       <form class="form-inline mt-3">
         <label class="my-1 mr-2 sr-only" for="name">Your name</label>
         <input type="text" class="my-1 mr-2" id="name" placeholder="Your name"></input>
@@ -138,6 +138,7 @@ function addNode() {
       document.getElementById('node'+selected[1]).classList.remove('selected');
       selected = [false,false]
       updateNetwork();
+      showUserAddedANode();
     } else {
       handleAjaxError(this);
     }
@@ -199,6 +200,11 @@ function handleAjaxError(req) {
   if (req.readyState === 4 && req.status === 400) {
     createAlert(req.getResponseHeader('message'));
   }
+}
+
+function showUserAddedANode() {
+  $('#instructions-container, #add-node-container').remove();
+  createAlert('You added a node, thank you!', 'success', 'Hooray!');
 }
 
 // A mapping from node/link to its id name
@@ -350,6 +356,9 @@ xmlHttp.onreadystatechange = function() {
       const n = graph.nodes[id];
       n.x = width/2;
       n.y = height/2;
+      if (n.yours === true) {
+        showUserAddedANode();
+      }
     }
     graph.links.forEach(addLink);
     console.log(graph);
