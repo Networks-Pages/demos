@@ -25,7 +25,11 @@ const db = {
   },
 
   open: function(then = null) {
-    if (!dbParams.mock && !db.active) {
+    if (dbParams.mock) {
+      if (then !== null && typeof then === 'function') {
+        then();
+      }
+    } else if (!db.active) {
       db.conn = mysql.createConnection({
         host: 'localhost',
         database: 'tcasterm_networks',
@@ -53,10 +57,10 @@ const db = {
     dbParams.mock = (mock === true);
   },
 
-  query: function(query, callback = null) {
+  query: function(query, callback = null, mockResult = []) {
     if (dbParams.mock) {
       if (typeof callback === 'function') {
-        callback([], null);
+        callback(mockResult, null);
       }
       return;
     }

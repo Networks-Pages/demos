@@ -180,7 +180,7 @@ function _percolate(req, res) {
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
-  console.log(remainingLinks);
+  debug(remainingLinks);
   let outputLinks = [];
   remainingLinks.forEach(function (link) {
     const [i, j] = link;
@@ -264,7 +264,10 @@ function initFromDB() {
       });
       idx2id.push(row.id);
     });
-  });
+  }, [
+    {id: 1, name: 'Dummy A', ip_address: null},
+    {id: 2, name: 'Dummy B', ip_address: null}
+  ]);
   db.query('SELECT * from links', function(results) {
     results.forEach((row) => {
       links.push([row.id_source, row.id_target]);
@@ -279,17 +282,6 @@ function open() {
     db.setMock(true);
   }
   db.open(initFromDB);
-  if (db.isMocked()) {
-    ['A', 'B'].forEach((name, i) => {
-      nodes.set(i + 1, {
-        name: `Dummy ${name}`,
-        degree: 0,
-        idx: i,
-        ip: null
-      });
-      idx2id.push(i + 1);
-    });
-  }
 }
 
 function route(req, res) {
