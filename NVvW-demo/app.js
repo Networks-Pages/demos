@@ -9,9 +9,10 @@ const url = require('url');
 const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
     '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
 const DEBUG = (process.env.DEBUG === 'true');
-const URL_PREFIX = '/network';
 const MAX_DEGREE = 5;
+const STANDALONE = (process.env.STANDALONE === 'true');
 const SURVIVAL_P = 0.5;
+const URL_PREFIX = '/network';
 
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
@@ -274,7 +275,21 @@ function initFromDB() {
 }
 
 function open() {
+  if (STANDALONE) {
+    db.setMock(true);
+  }
   db.open(initFromDB);
+  if (db.isMocked()) {
+    ['A', 'B'].forEach((name, i) => {
+      nodes.set(i + 1, {
+        name: `Dummy ${name}`,
+        degree: 0,
+        idx: i,
+        ip: null
+      });
+      idx2id.push(i + 1);
+    });
+  }
 }
 
 function route(req, res) {
@@ -325,7 +340,7 @@ module.exports = {
   'route': route
 };
 
-if (DEBUG && require.main === module) {
+if (STANDALONE && require.main === module) {
   let port = process.env.PORT;
   open();
   let server = http.createServer(route);
