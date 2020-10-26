@@ -4,8 +4,8 @@
   <title>Network Games</title>
 
   <link rel="stylesheet"
-        href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
-        integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+        integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
         crossorigin="anonymous">
 
   <style>
@@ -35,57 +35,65 @@
     #nodes g.win circle {
       fill: green;
     }
-
-    #explanation p, #explanation h1 {
-      text-align: center;
-      width: 100%;
-      margin: auto;
-    }
   </style>
 </head>
 <body>
-  <div class="row">
-    <div class="col-md-12">
-      <div style="max-width:1000px;margin:auto;">
-        <div class="row">
-          <div class="col-md-12" id="explanation">
-            <h1>Instructions</h1>
-            <p>
-              In this game, each participant adds a single node to the network and chooses two neighbors that this node connects to.
-              You can only connect to nodes that have <b>less than 5 neighbors</b>.
-              At the end of the game, we will percolate the graph: each link will be removed with probability <i>0.5</i> (independently).
-            </p>
-            <p>
-              The game is won by the players whose nodes end up in the largest connected component after percolation. When two components have equal size, both components win.
-            </p>
-            <p>
-              You can add your node by clicking the two neighbors that you want to connect to, typing your name in the textfield and clicking the button "Add node".
-            </p>
-          </div>
-        </div>
-        <div class="row" style="height:30px"></div>
-        <div class="row">
-          <label class="col-md-2" for="name" style="display:flex;align-content:center;">Your name:</label>
-          <input type="text" class="col-md-4" id="name"></input>
-          <button class="col-md-3 btn btn-primary" onclick="addNode()">
-            Add node
-          </button>
-          <button class="col-md-3 btn btn-primary" onclick="updateNetwork()">
-            Refresh
-          </button>
-        </div>
+  <div class="container">
+    <div class="row justify-content-center" id="alerts"></div>
+    
+    <div class="row mt-3">
+      <div class="col-md-12">
+        <h1>Instructions</h1>
+      </div>
+      <div class="col-md-5">
+        <p>
+          In this game, each participant adds a single node to the network and chooses two neighbors that this node connects to.
+          You can only connect to nodes that have <b>less than 5 neighbors</b>.
+          At the end of the game, we will percolate the graph: each link will be removed with probability <i>0.5</i> (independently).
+        </p>
+      </div>
+      <div class="col-md-7">
+        <p>
+          The game is won by the players whose nodes end up in the <i>largest</i> connected component after percolation. When multiple components have equal size, both win.
+        </p>
+        <p>
+          You can <b>add your node</b> by clicking the two neighbors that you want to connect to, typing your name in the textfield and clicking the button "Add node".
+        </p>
       </div>
     </div>
-
-  </div>
-
-  <div class="row">
-    <div id="canvas" height="100%" class="col-md-12"></div>
-  </div>
+    
+    <div class="row justify-content-center">
+      <form class="form-inline mt-3">
+        <label class="my-1 mr-2 sr-only" for="name">Your name</label>
+        <input type="text" class="my-1 mr-2" id="name" placeholder="Your name"></input>
+        <button class="btn btn-primary my-1 mr-2" onclick="addNode()">
+          Add node
+        </button>
+        <button class="btn btn-primary my-1" onclick="updateNetwork()">
+          Refresh
+        </button>
+      </form>
+    </div>
+  </div><!-- /.container -->
+  <div class="container-fluid">
+    <div class="row">
+      <div id="canvas" height="100%" class="col-md-12 px-0"></div>
+    </div>
+  </div><!-- /.container-fluid -->
 </body>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
+        crossorigin="anonymous"></script>
 <script>
+// disable form submission; we handle everything using AJAX
+$('form').on('submit', (e) => e.preventDefault());
+
+
 var MAX_DEGREE = 5;
 var userID = new URLSearchParams(window.location.search).get('id');
 
@@ -125,14 +133,13 @@ function addNode() {
   }
   addNodeHttp.open("GET",url);
   addNodeHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 400) {
-      console.log(this.getResponseHeader("errorfield"));
-      // TODO make errorfield red
-    } else if (this.readyState == 4 && this.status == 200) {
+    if (this.readyState == 4 && this.status == 200) {
       document.getElementById('node'+selected[0]).classList.remove('selected');
       document.getElementById('node'+selected[1]).classList.remove('selected');
       selected = [false,false]
       updateNetwork();
+    } else {
+      handleAjaxError(this);
     }
   }
   addNodeHttp.send();
@@ -168,9 +175,30 @@ function updateNetwork() {
         data.neighbors.forEach(addLinksFromNeighbors);
         updateVisualization();
         recomputeDegrees();
+    } else {
+      handleAjaxError(this);
     }
   }
   updateHttp.send();
+}
+
+function createAlert(message, type = 'danger', title = 'Error.') {
+  var $alert = $(`
+    <div class="alert alert-${type} mt-3 alert-dismissible fade show" role="alert">
+      <strong>${title}</strong> ${message}
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  `);
+  $('#alerts').append($alert);
+  $alert.alert();
+}
+
+function handleAjaxError(req) {
+  if (req.readyState === 4 && req.status === 400) {
+    createAlert(req.getResponseHeader('message'));
+  }
 }
 
 // A mapping from node/link to its id name
@@ -330,6 +358,8 @@ xmlHttp.onreadystatechange = function() {
     if (graph.percolation) {
       showPercolation(graph.percolation);
     }
+  } else {
+    handleAjaxError(this);
   }
 };
 xmlHttp.open("GET", "/network/getdata");
