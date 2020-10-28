@@ -94,7 +94,9 @@
 $('form').on('submit', (e) => e.preventDefault());
 
 
-var MAX_DEGREE = 5;
+const MAX_DEGREE = 5;
+const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+
 var userID = new URLSearchParams(window.location.search).get('id');
 
 var graph;
@@ -127,7 +129,8 @@ function addNode() {
   var name = document.getElementById("name").value;
   var addNodeHttp = new XMLHttpRequest();
   addNodeHttp.overrideMimeType("application/json");
-  let url = "/network/addnode?name="+name+"&neighbor1="+selected[0]+"&neighbor2="+selected[1];
+  let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
+        `neighbor2=${selected[1]}`;
   if (userID) {
     url += "&id="+userID;
   }
@@ -169,7 +172,7 @@ function updateNetwork() {
   var n = graph.nodes.length;
   var updateHttp = new XMLHttpRequest();
   updateHttp.overrideMimeType("application/json");
-  updateHttp.open("GET","/network/updatedata?n="+n);
+  updateHttp.open("GET", `${URL_PREFIX}/updatedata?n=${n}`);
   updateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
         data = JSON.parse(this.responseText);
@@ -371,7 +374,7 @@ xmlHttp.onreadystatechange = function() {
     handleAjaxError(this);
   }
 };
-xmlHttp.open("GET", "/network/getdata");
+xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
 xmlHttp.send();
 
 </script>

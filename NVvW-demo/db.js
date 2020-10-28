@@ -32,9 +32,9 @@ const db = {
     } else if (!db.active) {
       db.conn = mysql.createConnection({
         host: 'localhost',
-        database: 'tcasterm_networks',
-        user: 'networks',
-        password: 'G6ca#z70',
+        database: 'tcasterm_networks_dev',
+        user: 'networks_dev',
+        password: 'Kvsl!708',
         multipleStatements: true
       });
       db.conn.connect(function(err) {

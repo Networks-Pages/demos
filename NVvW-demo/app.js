@@ -12,7 +12,7 @@ const DEBUG = (process.env.DEBUG === 'true');
 const MAX_DEGREE = 5;
 const STANDALONE = (process.env.STANDALONE === 'true');
 const SURVIVAL_P = 0.5;
-const URL_PREFIX = '/network';
+const URL_PREFIX = '/network-dev';
 
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
