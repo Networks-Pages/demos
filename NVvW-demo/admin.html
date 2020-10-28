@@ -43,6 +43,8 @@
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
+const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+
 var graph;
 var containerID = "canvas";
 var container = document.getElementById(containerID);
@@ -64,7 +66,7 @@ function percolate() {
   graph.nodes.forEach(n => source2remaining.set(n.id,[]));
 
   let percolateHttp = new XMLHttpRequest();
-  percolateHttp.open("GET","./percolate");
+  percolateHttp.open("GET", `${URL_PREFIX}/percolate`);
   percolateHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
       data = JSON.parse(this.responseText);
@@ -82,7 +84,7 @@ function dramaticallyRemoveLinks(source2remaining,originalIDs,idx) {
   if (idx>=originalIDs.length) {
     // Notify the server that the percolation has ended
     let percolateEndedHttp = new XMLHttpRequest();
-    percolateEndedHttp.open("GET","./finishPercolation");
+    percolateEndedHttp.open("GET", `${URL_PREFIX}/finishPercolation`);
     percolateEndedHttp.send();
     // Make winners green
     nodes.classed("win",n=>winners.includes(n.id));
@@ -260,7 +262,7 @@ xmlHttp.onreadystatechange = function() {
     showGraph();
   }
 };
-xmlHttp.open("GET", "/network/getdata");
+xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
 xmlHttp.send();
 
 </script>
