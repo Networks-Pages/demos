@@ -16,25 +16,21 @@
 
     #nodes circle {
       stroke: black;
-      fill: yellow;
+      fill: #ffffb2;
       stroke-width: 1.5px;
     }
 
-    #nodes g.selected circle {
-      fill: blue;
-    }
+    #nodes g.selected circle { fill: #045a8d; }
 
-    #nodes g.max-degree circle {
-      fill: purple;
-    }
+    /* 6-class YlOrRd from colorbrewer2.org */
+    #nodes g.degree-1 circle { fill: #fed976; }
+    #nodes g.degree-2 circle { fill: #feb24c; }
+    #nodes g.degree-3 circle { fill: #fd8d3c; }
+    #nodes g.degree-4 circle { fill: #f03b20; }
+    #nodes g.degree-5 circle { fill: #bd0026; }
 
-    #nodes g.lost circle {
-      fill: red;
-    }
-
-    #nodes g.win circle {
-      fill: green;
-    }
+    #nodes g.lost circle { fill: #de2d26; }
+    #nodes g.win circle { fill: #006d2c; }
   </style>
 </head>
 <body>
@@ -163,7 +159,11 @@ function recomputeDegrees() {
     e.source.degree++;
     e.target.degree++;
   });
-  nodes.classed("max-degree",n=>n.degree>=MAX_DEGREE);
+  nodes.each(function(n) {
+    for (let i = 1; i <= MAX_DEGREE; ++i) {
+        this.classList.toggle(`degree-${i}`, n.degree === i);
+    }
+  });
 }
 
 
