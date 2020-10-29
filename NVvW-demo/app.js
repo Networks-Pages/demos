@@ -7,7 +7,7 @@ const url = require('url');
 
 // --- constants ---------------------------------------------------------------
 const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
-    '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b/';
+    '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b';
 const DEBUG = (process.env.DEBUG === 'true');
 const MAX_DEGREE = 5;
 const STANDALONE = (process.env.STANDALONE === 'true');
@@ -24,7 +24,7 @@ var percolationDone = false;
 var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
-function _addnode(req, res) {
+function _addnode(req, url, res) {
   let ip = getIP(req);
 
   if (percolationResult) {
@@ -34,28 +34,28 @@ function _addnode(req, res) {
     }).end();
   }
 
-  var data = url.parse(req.url, true).query;
+  const data = url.searchParams;
   let ipUnique = true;
   nodes.forEach(function (n) {
     if (n.ip == ip) ipUnique = false;
   });
-  if (!ipUnique && !data.id) {
+  if (!ipUnique && !data.has('id')) {
     return res.writeHead(400, {
       message: "You have already added a node to the network.",
       errorfield: "id"
     }).end();
   }
   let newIDi;
-  if (!data.id) {
+  if (!data.has('id')) {
     newIDi = 500+idx2id.length;
   } else {
     newIDi = parseInt(data.id, 10);
   }
 
-  if (data.name) {
+  if (data.has('name')) {
     // Check parameters
-    const n1Idx = parseInt(data.neighbor1, 10);
-    const n2Idx = parseInt(data.neighbor2, 10);
+    const n1Idx = parseInt(data.get('neighbor1'), 10);
+    const n2Idx = parseInt(data.get('neighbor2'), 10);
     if (nodes.has(newIDi)) {
       return res.writeHead(400, {
         message: `The id ${newIDi} has already been taken.`,
@@ -93,13 +93,14 @@ function _addnode(req, res) {
     debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
     let idx = nodes.size;
     nodes.set(newIDi, {
-      name: data.name,
+      name: data.get('name'),
       degree: 2,
       idx: idx,
       ip: ip
     });
     idx2id.push(newIDi);
-    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.name}','${ip}')`);
+    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.get('name')}', ` +
+        `'${ip}')`);
     links.push([newIDi,n1ID]);
     db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
     links.push([newIDi,n2ID]);
@@ -145,13 +146,13 @@ function _getdata(req, res) {
   return res.end(JSON.stringify(data));
 }
 
-function _updatedata(req, res) {
-  var data = url.parse(req.url, true).query;
-  if (!data.n) {
+function _updatedata(req, url, res) {
+  const data = url.searchParams;
+  if (!data.has('n')) {
     return res.writeHead(400, {message: "Missing parameter n."}).end()
   }
   return res.end(JSON.stringify({
-    neighbors: Array.from(nodes).slice(data.n).map((nodeInfo) => {
+    neighbors: Array.from(nodes).slice(data.get('n')).map((nodeInfo) => {
       var [id, node] = nodeInfo,
           neighbors = [];
       for (let link of links) {
@@ -172,7 +173,7 @@ function _updatedata(req, res) {
   }));
 }
 
-function _percolate(req, res) {
+function _percolate(res) {
   percolationDone = false;
   const node2component = new Map();
   // Assign each node to a component consisting only of itself
@@ -295,40 +296,51 @@ function open() {
 }
 
 function route(req, res) {
-  if (req.url.startsWith(`${URL_PREFIX}/getdata`)) {
-    return _getdata(req, res);
-  } else if (req.url.startsWith(`${URL_PREFIX}/updatedata`)) {
-    return _updatedata(req, res);
-  } else if (req.url.startsWith(`${URL_PREFIX}/addnode`)) {
-    return _addnode(req, res);
-  } else if (req.url.startsWith(`${URL_PREFIX}/${ADMIN_PAGE}`)) {
-    // Admin page
-    if (req.url.endsWith('/finishPercolation')) {
-      percolationDone = true;
-      return res.end('okay');
-    } else if (req.url.endsWith('/percolate')) {
-      return _percolate(req, res);
-    } else if (req.url.endsWith('/restart')) {
-      _restart();
-      let ip = getIP(req);
-      return res.end('okay'+ip);
-    } else if (req.url.endsWith('/undoPercolation')) {
-      percolationDone = false;
-      percolationResult = null;
-      return res.end('okay');
-    }
-    fs.readFile(path.resolve(__dirname, './admin.html'), function(err, data) {
-      res.writeHead(200, {'Content-Type': 'text/html'});
-      res.write(data);
-      return res.end();
-    });
-  } else {
-    fs.readFile(path.resolve(__dirname, './interface.html'), function(err, data) {
-      res.writeHead(200, {'Content-Type': 'text/html'});
-      res.write(data);
-      return res.end();
-    });
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const reqPath = url.pathname.split('/');
+  const prefixPath = URL_PREFIX.split('/');
+  const splicedPath = reqPath.splice(0, prefixPath.length); // remove prefix
+  if (!_.isEqual(splicedPath, prefixPath)) {
+    res.writeHead(307, {'Location': prefixPath.concat(reqPath).join('/')});
+    return res.end();
   }
+
+  switch (reqPath[0]) {
+    case 'addnode':
+      return _addnode(req, url, res);
+    case 'getdata':
+      return _getdata(req, res);
+    case 'updatedata':
+      return _updatedata(req, url, res);
+    case ADMIN_PAGE:
+      switch (reqPath[1]) {
+        case 'finishPercolation':
+          percolationDone = true;
+          return res.end('okay');
+        case 'percolate':
+          return _percolate(res);
+        case 'restart':
+          _restart();
+          return res.end('okay');
+        case 'undoPercolation':
+          percolationDone = false;
+          percolationResult = null;
+          return res.end('okay');
+        default:
+          serveHtml(res, 'admin.html');
+      }
+      break;
+    default:
+      serveHtml(res, 'interface.html');
+  }
+}
+
+function serveHtml(res, filename) {
+  fs.readFile(path.resolve(__dirname, `./${filename}`), function(err, data) {
+    res.writeHead(200, {'Content-Type': 'text/html'});
+    res.write(data);
+    res.end();
+  });
 }
 
 
