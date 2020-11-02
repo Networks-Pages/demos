@@ -9,6 +9,22 @@
         crossorigin="anonymous">
 
   <style>
+    html, body {
+      height: 100%;
+    }
+
+    #canvas {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      flex: 1 1 auto;
+    }
+    #canvas-container .row {
+      height: 100%;
+    }
+
     #links line {
       stroke: #999;
       stroke-opacity: 0.6;
@@ -33,10 +49,10 @@
     #nodes g.win circle { fill: #006d2c; }
   </style>
 </head>
-<body>
-  <div class="container">
+<body class="d-flex flex-column overflow-hidden">
+  <div class="container" style="flex: 0 1 auto;">
     <div class="row flex-column align-items-center" id="alerts"></div>
-    
+
     <div class="row mt-3" id="instructions-container">
       <div class="col-md-12">
         <h1>Instructions</h1>
@@ -57,7 +73,7 @@
         </p>
       </div>
     </div>
-    
+
     <div class="row justify-content-center" id="add-node-container">
       <form class="form-inline mt-3">
         <label class="my-1 mr-2 sr-only" for="name">Your name</label>
@@ -71,9 +87,9 @@
       </form>
     </div>
   </div><!-- /.container -->
-  <div class="container-fluid">
+  <div class="container-fluid" id="canvas-container">
     <div class="row">
-      <div id="canvas" height="100%" class="col-md-12 px-0"></div>
+      <div id="canvas" class="col-md-12 px-0"></div>
     </div>
   </div><!-- /.container-fluid -->
 </body>
@@ -100,8 +116,8 @@ var containerID = "canvas";
 var container = document.getElementById(containerID);
 var width = container.offsetWidth,
 	height = container.offsetHeight;
-if (height<width) height=width;
-if (height>0.8*window.innerHeight) height = 0.8*window.innerHeight;
+//if (height<width) height=width;
+//if (height>0.8*window.innerHeight) height = 0.8*window.innerHeight;
 // Variables for selecting neighbors
 var neighbor2select = false;
 var neighbors = {neighbor1: true, neighbor2: true};
