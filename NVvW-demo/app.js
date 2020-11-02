@@ -2,6 +2,7 @@
 const _ = require('underscore');
 const fs = require('fs');
 const http = require('http');
+const mime = require('mime-types');
 const path = require('path');
 const url = require('url');
 
@@ -305,6 +306,12 @@ function route(req, res) {
     return res.end();
   }
 
+  if (reqPath.length > 1 && fs.existsSync(
+        path.resolve(__dirname, 'public', reqPath.join('/')))) {
+    serveHtml(res, ['public'].concat(reqPath).join('/'));
+    return;
+  }
+
   switch (reqPath[0]) {
     case 'addnode':
       return _addnode(req, url, res);
@@ -336,8 +343,10 @@ function route(req, res) {
 }
 
 function serveHtml(res, filename) {
-  fs.readFile(path.resolve(__dirname, `./${filename}`), function(err, data) {
-    res.writeHead(200, {'Content-Type': 'text/html'});
+  fs.readFile(path.resolve(__dirname, filename), function(err, data) {
+    res.writeHead(200, {
+      'Content-Type': mime.lookup(filename) || 'application/octet-stream'
+    });
     res.write(data);
     res.end();
   });
