@@ -26,113 +26,108 @@ var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, url, res) {
-  let ip = getIP(req);
+  const ip = getIP(req);
+  const data = url.searchParams;
+  const id = (data.has('id') ? parseInt(data.id, 10) : false);
 
-  if (percolationResult) {
-    return res.writeHead(400, {
-      message: "Cannot add nodes anymore, percolation has started.",
-      errorfield: "id"
-    }).end();
+  for (let param of ['name', 'neighbor1', 'neighbor2']) {
+    if (!data.has(param)) {
+      return res.writeHead(400, {
+        message: `Please provide ${param}.`,
+        errorfield: param
+      }).end();
+    }
   }
 
-  const data = url.searchParams;
+  try {
+    _addnode_internal(ip, data.get('name'), parseInt(data.get('neighbor1'), 10),
+                      parseInt(data.get('neighbor2'), 10), id);
+  } catch (errorMessage) {
+      return res.writeHead(400, {
+        message: errorMessage,
+        errorfield: false
+      }).end();
+  }
+
+  return res.end('okay');
+}
+function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
+  // check if percolation has started
+  if (percolationResult) {
+    throw 'Cannot add nodes anymore, percolation has started.';
+  }
+
+  // check if ip is unique
   let ipUnique = true;
   nodes.forEach(function (n) {
     if (n.ip == ip) ipUnique = false;
   });
-  if (!ipUnique && !data.has('id')) {
-    return res.writeHead(400, {
-      message: "You have already added a node to the network.",
-      errorfield: "id"
-    }).end();
+  if (!ipUnique && id === false) {
+    throw 'You have already added a node to the network.';
   }
+
+  // define ID for the new node
   let newIDi;
-  if (!data.has('id')) {
-    newIDi = 500+idx2id.length;
+  if (id === false) {
+    newIDi = 500 + idx2id.length;
   } else {
-    newIDi = parseInt(data.id, 10);
+    newIDi = id;
   }
 
-  if (data.has('name')) {
-    // Check parameters
-    const n1Idx = parseInt(data.get('neighbor1'), 10);
-    const n2Idx = parseInt(data.get('neighbor2'), 10);
-    if (nodes.has(newIDi)) {
-      return res.writeHead(400, {
-        message: `The id ${newIDi} has already been taken.`,
-        errorfield: "id"
-      }).end();
-    }
-    if (isNaN(n1Idx) || n1Idx >= idx2id.length) {
-        return res.writeHead(400, {
-          message: `neighbor1 ${n1Idx} does not exist`,
-          errorfield: "neighbor1"
-        }).end();
-    }
-    n1ID = idx2id[n1Idx];
-    if (isNaN(n2Idx) || n2Idx >= idx2id.length) {
-        return res.writeHead(400, {
-          message: `neighbor2 ${n2Idx} does not exist`,
-          errorfield: "neighbor2"
-        }).end();
-    }
-    n2ID = idx2id[n2Idx];
-    if (nodes.get(n1ID).degree >= MAX_DEGREE) {
-        return res.writeHead(400, {
-          message: `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`,
-          errorfield: "neighbor1"
-        }).end();
-    }
-    if (nodes.get(n2ID).degree >= MAX_DEGREE) {
-        return res.writeHead(400, {
-          message: `neighbor2 ${n2ID} already has ${MAX_DEGREE} connections`,
-          errorfield: "neighbor2"
-        }).end();
-    }
+  // some checks on properties of the node
+  if (nodes.has(newIDi))
+    throw `The id ${newIDi} has already been taken.`;
+  if (isNaN(n1Idx) || n1Idx >= idx2id.length)
+    throw `neighbor1 ${n1Idx} does not exist`;
+  if (isNaN(n2Idx) || n2Idx >= idx2id.length)
+    throw `neighbor2 ${n2Idx} does not exist`;
+  n1ID = idx2id[n1Idx];
+  n2ID = idx2id[n2Idx];
+  if (nodes.get(n1ID).degree >= MAX_DEGREE)
+    throw `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`;
+  if (nodes.get(n2ID).degree >= MAX_DEGREE)
+    throw `neighbor2 ${n2ID} already has ${MAX_DEGREE} connections`;
 
-    // Add node, update metadata
-    debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
-    let idx = nodes.size;
-    nodes.set(newIDi, {
-      name: data.get('name'),
-      degree: 2,
-      idx: idx,
-      ip: ip
-    });
-    idx2id.push(newIDi);
-    db.query(`INSERT INTO nodes VALUES (${newIDi}, '${data.get('name')}', ` +
-        `'${ip}')`);
-    links.push([newIDi,n1ID]);
-    db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
-    links.push([newIDi,n2ID]);
-    db.query(`INSERT INTO links VALUES (${newIDi}, ${n2ID})`);
-    nodes.get(n1ID).degree++;
-    nodes.get(n2ID).degree++;
+  // add node, update metadata
+  debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
+  let idx = nodes.size;
+  nodes.set(newIDi, {
+    name: name,
+    degree: 2,
+    idx: idx,
+    ip: ip
+  });
+  idx2id.push(newIDi);
+  db.query(`INSERT INTO nodes VALUES (${newIDi}, '${name}', ` +
+      `'${ip}')`);
+  links.push([newIDi,n1ID]);
+  db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
+  links.push([newIDi,n2ID]);
+  db.query(`INSERT INTO links VALUES (${newIDi}, ${n2ID})`);
+  nodes.get(n1ID).degree++;
+  nodes.get(n2ID).degree++;
 
-    return res.end('okay');
-  } else {
-    return res.writeHead(400, {
-      message: "Please provide a name.",
-      errorfield: "name"
-    }).end();
-  }
+  return {id: newIDi, idx: idx};
 }
 
-function _getdata(req, res) {
+function _getdata(req, url, res) {
   res.setHeader('Content-Type', 'application/json');
-  var ip = getIP(req);
+  const ip = getIP(req);
+  const data = url.searchParams;
+  const id = (data.has('id') && typeof data.get('id') === 'string' &&
+              data.get('id') !== 'NaN' ? parseInt(data.get('id'), 10) : false);
   var returnNodes = [];
   nodes.forEach(n => {
     let newNode = {
       id: n.idx,
       name: n.name
     };
-    if (n.ip === ip) {
+    if ((id === false && n.ip === ip) || (id !== false && id === n.idx)) {
       newNode.yours = true;
     }
     returnNodes.push(newNode);
   });
-  var data = {
+  var returnData = {
       nodes: returnNodes,
       links: links.map((link) => {
         return {
@@ -142,9 +137,9 @@ function _getdata(req, res) {
       })
   };
   if (percolationDone) {
-    data.percolation = percolationResult;
+    returnData.percolation = percolationResult;
   }
-  return res.end(JSON.stringify(data));
+  return res.end(JSON.stringify(returnData));
 }
 
 function _updatedata(req, url, res) {
@@ -235,13 +230,20 @@ function _restart() {
 }
 
 
-function close() {
-  db.close();
+function close(server) {
+  server.destroy();
 }
 
 function debug() {
   if (DEBUG) {
     console.log.apply(this, arguments);
+  }
+}
+
+function emitAll(connections) {
+  const emitArgs = Array.from(arguments).slice(1);
+  for (let key in connections) {
+    connections[key].emit.apply(connections[key], emitArgs);
   }
 }
 
@@ -289,11 +291,62 @@ function initFromDB() {
   });
 }
 
-function open() {
+function open(server) {
+  // open database
   if (STANDALONE) {
     db.setMock(true);
   }
   db.open(initFromDB);
+
+
+  // initialize socket.io; closing logic from
+  // https://github.com/socketio/socket.io/issues/1602#issuecomment-120561951
+  const io = require('socket.io')(server, { serveClient: false });
+  const connections = {};
+
+  io.on('connection', socket => {
+    const ip = socket.conn.remoteAddress;
+    const key = socket.conn.id;
+    connections[key] = socket;
+    socket.conn.on('close', () => delete connections[key]);
+
+    socket.on('add-node', (data) => {
+      if (typeof data !== 'object') {
+        socket.emit('oops', 'Invalid event data for add-node.');
+        return;
+      }
+      for (let param of ['name', 'neighbors']) {
+        if (!data.hasOwnProperty(param)) {
+          socket.emit('oops', 'Invalid event data for add-node.');
+          return;
+        }
+      }
+      if (!data.hasOwnProperty('id') || typeof data.id !== 'number') {
+        data.id = false;
+      }
+      try {
+        var node = _addnode_internal(ip, data.name, data.neighbors[0],
+                                    data.neighbors[1], data.id);
+      } catch (errorMessage) {
+        socket.emit('oops', errorMessage);
+        return;
+      }
+      emitAll(connections, 'node-added', {
+        id: node.idx,
+        name: data.name,
+        neighbor1: data.neighbors[0],
+        neighbor2: data.neighbors[1]
+      });
+    });
+  });
+
+  server.destroy = () => {
+    db.close();
+    for (let key in connections) {
+      connections[key].disconnect(true);
+    }
+    server.close();
+  }
 }
 
 function route(req, res) {
@@ -316,7 +369,7 @@ function route(req, res) {
     case 'addnode':
       return _addnode(req, url, res);
     case 'getdata':
-      return _getdata(req, res);
+      return _getdata(req, url, res);
     case 'updatedata':
       return _updatedata(req, url, res);
     case ADMIN_PAGE:
@@ -362,11 +415,10 @@ module.exports = {
 
 if (STANDALONE && require.main === module) {
   let port = process.env.PORT;
-  open();
   let server = http.createServer(route);
-  server.on('close', close);
+  open(server);
   process.on('SIGINT', function() {
-    server.close();
+    close(server);
   });
   server.listen(port);
   debug(`Running on port ${port}`);
