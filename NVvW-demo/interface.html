@@ -56,39 +56,27 @@
 
     <div class="row mt-3" id="instructions-container">
       <div class="col-md-12">
-        <h1 data-i18n-key="title">Instructions</h1>
+        <h1 data-i18n-key="title"></h1>
       </div>
       <div class="col-md-5">
-        <p data-i18n-key="instructions-1">
-          In this game, each participant adds a single node to the network and chooses two neighbors that this node connects to.
-          You can only connect to nodes that have <b>less than 5 neighbors</b>.
-          At the end of the game, we will percolate the graph: half of the links will be removed at random.
-        </p>
+        <p data-i18n-key="instructions-1"></p>
       </div>
       <div class="col-md-7">
-        <p data-i18n-key="instructions-2">
-          The game is won by the players whose nodes end up in the <i>largest</i> connected component after percolation. When multiple components have equal size, both win.
-        </p>
-        <p data-i18n-key="instructions-3">
-          You can <b>add your node</b> by clicking the two neighbors that you want to connect to, typing your name in the textfield and clicking the button "Add node".
-        </p>
+        <p data-i18n-key="instructions-2"></p>
+        <p data-i18n-key="instructions-3"></p>
       </div>
     </div>
 
     <div class="row justify-content-center" id="add-node-container">
       <form class="form-inline mt-3">
         <label class="my-1 mr-2 sr-only" for="name"
-               data-i18n-key="your-name">Your name</label>
-        <input type="text" class="my-1 mr-2" id="name" placeholder="Your name"
+               data-i18n-key="your-name"></label>
+        <input type="text" class="my-1 mr-2" id="name"
                data-i18n-key="your-name" data-i18n-attr="placeholder"></input>
         <button class="btn btn-primary my-1 mr-2" onclick="addNode()"
-                data-i18n-key="add-node">
-          Add node
-        </button>
+                data-i18n-key="add-node"></button>
         <button class="btn btn-primary my-1" onclick="updateNetwork()"
-                data-i18n-key="refresh">
-          Refresh
-        </button>
+                data-i18n-key="refresh"></button>
       </form>
     </div>
   </div><!-- /.container -->
@@ -116,9 +104,11 @@ const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
 const socket = io({transports: ['polling']});
-socket.once('connect', () => {
+socket.on('connect', () => {
   let btn = document.querySelector('button[data-i18n-key="refresh"]');
-  btn.parentNode.removeChild(btn);
+  if (btn !== null) {
+    btn.parentNode.removeChild(btn);
+  }
 
   socket.on('node-added', (node) => {
     addLinksFromNeighbors(node);
@@ -255,8 +245,11 @@ function handleAjaxError(req) {
 
 function showUserAddedANode() {
   d3.selectAll('.selected').classed('selected', false);
-  $('#instructions-container, #add-node-container').remove();
-  createAlert('You added a node, thank you!', 'success', 'Hooray!');
+  const $instructions = $('#instructions-container, #add-node-container');
+  if ($instructions.length > 0) {
+    $instructions.remove();
+    createAlert(i18n.t('node-added'), 'success', i18n.t('node-added-title'));
+  }
 }
 
 // A mapping from node/link to its id name
