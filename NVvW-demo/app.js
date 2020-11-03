@@ -117,12 +117,12 @@ function _getdata(req, url, res) {
   const id = (data.has('id') && typeof data.get('id') === 'string' &&
               data.get('id') !== 'NaN' ? parseInt(data.get('id'), 10) : false);
   var returnNodes = [];
-  nodes.forEach(n => {
+  nodes.forEach((n, nodeId) => {
     let newNode = {
       id: n.idx,
       name: n.name
     };
-    if ((id === false && n.ip === ip) || (id !== false && id === n.idx)) {
+    if ((id === false && n.ip === ip) || (id !== false && id === nodeId)) {
       newNode.yours = true;
     }
     returnNodes.push(newNode);
