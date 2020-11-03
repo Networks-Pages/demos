@@ -12,14 +12,14 @@ const dbParams = {
 };
 const db = {
   active: false,
-  
+
   close: function() {
     if (!dbParams.mock && db.active) {
       db.active = false;
       db.conn.end();
     }
   },
-  
+
   isMocked: function() {
     return dbParams.mock;
   },
@@ -32,9 +32,9 @@ const db = {
     } else if (!db.active) {
       db.conn = mysql.createConnection({
         host: 'localhost',
-        database: 'tcasterm_networks_dev',
-        user: 'networks_dev',
-        password: 'Kvsl!708',
+        database: 'tcasterm_networks',
+        user: 'networks',
+        password: 'G6ca#z70',
         multipleStatements: true
       });
       db.conn.connect(function(err) {
@@ -49,7 +49,7 @@ const db = {
       });
     }
   },
-  
+
   setMock: function(mock) {
     if (mock !== true) {
       db.close(); // ensure the database is closed if it is open now
