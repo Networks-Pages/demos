@@ -112,7 +112,6 @@
 $('form').on('submit', (e) => e.preventDefault());
 
 const MAX_DEGREE = 5;
-const NUM_NODES_RESIZE = 50;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
 const socket = io();
@@ -302,14 +301,6 @@ function updateVisualization() {
 }
 
 function showGraph() {
-  // Increase size by a factor 3 if there are many nodes
-  let resized = false;
-  if (graph.nodes.length >= NUM_NODES_RESIZE) {
-    resized = true;
-    height *= 3;
-    width *= 3;
-  }
-
   drag = simulation => {
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -341,22 +332,27 @@ function showGraph() {
                  .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
 
-	svg = d3.select("#"+containerID).append("svg")
-					.attr("width", width)
-					.attr("height", height);
-  // Scroll the container to the middle of the svg
-  if (resized) {
-    container = document.getElementById('canvas-container');
-    container.scrollTo((width-container.offsetWidth)/2,(height-container.offsetHeight)/2)
-  }
+  svg = d3.select("#"+containerID).append("svg")
+          .attr("width", width)
+          .attr("height", height);
 
-  links = svg.append("g").attr("id","links")
+  let parent = svg.append('g');
+  var rect = parent.append("rect")
+                   .attr("width", width)
+                   .attr("height", height)
+                   .style("fill", "none")
+                   .style("pointer-events", "all");
+
+  links = parent.append("g").attr("id","links")
       .attr("stroke", "#999")
       .attr("stroke-opacity", 0.6);
 
-  nodes = svg.append("g").attr("id","nodes")
+  nodes = parent.append("g").attr("id","nodes")
                   .attr("stroke", "#fff")
                   .attr("stroke-width", 1.5);
+
+  parent.call(d3.zoom().scaleExtent([0.1, 1]).on('zoom', zoomed));
+
   updateVisualization();
   simulation.on("tick", () => {
     links
@@ -406,6 +402,10 @@ function addLink(e) {
   e.y1 = e.source.y;
   e.x2 = e.target.x;
   e.y2 = e.target.y;
+}
+
+function zoomed(e) {
+  d3.select(this).attr('transform', e.transform);
 }
 
 // Retrieve graph
