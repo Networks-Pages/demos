@@ -305,7 +305,8 @@ function open(server) {
   const connections = {};
 
   io.on('connection', socket => {
-    const ip = socket.conn.remoteAddress;
+    const ip = socket.handshake.headers['x-real-ip'] ||
+                socket.conn.remoteAddress;
     const key = socket.conn.id;
     connections[key] = socket;
     socket.conn.on('close', () => delete connections[key]);
