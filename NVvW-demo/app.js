@@ -382,7 +382,8 @@ function route(req, res) {
           return _percolate(res);
         case 'restart':
           _restart();
-          return res.end('okay');
+          setTimeout(() => res.end('okay'), 250);
+          return;
         case 'undoPercolation':
           percolationDone = false;
           percolationResult = null;

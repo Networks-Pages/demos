@@ -72,11 +72,24 @@ form {
         integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
         crossorigin="anonymous"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.slim.js"></script>
 <script>
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
+
+const socket = io({transports: ['polling']});
+socket.on('connect', () => {
+  socket.on('node-added', (node) => {
+    addLinksFromNeighbors(node);
+    updateVisualization();
+  });
+
+  socket.on('oops', (errorMessage) => {
+    console.error(errorMessage);
+  });
+});
 
 var graph;
 var containerID = "canvas";
@@ -116,9 +129,10 @@ function percolate() {
 function restart() {
   let restartHttp = new XMLHttpRequest();
   restartHttp.open("GET", './restart');
+  restartHttp.overrideMimeType('text/plain');
   restartHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-      window.location.reload();
+      retrieveGraph();
     }
   }
   restartHttp.send();
@@ -293,20 +307,23 @@ function addLink(e) {
   e.y2 = e.target.y;
 }
 
-// Retrieve graph
-var xmlHttp = new XMLHttpRequest();
-xmlHttp.onreadystatechange = function() {
+function retrieveGraph() {
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.onreadystatechange = function() {
     if (this.readyState == 4 && this.status == 200) {
-        graph = JSON.parse(this.responseText);
-		graph.nodes.forEach(function(v) {
-			v.x = width/2;
-      v.y = height/2;
-		});
-    graph.links.forEach(addLink);
-    showGraph();
-  }
-};
-xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
-xmlHttp.send();
+      graph = JSON.parse(this.responseText);
+      graph.nodes.forEach(function(v) {
+        v.x = width/2;
+        v.y = height/2;
+      });
+      graph.links.forEach(addLink);
+      showGraph();
+    }
+  };
+  xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
+  xmlHttp.send();
+}
+
+retrieveGraph();
 
 </script>
