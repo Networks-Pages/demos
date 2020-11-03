@@ -354,8 +354,10 @@ function open(server) {
     socket.on('percolate', () =>
         emitAll(connections, 'percolate-start', _percolate(true)));
 
-    socket.on('percolate-done', () =>
-        emitAll(connections, 'percolate-done', percolationResult));
+    socket.on('percolate-done', () => {
+        percolationDone = true;
+        emitAll(connections, 'percolate-done', percolationResult);
+    });
 
     socket.on('restart', () => {
       _restart();
