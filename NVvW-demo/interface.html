@@ -352,7 +352,8 @@ function showGraph() {
                   .attr("stroke", "#fff")
                   .attr("stroke-width", 1.5);
 
-  parent.call(d3.zoom().scaleExtent([0.1, 1]).on('zoom', zoomed));
+  parent.call(d3.zoom().scaleExtent([0.1, 1]).on('zoom', zoomed))
+        .on('mousedown.zoom', null);
 
   updateVisualization();
   simulation.on("tick", () => {
