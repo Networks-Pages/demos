@@ -15,12 +15,11 @@
 
     #canvas {
       height: 100%;
-      overflow: inherit;
+      overflow: hidden;
     }
 
     #canvas-container {
       flex: 1 1 auto;
-      overflow: scroll;
     }
     #canvas-container .row {
       height: 100%;
@@ -37,14 +36,14 @@
       stroke-width: 1.5px;
     }
 
+    #nodes g.selected circle { fill: #045a8d !important; }
+
     /* 6-class YlOrRd from colorbrewer2.org */
     #nodes g.degree-1 circle { fill: #fed976; }
     #nodes g.degree-2 circle { fill: #feb24c; }
     #nodes g.degree-3 circle { fill: #fd8d3c; }
     #nodes g.degree-4 circle { fill: #f03b20; }
     #nodes g.degree-5 circle { fill: #bd0026; }
-
-    #nodes g.selected circle { fill: #045a8d !important; }
 
     #nodes g.lost circle { fill: #de2d26; }
     #nodes g.win circle { fill: #006d2c; }
@@ -98,7 +97,7 @@
     </div>
   </div><!-- /.container-fluid -->
 </body>
-<script src="js/i18n.js"></script>
+<script src="/network/js/i18n.js"></script>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
@@ -107,15 +106,31 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
         crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.slim.js"></script>
 <script>
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
 
-const NUM_NODES_RESIZE = 50;
 const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
-var userID = new URLSearchParams(window.location.search).get('id');
+const socket = io();
+socket.on('connect', () => {
+  let btn = document.querySelector('button[data-i18n-key="refresh"]');
+  btn.parentNode.removeChild(btn);
+
+  socket.on('node-added', (node) => {
+    addLinksFromNeighbors(node);
+    updateVisualization();
+    recomputeDegrees();
+  });
+
+  socket.on('oops', (errorMessage) => {
+    createAlert(errorMessage);
+  });
+});
+
+const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
 
 var graph;
 var containerID = "canvas";
@@ -144,27 +159,37 @@ function nodeSelected(e,node) {
   }
 }
 function addNode() {
-  var name = document.getElementById("name").value;
-  var addNodeHttp = new XMLHttpRequest();
-  addNodeHttp.overrideMimeType("application/json");
-  let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
-        `neighbor2=${selected[1]}`;
-  if (userID) {
-    url += "&id="+userID;
-  }
-  addNodeHttp.open("GET",url);
-  addNodeHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      document.getElementById('node'+selected[0]).classList.remove('selected');
-      document.getElementById('node'+selected[1]).classList.remove('selected');
-      selected = [false,false]
-      updateNetwork();
-      showUserAddedANode();
-    } else {
-      handleAjaxError(this);
+  const name = document.getElementById("name").value;
+  if (socket.connected) {
+    socket.emit('add-node', {
+      name: name,
+      neighbors: selected,
+      id: (isNaN(userID) ? false : userID)
+    });
+    socket.once('node-added', showUserAddedANode);
+  } else {
+    const addNodeHttp = new XMLHttpRequest();
+    addNodeHttp.overrideMimeType("application/json");
+    let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
+          `neighbor2=${selected[1]}`;
+    if (!isNaN(userID)) {
+      url += "&id="+userID;
     }
+
+    addNodeHttp.open("GET",url);
+    addNodeHttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('node'+selected[0]).classList.remove('selected');
+        document.getElementById('node'+selected[1]).classList.remove('selected');
+        selected = [false,false]
+        updateNetwork();
+        showUserAddedANode();
+      } else {
+        handleAjaxError(this);
+      }
+    }
+    addNodeHttp.send();
   }
-  addNodeHttp.send();
 }
 
 function showPercolation(data) {
@@ -228,6 +253,7 @@ function handleAjaxError(req) {
 }
 
 function showUserAddedANode() {
+  d3.selectAll('.selected').classed('selected', false);
   $('#instructions-container, #add-node-container').remove();
   createAlert('You added a node, thank you!', 'success', 'Hooray!');
 }
@@ -275,14 +301,6 @@ function updateVisualization() {
 }
 
 function showGraph() {
-  // Increase size by a factor 3 if there are many nodes
-  let resized = false;
-  if (graph.nodes.length >= NUM_NODES_RESIZE) {
-    resized = true;
-    height *= 3;
-    width *= 3;
-  }
-
   drag = simulation => {
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -314,22 +332,27 @@ function showGraph() {
                  .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
 
-	svg = d3.select("#"+containerID).append("svg")
-					.attr("width", width)
-					.attr("height", height);
-  // Scroll the container to the middle of the svg
-  if (resized) {
-    container = document.getElementById('canvas-container');
-    container.scrollTo((width-container.offsetWidth)/2,(height-container.offsetHeight)/2)
-  }
+  svg = d3.select("#"+containerID).append("svg")
+          .attr("width", width)
+          .attr("height", height);
 
-  links = svg.append("g").attr("id","links")
+  let parent = svg.append('g');
+  var rect = parent.append("rect")
+                   .attr("width", width)
+                   .attr("height", height)
+                   .style("fill", "none")
+                   .style("pointer-events", "all");
+
+  links = parent.append("g").attr("id","links")
       .attr("stroke", "#999")
       .attr("stroke-opacity", 0.6);
 
-  nodes = svg.append("g").attr("id","nodes")
+  nodes = parent.append("g").attr("id","nodes")
                   .attr("stroke", "#fff")
                   .attr("stroke-width", 1.5);
+
+  parent.call(d3.zoom().scaleExtent([0.1, 1]).on('zoom', zoomed));
+
   updateVisualization();
   simulation.on("tick", () => {
     links
@@ -381,6 +404,10 @@ function addLink(e) {
   e.y2 = e.target.y;
 }
 
+function zoomed(e) {
+  d3.select(this).attr('transform', e.transform);
+}
+
 // Retrieve graph
 var xmlHttp = new XMLHttpRequest();
 xmlHttp.overrideMimeType("application/json");
@@ -391,7 +418,7 @@ xmlHttp.onreadystatechange = function() {
       const n = graph.nodes[id];
       n.x = width/2;
       n.y = height/2;
-      if (n.yours === true && userID == null) {
+      if (n.yours === true) {
         showUserAddedANode();
       }
     }
@@ -406,7 +433,7 @@ xmlHttp.onreadystatechange = function() {
     handleAjaxError(this);
   }
 };
-xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
+xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}`);
 xmlHttp.send();
 
 </script>
