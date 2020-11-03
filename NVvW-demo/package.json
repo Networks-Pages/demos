@@ -18,6 +18,7 @@
   "homepage": "https://github.com/Networks-Pages/demos#readme",
   "dependencies": {
     "mime-types": "^2.1.27",
-    "node-mysql": "^0.4.2"
+    "node-mysql": "^0.4.2",
+    "socket.io": "^2.3.0"
   }
 }
