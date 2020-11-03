@@ -15,11 +15,12 @@
 
     #canvas {
       height: 100%;
-      overflow: hidden;
+      overflow: inherit;
     }
 
     #canvas-container {
       flex: 1 1 auto;
+      overflow: scroll;
     }
     #canvas-container .row {
       height: 100%;
@@ -110,7 +111,7 @@
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
 
-
+const NUM_NODES_RESIZE = 3;
 const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
@@ -303,14 +304,23 @@ function showGraph() {
                  .force("boundary", forceBoundary(15,15,width-15, height-15))
                  .force("charge", d3.forceManyBody().strength(-400))
                  .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
-  /*simulation = d3.forceSimulation(graph.nodes)
-                 .force("link", d3.forceLink(graph.links).id(node2id))
-                 .force("charge", d3.forceManyBody().strength(-800))
-                 .force("center", d3.forceCenter(width / 2, height / 2));*/
+
+  // Increase size by a factor 3 if there are many nodes
+  let resized = false;
+  if (graph.nodes.length >= NUM_NODES_RESIZE) {
+    resized = true;
+    height *= 3;
+    width *= 3;
+  }
 
 	svg = d3.select("#"+containerID).append("svg")
-							   .attr("width", width)
-							   .attr("height", height);
+					.attr("width", width)
+					.attr("height", height);
+  // Scroll the container to the middle of the svg
+  if (resized) {
+    container = document.getElementById('canvas-container');
+    container.scrollTo((width-container.offsetWidth)/2,(height-container.offsetHeight)/2)
+  }
 
   links = svg.append("g").attr("id","links")
       .attr("stroke", "#999")
