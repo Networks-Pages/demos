@@ -116,6 +116,10 @@ function _getdata(req, url, res) {
   const data = url.searchParams;
   const id = (data.has('id') && typeof data.get('id') === 'string' &&
               data.get('id') !== 'NaN' ? parseInt(data.get('id'), 10) : false);
+
+  return res.end(JSON.stringify(_getdata_internal(ip, id)));
+}
+function _getdata_internal(ip, id = false) {
   var returnNodes = [];
   nodes.forEach((n, nodeId) => {
     let newNode = {
@@ -139,7 +143,7 @@ function _getdata(req, url, res) {
   if (percolationDone) {
     returnData.percolation = percolationResult;
   }
-  return res.end(JSON.stringify(returnData));
+  return returnData;
 }
 
 function _updatedata(req, url, res) {
@@ -212,6 +216,10 @@ function _percolate(res) {
     "winners": winners,
     "remainingLinks": outputLinks
   };
+
+  if (typeof res === 'boolean') {
+    return percolationResult;
+  }
   return res.end(JSON.stringify(percolationResult));
 }
 
@@ -243,7 +251,7 @@ function debug() {
 function emitAll(connections) {
   const emitArgs = Array.from(arguments).slice(1);
   for (let key in connections) {
-    connections[key].emit.apply(connections[key], emitArgs);
+    connections[key].socket.emit.apply(connections[key].socket, emitArgs);
   }
 }
 
@@ -307,8 +315,11 @@ function open(server) {
   io.on('connection', socket => {
     const ip = socket.handshake.headers['x-real-ip'] ||
                 socket.conn.remoteAddress;
+    const userID = (socket.handshake.query.hasOwnProperty('userID') &&
+        socket.handshake.query.userID !== 'NaN' ?
+        parseInt(socket.handshake.query.userID, 10) : false);
     const key = socket.conn.id;
-    connections[key] = socket;
+    connections[key] = {socket, userID};
     socket.conn.on('close', () => delete connections[key]);
 
     socket.on('add-node', (data) => {
@@ -339,12 +350,28 @@ function open(server) {
         neighbor2: data.neighbors[1]
       });
     });
+
+    socket.on('percolate', () =>
+        emitAll(connections, 'percolate-start', _percolate(true)));
+
+    socket.on('percolate-done', () =>
+        emitAll(connections, 'percolate-done', percolationResult));
+
+    socket.on('restart', () => {
+      _restart();
+      setTimeout(() => {
+        for (let key in connections) {
+          connections[key].socket.emit('restart', _getdata_internal(ip,
+            connections[key].userID));
+        }
+      }, 250);
+    });
   });
 
   server.destroy = () => {
     db.close();
     for (let key in connections) {
-      connections[key].disconnect(true);
+      connections[key].socket.disconnect(true);
     }
     server.close();
   }

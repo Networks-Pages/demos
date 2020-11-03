@@ -102,8 +102,14 @@ $('form').on('submit', (e) => e.preventDefault());
 
 const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
 
-const socket = io({transports: ['polling']});
+const socket = io({
+  query: {
+    id: userID
+  },
+  transports: ['polling']
+});
 socket.on('connect', () => {
   let btn = document.querySelector('button[data-i18n-key="refresh"]');
   if (btn !== null) {
@@ -119,9 +125,29 @@ socket.on('connect', () => {
   socket.on('oops', (errorMessage) => {
     createAlert(errorMessage);
   });
-});
 
-const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
+  socket.on('percolate-done', (percolation) => {
+    showPercolation(percolation);
+  });
+
+  socket.on('restart', (graphData) => {
+    graph = graphData;
+    for (const id in graph.nodes) {
+      const n = graph.nodes[id];
+      n.x = width/2;
+      n.y = height/2;
+      if (n.yours === true) {
+        showUserAddedANode();
+      }
+    }
+    graph.links.forEach(addLink);
+    showGraph();
+    recomputeDegrees();
+    nodes.classed("win", false);
+    nodes.classed("lost", false);
+    $('#instructions-container, #add-node-container').show();
+  });
+});
 
 var graph;
 var containerID = "canvas";
@@ -246,8 +272,8 @@ function handleAjaxError(req) {
 function showUserAddedANode() {
   d3.selectAll('.selected').classed('selected', false);
   const $instructions = $('#instructions-container, #add-node-container');
-  if ($instructions.length > 0) {
-    $instructions.remove();
+  if ($instructions.is(':visible')) {
+    $instructions.hide();
     createAlert(i18n.t('node-added'), 'success', i18n.t('node-added-title'));
   }
 }
@@ -418,7 +444,7 @@ xmlHttp.onreadystatechange = function() {
       }
     }
     graph.links.forEach(addLink);
-    console.log(graph);
+    //console.log(graph);
     showGraph();
     recomputeDegrees();
     if (graph.percolation) {

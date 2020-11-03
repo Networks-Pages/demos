@@ -89,6 +89,17 @@ socket.on('connect', () => {
   socket.on('oops', (errorMessage) => {
     console.error(errorMessage);
   });
+
+  socket.on('restart', (graphData) => {
+    graph = graphData;
+    graph.nodes.forEach(function(v) {
+      v.x = width/2;
+      v.y = height/2;
+    });
+    graph.links.forEach(addLink);
+    showGraph();
+    nodes.classed("win", false);
+  });
 });
 
 var graph;
@@ -111,39 +122,58 @@ function percolate() {
   graph.links.forEach(e => originalIDs.push(link2id(e)));
   graph.nodes.forEach(n => source2remaining.set(n.id,[]));
 
-  let percolateHttp = new XMLHttpRequest();
-  percolateHttp.open("GET", './percolate');
-  percolateHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      data = JSON.parse(this.responseText);
-      winners = data.winners;
-      console.log(data.remainingLinks);
-      console.log(source2remaining);
-      data.remainingLinks.forEach(e => source2remaining.get(parseInt(e[0])).push(parseInt(e[1])));
-      dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
+  let onPercolateStarted = (data) => {
+    winners = data.winners;
+    //console.log(data.remainingLinks);
+    //console.log(source2remaining);
+    data.remainingLinks.forEach(e =>
+        source2remaining.get(parseInt(e[0])).push(parseInt(e[1])));
+    dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
+  };
+
+  if (socket.connected) {
+    socket.emit('percolate');
+    socket.once('percolate-start', onPercolateStarted);
+  } else {
+    let percolateHttp = new XMLHttpRequest();
+    percolateHttp.open("GET", './percolate');
+    percolateHttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        data = JSON.parse(this.responseText);
+        onPercolateStarted(data);
+      }
     }
+    percolateHttp.send();
   }
-  percolateHttp.send();
 }
 
 function restart() {
-  let restartHttp = new XMLHttpRequest();
-  restartHttp.open("GET", './restart');
-  restartHttp.overrideMimeType('text/plain');
-  restartHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      retrieveGraph();
+  if (socket.connected) {
+    socket.emit('restart');
+  } else {
+    let restartHttp = new XMLHttpRequest();
+    restartHttp.open("GET", './restart');
+    restartHttp.overrideMimeType('text/plain');
+    restartHttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        retrieveGraph();
+        nodes.classed('win', false);
+      }
     }
+    restartHttp.send();
   }
-  restartHttp.send();
 }
 
 function dramaticallyRemoveLinks(source2remaining,originalIDs,idx) {
   if (idx>=originalIDs.length) {
     // Notify the server that the percolation has ended
-    let percolateEndedHttp = new XMLHttpRequest();
-    percolateEndedHttp.open("GET", './finishPercolation');
-    percolateEndedHttp.send();
+    if (socket.connected) {
+      socket.emit('percolate-done');
+    } else {
+      let percolateEndedHttp = new XMLHttpRequest();
+      percolateEndedHttp.open("GET", './finishPercolation');
+      percolateEndedHttp.send();
+    }
     // Make winners green
     nodes.classed("win",n=>winners.includes(n.id));
     return;
