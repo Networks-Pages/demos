@@ -115,8 +115,8 @@ $('form').on('submit', (e) => e.preventDefault());
 const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
-const socket = io();
-socket.on('connect', () => {
+const socket = io({transports: ['polling']});
+socket.once('connect', () => {
   let btn = document.querySelector('button[data-i18n-key="refresh"]');
   btn.parentNode.removeChild(btn);
 
