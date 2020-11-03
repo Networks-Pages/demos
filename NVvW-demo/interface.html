@@ -111,7 +111,7 @@
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
 
-const NUM_NODES_RESIZE = 3;
+const NUM_NODES_RESIZE = 50;
 const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 
@@ -282,7 +282,7 @@ function showGraph() {
     height *= 3;
     width *= 3;
   }
-  
+
   drag = simulation => {
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
