@@ -391,7 +391,7 @@ xmlHttp.onreadystatechange = function() {
       const n = graph.nodes[id];
       n.x = width/2;
       n.y = height/2;
-      if (n.yours === true) {
+      if (n.yours === true && userID == null) {
         showUserAddedANode();
       }
     }
