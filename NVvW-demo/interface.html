@@ -275,6 +275,14 @@ function updateVisualization() {
 }
 
 function showGraph() {
+  // Increase size by a factor 3 if there are many nodes
+  let resized = false;
+  if (graph.nodes.length >= NUM_NODES_RESIZE) {
+    resized = true;
+    height *= 3;
+    width *= 3;
+  }
+  
   drag = simulation => {
     function dragstarted(event) {
       if (!event.active) simulation.alphaTarget(0.3).restart();
@@ -305,13 +313,6 @@ function showGraph() {
                  .force("charge", d3.forceManyBody().strength(-400))
                  .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
-  // Increase size by a factor 3 if there are many nodes
-  let resized = false;
-  if (graph.nodes.length >= NUM_NODES_RESIZE) {
-    resized = true;
-    height *= 3;
-    width *= 3;
-  }
 
 	svg = d3.select("#"+containerID).append("svg")
 					.attr("width", width)
