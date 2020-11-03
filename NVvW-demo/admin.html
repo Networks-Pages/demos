@@ -52,7 +52,7 @@ form {
 <body>
   <div class="container">
     <div class="row justify-content-center" id="add-node-container">
-      <form class="form-inline mt-3">
+      <form class="form-inline mt-3" id="form">
         <label class="my-1 mr-2" for="speed">Percolation speed</label>
         <input type="range" class="my-1 mr-2" min="1" max="10" id="speed" value="1" onchange="updateSpeed(this.value)">
         <button class="btn btn-danger my-1 mr-2" onclick="percolate()">
@@ -70,6 +70,11 @@ form {
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
 const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+
+// avoid form from reloading the page on each click
+var form = document.getElementById('form');
+function handleForm(event) { event.preventDefault(); }
+form.addEventListener('submit', handleForm);
 
 var graph;
 var containerID = "canvas";
