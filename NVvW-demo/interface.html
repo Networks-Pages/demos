@@ -21,6 +21,7 @@
 
     #canvas-container {
       flex: 1 1 auto;
+      max-height: 100%;
     }
     #canvas-container .row {
       height: 100%;
@@ -149,7 +150,7 @@ socket.on('connect', () => {
   });
 });
 
-var graph;
+var graph = null;
 var containerID = "canvas";
 var container = document.getElementById(containerID);
 var width = container.offsetWidth,
@@ -170,8 +171,6 @@ function nodeSelected(e,node) {
       document.getElementById('node'+selected[selectionCursor]).classList.remove("selected");
     }
     selected[selectionCursor] = node.id;
-    console.log(e);
-    console.log(selected);
     document.getElementById(node2id(node)).classList.add("selected");
   }
 }
@@ -283,9 +282,31 @@ var node2id = v=>`node${v.id}`;
 var link2id = e=>`e${e.source.id}-${e.target.id}`;
 
 // Update the visualization after graph is changed.
-var nodes,circles,labels,links,drag,simulation,svg;
-function updateVisualization() {
+var nodes,circles,labels,links,drag,simulation=null,svg;
+drag = simulation => {
+  function dragstarted(event) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    event.subject.fx = event.subject.x;
+    event.subject.fy = event.subject.y;
+  }
 
+  function dragged(event) {
+    event.subject.fx = event.x;
+    event.subject.fy = event.y;
+  }
+
+  function dragended(event) {
+    if (!event.active) simulation.alphaTarget(0);
+    event.subject.fx = null;
+    event.subject.fy = null;
+  }
+
+  return d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended);
+}
+function updateVisualization() {
   links = d3.select("#links").selectAll("line").data(graph.links,link2id);
   var linkEnter = links.enter()
                        .append("line")
@@ -321,70 +342,46 @@ function updateVisualization() {
 }
 
 function showGraph() {
-  drag = simulation => {
-    function dragstarted(event) {
-      if (!event.active) simulation.alphaTarget(0.3).restart();
-      event.subject.fx = event.subject.x;
-      event.subject.fy = event.subject.y;
-    }
+  if (graph === null)  return; // ignore early call from ResizeObserver
 
-    function dragged(event) {
-      event.subject.fx = event.x;
-      event.subject.fy = event.y;
-    }
-
-    function dragended(event) {
-      if (!event.active) simulation.alphaTarget(0);
-      event.subject.fx = null;
-      event.subject.fy = null;
-    }
-
-    return d3.drag()
-        .on("start", dragstarted)
-        .on("drag", dragged)
-        .on("end", dragended);
+  if (simulation === null) {
+    simulation = d3.forceSimulation(graph.nodes);
+  } else {
+    simulation.nodes(graph.nodes);
   }
+  simulation.force("link", d3.forceLink(graph.links).id(node2id))
+            .force("boundary", forceBoundary(15,15,width-15, height-15))
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
-  simulation = d3.forceSimulation(graph.nodes)
-                 .force("link", d3.forceLink(graph.links).id(node2id))
-                 .force("boundary", forceBoundary(15,15,width-15, height-15))
-                 .force("charge", d3.forceManyBody().strength(-400))
-                 .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
+  svg = d3SelectOrCreate(`#${containerID}`, 'svg')
+          .attr('width', width)
+          .attr('height', height)
+          .attr('viewBox', `0 0 ${width} ${height}`);
+  d3SelectOrCreate(svg, 'rect')
+    .attr("width", width)
+    .attr("height", height)
+    .style("fill", "none")
+    .style("pointer-events", "all");
 
+  let parent = d3SelectOrCreate(svg, 'g', '.zoom-container');
+  links = d3SelectOrCreate(parent, 'g', '#links')
+            .attr("stroke", "#999")
+            .attr("stroke-opacity", 0.6);
+  nodes = d3SelectOrCreate(parent, 'g', '#nodes')
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5);
 
-  svg = d3.select("#"+containerID).append("svg")
-          .attr("width", width)
-          .attr("height", height);
-
-  let parent = svg.append('g');
-  var rect = parent.append("rect")
-                   .attr("width", width)
-                   .attr("height", height)
-                   .style("fill", "none")
-                   .style("pointer-events", "all");
-
-  links = parent.append("g").attr("id","links")
-      .attr("stroke", "#999")
-      .attr("stroke-opacity", 0.6);
-
-  nodes = parent.append("g").attr("id","nodes")
-                  .attr("stroke", "#fff")
-                  .attr("stroke-width", 1.5);
-
-  parent.call(d3.zoom().scaleExtent([0.1, 1]).on('zoom', zoomed))
-        .on('mousedown.zoom', null);
+  svg.call(d3.zoom().scaleExtent([0.1, 2]).on('zoom', zoomed));
 
   updateVisualization();
   simulation.on("tick", () => {
-    links
-        .attr("x1", d => d.source.x)
-        .attr("y1", d => d.source.y)
-        .attr("x2", d => d.target.x)
-        .attr("y2", d => d.target.y);
-
+    links.attr("x1", d => d.source.x)
+         .attr("y1", d => d.source.y)
+         .attr("x2", d => d.target.x)
+         .attr("y2", d => d.target.y);
     nodes.attr("transform", d => "translate("+d.x+","+d.y+")");
   });
-
 }
 
 function addNodesFromName(n) {
@@ -425,8 +422,51 @@ function addLink(e) {
   e.y2 = e.target.y;
 }
 
+function d3SelectOrCreate(parentSelector, tagName, childSelector = null) {
+  const parentIsD3 = (parentSelector instanceof d3.selection);
+  var result;
+  const qs = (childSelector === null ? tagName : childSelector);
+  if (parentIsD3) {
+    result = parentSelector.select(qs);
+  } else {
+    result = d3.select(parentSelector + ' ' + qs);
+  }
+  if (result.size() === 0) {
+    result = (parentIsD3 ? parentSelector : d3.select(parentSelector))
+               .append(tagName);
+    if (childSelector !== null) {
+      let name = childSelector.substring(1);
+      if (childSelector[0] === '#')  result.attr('id', name);
+      if (childSelector[0] === '.')  result.classed(name, true);
+    }
+  }
+  return result;
+}
+
+// based on https://stackoverflow.com/a/27078401
+// not perfect, but good enough (can be called faster after trailing call)
+function throttle(callback, limit) {
+  var waiting = false,
+      needTrailing = false;
+  return function() {
+    if (!waiting) {
+      callback.apply(this, arguments);
+      waiting = true;
+      setTimeout(function() {
+        waiting = false;
+        if (needTrailing !== false) {
+          callback.apply(this, needTrailing);
+          needTrailing = false;
+        }
+      }, limit);
+    } else {
+      needTrailing = arguments;
+    }
+  };
+}
+
 function zoomed(e) {
-  d3.select(this).attr('transform', e.transform);
+  d3.select('.zoom-container').attr('transform', e.transform);
 }
 
 // Retrieve graph
@@ -444,7 +484,6 @@ xmlHttp.onreadystatechange = function() {
       }
     }
     graph.links.forEach(addLink);
-    //console.log(graph);
     showGraph();
     recomputeDegrees();
     if (graph.percolation) {
@@ -456,5 +495,29 @@ xmlHttp.onreadystatechange = function() {
 };
 xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}`);
 xmlHttp.send();
+
+
+// respond to changes in canvas size
+// from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
+  var containerWidth, containerHeight;
+  for (const entry of entries) {
+    if (entry.contentBoxSize) {
+      if (entry.contentBoxSize[0]) {
+        containerWidth = entry.contentBoxSize[0].inlineSize;
+        containerHeight = entry.contentBoxSize[0].blockSize;
+      } else {
+        containerWidth = entry.contentBoxSize.inlineSize;
+        containerHeight = entry.contentBoxSize.blockSize;
+      }
+    } else {
+      containerWidth = entry.contentRect.width;
+      containerHeight = entry.contentRect.height;
+    }
+  }
+  [width, height] = [containerWidth, containerHeight];
+  showGraph();
+}, 1000));
+canvasResizeObserver.observe(document.getElementById(containerID));
 
 </script>
