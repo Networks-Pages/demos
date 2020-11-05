@@ -33,6 +33,7 @@
       // alerts and other interactive elements
       'node-added': 'You added a node, thank you!',
       'node-added-title': 'Hooray!',
+      'select-nodes': 'Please select two nodes you want to connect to first.',
     },
     nl: {
       // interface elements
@@ -67,6 +68,7 @@
       // alerts and other interactive elements
       'node-added': 'Je hebt een knoop toegevoegd, bedankt!',
       'node-added-title': 'Hoera!',
+      'select-nodes': 'Selecteer eerst twee knopen om mee te verbinden.',
     }
   };
   var lang = navigator.language.substring(0, 2),

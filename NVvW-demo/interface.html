@@ -176,6 +176,11 @@ function nodeSelected(e,node) {
   }
 }
 function addNode() {
+  if (selected.every((n) => n === false)) {
+    createAlert(i18n.t('select-nodes'));
+    return;
+  }
+
   const name = document.getElementById("name").value;
   if (socket.connected) {
     socket.emit('add-node', {
