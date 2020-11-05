@@ -5,7 +5,7 @@
     en: {
       // interface elements
       'add-node': 'Add node',
-      'title': 'Instructions',
+      'hide': 'Hide instructions',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
         can only connect to nodes that have <b>less than 5 neighbors</b>. `,
@@ -28,6 +28,8 @@
         In this game, we will experience this process in practice!`,
       'page-title': 'Network Game',
       'refresh': 'Refresh',
+      'show': 'Show instructions',
+      'title': 'Instructions',
       'your-name': 'Your name',
 
       // alerts and other interactive elements
@@ -38,7 +40,7 @@
     nl: {
       // interface elements
       'add-node': 'Voeg knoop toe',
-      'title': 'Instructies',
+      'hide': 'Verberg instructies',
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
         hun naam aan het netwerk toevoegen, die verbonden moet zijn met precies
         twee andere knopen. Je kunt alleen verbinding maken met knopen die
@@ -63,6 +65,8 @@
         In dit spel gaan we dit samen live ontdekken!`,
       'page-title': 'Netwerkspel',
       'refresh': 'Verversen',
+      'show': 'Toon instructies',
+      'title': 'Instructies',
       'your-name': 'Jouw naam',
 
       // alerts and other interactive elements

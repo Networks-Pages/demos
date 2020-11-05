@@ -14,6 +14,11 @@
       height: 100%;
     }
 
+    #add-node-container {
+      align-items: center;
+      justify-content: center;
+    }
+
     #canvas {
       height: 100%;
       overflow: hidden;
@@ -25,6 +30,12 @@
     }
     #canvas-container .row {
       height: 100%;
+    }
+
+    #instructions-title-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
     }
 
     #links line {
@@ -56,8 +67,10 @@
     <div class="row flex-column align-items-center" id="alerts"></div>
 
     <div class="row mt-3" id="instructions-container">
-      <div class="col-md-12">
+      <div class="col-md-12" id="instructions-title-container">
         <h1 data-i18n-key="title"></h1>
+        <button class="btn btn-secondary btn-sm" onclick="toggleInstructions()"
+                data-i18n-key="hide"></button>
       </div>
       <div class="col-md-5">
         <p data-i18n-key="instructions-1"></p>
@@ -69,17 +82,19 @@
       </div>
     </div>
 
-    <div class="row justify-content-center" id="add-node-container">
-      <form class="form-inline mt-3">
+    <div class="row mt-3" id="add-node-container">
+      <form class="form-inline">
         <label class="my-1 mr-2 sr-only" for="name"
                data-i18n-key="your-name"></label>
         <input type="text" class="my-1 mr-2" id="name"
                data-i18n-key="your-name" data-i18n-attr="placeholder"></input>
-        <button class="btn btn-primary my-1 mr-2" onclick="addNode()"
+        <button class="btn btn-primary my-1" onclick="addNode()"
                 data-i18n-key="add-node"></button>
-        <button class="btn btn-primary my-1" onclick="updateNetwork()"
+        <button class="btn btn-primary my-1 ml-2" onclick="updateNetwork()"
                 data-i18n-key="refresh"></button>
       </form>
+      <button class="btn btn-secondary btn-sm ml-2" style="display: none;"
+              onclick="toggleInstructions()" data-i18n-key="show"></button>
     </div>
   </div><!-- /.container -->
   <div class="container-fluid" id="canvas-container">
@@ -281,6 +296,11 @@ function showUserAddedANode() {
     $instructions.hide();
     createAlert(i18n.t('node-added'), 'success', i18n.t('node-added-title'));
   }
+}
+
+function toggleInstructions() {
+  var toggled = $('#instructions-container').children().toggle();
+  $('#add-node-container > button').toggle(toggled.is(':hidden'));
 }
 
 // A mapping from node/link to its id name
