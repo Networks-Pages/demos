@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
   <title data-i18n-key="page-title">Network Games</title>
 
   <link rel="icon" href="data:,">
@@ -25,11 +27,16 @@
     }
 
     #canvas-container {
-      flex: 1 1 auto;
+      flex: 1 1 0;
       overflow: hidden; /* allow container to be smaller than the SVG in it */
     }
     #canvas-container .row {
       height: 100%;
+    }
+
+    .container {
+      max-height: 100%;
+      overflow-y: auto;
     }
 
     #instructions-title-container {
@@ -82,7 +89,7 @@
       </div>
     </div>
 
-    <div class="row mt-3" id="add-node-container">
+    <div class="row my-3" id="add-node-container">
       <form class="form-inline">
         <label class="my-1 mr-2 sr-only" for="name"
                data-i18n-key="your-name"></label>
