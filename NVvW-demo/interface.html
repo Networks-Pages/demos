@@ -90,7 +90,7 @@
 </body>
 <script src="/network/js/i18n.js"></script>
 <script src="https://d3js.org/d3.v6.min.js"></script>
-<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
+<!--<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>-->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
         integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
         crossorigin="anonymous"></script>
@@ -351,7 +351,7 @@ function showGraph() {
     simulation.nodes(graph.nodes);
   }
   simulation.force("link", d3.forceLink(graph.links).id(node2id))
-            .force("boundary", forceBoundary(15,15,width-15, height-15))
+            //.force("boundary", forceBoundary(15,15,width-15, height-15))
             .force("charge", d3.forceManyBody().strength(-400))
             .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
