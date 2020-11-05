@@ -191,12 +191,17 @@ function nodeSelected(e,node) {
   }
 }
 function addNode() {
-  if (selected.every((n) => n === false)) {
+  if (selected.some((n) => n === false)) {
     createAlert(i18n.t('select-nodes'));
     return;
   }
 
   const name = document.getElementById("name").value;
+  if (name.trim() === '') {
+    createAlert(i18n.t('node-name'));
+    return;
+  }
+
   if (socket.connected) {
     socket.emit('add-node', {
       name: name,
@@ -270,7 +275,8 @@ function updateNetwork() {
   updateHttp.send();
 }
 
-function createAlert(message, type = 'danger', title = 'Error.') {
+function createAlert(message, type = 'danger', title = false) {
+  if (title === false)  title = i18n.t('error') + '.'
   var $alert = $(`
     <div class="alert alert-${type} mt-3 alert-dismissible fade show" role="alert">
       <strong>${title}</strong> ${message}

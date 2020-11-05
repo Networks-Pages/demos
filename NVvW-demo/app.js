@@ -57,6 +57,10 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
     throw 'Cannot add nodes anymore, percolation has started.';
   }
 
+  // check if name is given
+  if (typeof name !== 'string' || name.trim() === '')
+    throw 'Please specify a name for your node.'
+
   // check if ip is unique
   let ipUnique = true;
   nodes.forEach(function (n) {
@@ -77,16 +81,20 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
   // some checks on properties of the node
   if (nodes.has(newIDi))
     throw `The id ${newIDi} has already been taken.`;
-  if (isNaN(n1Idx) || n1Idx >= idx2id.length)
-    throw `neighbor1 ${n1Idx} does not exist`;
-  if (isNaN(n2Idx) || n2Idx >= idx2id.length)
-    throw `neighbor2 ${n2Idx} does not exist`;
+  if (isNaN(n1Idx) || typeof n1Idx !== 'number')
+    throw 'Please select neighbor 1.';
+  if (n1Idx >= idx2id.length)
+    throw `Neighbor 1 (${n1Idx}) does not exist.`;
+  if (isNaN(n2Idx) || typeof n2Idx !== 'number')
+    throw 'Please select neighbor 2.';
+  if (n2Idx >= idx2id.length)
+    throw `Neighbor 2 (${n2Idx}) does not exist.`;
   n1ID = idx2id[n1Idx];
   n2ID = idx2id[n2Idx];
   if (nodes.get(n1ID).degree >= MAX_DEGREE)
-    throw `neighbor1 ${n1ID} already has ${MAX_DEGREE} connections`;
+    throw `Neighbor1 ${n1ID} already has ${MAX_DEGREE} connections.`;
   if (nodes.get(n2ID).degree >= MAX_DEGREE)
-    throw `neighbor2 ${n2ID} already has ${MAX_DEGREE} connections`;
+    throw `Neighbor2 ${n2ID} already has ${MAX_DEGREE} connections.`;
 
   // add node, update metadata
   debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);

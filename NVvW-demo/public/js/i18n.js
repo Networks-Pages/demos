@@ -33,8 +33,10 @@
       'your-name': 'Your name',
 
       // alerts and other interactive elements
+      'error': 'Error',
       'node-added': 'You added a node, thank you!',
       'node-added-title': 'Hooray!',
+      'node-name': 'Please specify a name for your node.',
       'select-nodes': 'Please select two nodes you want to connect to first.',
     },
     nl: {
@@ -70,8 +72,10 @@
       'your-name': 'Jouw naam',
 
       // alerts and other interactive elements
+      'error': 'Fout',
       'node-added': 'Je hebt een knoop toegevoegd, bedankt!',
       'node-added-title': 'Hoera!',
+      'node-name': 'Geef een naam op voor je knoop.',
       'select-nodes': 'Selecteer eerst twee knopen om mee te verbinden.',
     }
   };
