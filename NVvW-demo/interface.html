@@ -352,8 +352,8 @@ function showGraph() {
   }
   simulation.force("link", d3.forceLink(graph.links).id(node2id))
             //.force("boundary", forceBoundary(15,15,width-15, height-15))
-            .force("charge", d3.forceManyBody().strength(-200))
-            .force("center", d3.forceCenter(width / 2, height / 2).strength(5));
+            .force("charge", d3.forceManyBody().strength(-400))
+            .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
   svg = d3SelectOrCreate(`#${containerID}`, 'svg')
           .attr('width', width)
