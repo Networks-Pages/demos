@@ -1,0 +1,24 @@
+{
+  "name": "nvvw-demo",
+  "version": "1.0.0",
+  "description": "Little game for the NVvW day 2020",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Networks-Pages/demos.git"
+  },
+  "author": "Thom Castermans; Martijn Gösgens",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/Networks-Pages/demos/issues"
+  },
+  "homepage": "https://github.com/Networks-Pages/demos#readme",
+  "dependencies": {
+    "mime-types": "^2.1.27",
+    "node-mysql": "^0.4.2",
+    "socket.io": "^2.3.0"
+  }
+}

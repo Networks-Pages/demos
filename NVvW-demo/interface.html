@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<head>
+  <meta charset="utf-8">
+  <title data-i18n-key="page-title">Network Games</title>
+
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+        integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
+        crossorigin="anonymous">
+
+  <style>
+    html, body {
+      height: 100%;
+    }
+
+    #add-node-container {
+      align-items: center;
+      justify-content: center;
+    }
+
+    #canvas {
+      height: 100%;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      flex: 1 1 auto;
+      overflow: hidden; /* allow container to be smaller than the SVG in it */
+    }
+    #canvas-container .row {
+      height: 100%;
+    }
+
+    #instructions-title-container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    #links line {
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
+
+    #nodes circle {
+      stroke: black;
+      fill: #ffffb2;
+      stroke-width: 1.5px;
+    }
+
+    #nodes g.selected circle { fill: #045a8d !important; }
+
+    /* 6-class YlOrRd from colorbrewer2.org */
+    #nodes g.degree-1 circle { fill: #fed976; }
+    #nodes g.degree-2 circle { fill: #feb24c; }
+    #nodes g.degree-3 circle { fill: #fd8d3c; }
+    #nodes g.degree-4 circle { fill: #f03b20; }
+    #nodes g.degree-5 circle { fill: #000;/*#bd0026;*/ }
+
+    #nodes g.lost circle { fill: #de2d26; }
+    #nodes g.win circle { fill: #006d2c; }
+  </style>
+</head>
+<body class="d-flex flex-column overflow-hidden">
+  <div class="container" style="flex: 0 1 auto;">
+    <div class="row flex-column align-items-center" id="alerts"></div>
+
+    <div class="row mt-3" id="instructions-container">
+      <div class="col-md-12" id="instructions-title-container">
+        <h1 data-i18n-key="title"></h1>
+        <button class="btn btn-secondary btn-sm" onclick="toggleInstructions()"
+                data-i18n-key="hide"></button>
+      </div>
+      <div class="col-md-5">
+        <p data-i18n-key="instructions-1"></p>
+        <p data-i18n-key="instructions-2"></p>
+      </div>
+      <div class="col-md-7">
+        <p data-i18n-key="instructions-3"></p>
+        <p data-i18n-key="instructions-perc"></p>
+      </div>
+    </div>
+
+    <div class="row mt-3" id="add-node-container">
+      <form class="form-inline">
+        <label class="my-1 mr-2 sr-only" for="name"
+               data-i18n-key="your-name"></label>
+        <input type="text" class="my-1 mr-2" id="name"
+               data-i18n-key="your-name" data-i18n-attr="placeholder"></input>
+        <button class="btn btn-primary my-1" onclick="addNode()"
+                data-i18n-key="add-node"></button>
+        <button class="btn btn-primary my-1 ml-2" onclick="updateNetwork()"
+                data-i18n-key="refresh"></button>
+      </form>
+      <button class="btn btn-secondary btn-sm ml-2" style="display: none;"
+              onclick="toggleInstructions()" data-i18n-key="show"></button>
+    </div>
+  </div><!-- /.container -->
+  <div class="container-fluid" id="canvas-container">
+    <div class="row">
+      <div id="canvas" class="col-md-12 px-0"></div>
+    </div>
+  </div><!-- /.container-fluid -->
+</body>
+<script src="/network/js/i18n.js"></script>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<!--<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>-->
+<script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
+        integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
+        crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.slim.js"></script>
+<script>
+// disable form submission; we handle everything using AJAX
+$('form').on('submit', (e) => e.preventDefault());
+
+const MAX_DEGREE = 5;
+const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
+
+const socket = io({
+  query: {
+    id: userID
+  },
+  transports: ['polling']
+});
+socket.on('connect', () => {
+  let btn = document.querySelector('button[data-i18n-key="refresh"]');
+  if (btn !== null) {
+    btn.parentNode.removeChild(btn);
+  }
+
+  socket.on('node-added', (node) => {
+    addLinksFromNeighbors(node);
+    updateVisualization();
+    recomputeDegrees();
+  });
+
+  socket.on('oops', (errorMessage) => {
+    createAlert(errorMessage);
+  });
+
+  socket.on('percolate-done', (percolation) => {
+    showPercolation(percolation);
+  });
+
+  socket.on('restart', (graphData) => {
+    graph = graphData;
+    for (const id in graph.nodes) {
+      const n = graph.nodes[id];
+      n.x = width/2;
+      n.y = height/2;
+      if (n.yours === true) {
+        showUserAddedANode();
+      }
+    }
+    graph.links.forEach(addLink);
+    showGraph();
+    recomputeDegrees();
+    nodes.classed("win", false);
+    nodes.classed("lost", false);
+    $('#instructions-container, #add-node-container').show();
+  });
+});
+
+var graph = null;
+var containerID = "canvas";
+var container = document.getElementById(containerID);
+var width = container.offsetWidth,
+	height = container.offsetHeight;
+//if (height<width) height=width;
+//if (height>0.8*window.innerHeight) height = 0.8*window.innerHeight;
+// Variables for selecting neighbors
+var neighbor2select = false;
+var neighbors = {neighbor1: true, neighbor2: true};
+var selectionCursor = 0;
+var selected = [false,false];
+// When one of the select-buttons is pressed
+// Change the label below the select-button to the node name.
+function nodeSelected(e,node) {
+  if (!selected.includes(node.id) && node.degree<MAX_DEGREE) {
+    selectionCursor = (selectionCursor+1)%2;
+    if (selected[selectionCursor]!==false) {
+      document.getElementById('node'+selected[selectionCursor]).classList.remove("selected");
+    }
+    selected[selectionCursor] = node.id;
+    document.getElementById(node2id(node)).classList.add("selected");
+  }
+}
+function addNode() {
+  if (selected.some((n) => n === false)) {
+    createAlert(i18n.t('select-nodes'));
+    return;
+  }
+
+  const name = document.getElementById("name").value;
+  if (name.trim() === '') {
+    createAlert(i18n.t('node-name'));
+    return;
+  }
+
+  if (socket.connected) {
+    socket.emit('add-node', {
+      name: name,
+      neighbors: selected,
+      id: (isNaN(userID) ? false : userID)
+    });
+    socket.once('node-added', showUserAddedANode);
+  } else {
+    const addNodeHttp = new XMLHttpRequest();
+    addNodeHttp.overrideMimeType("application/json");
+    let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
+          `neighbor2=${selected[1]}`;
+    if (!isNaN(userID)) {
+      url += "&id="+userID;
+    }
+
+    addNodeHttp.open("GET",url);
+    addNodeHttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        document.getElementById('node'+selected[0]).classList.remove('selected');
+        document.getElementById('node'+selected[1]).classList.remove('selected');
+        selected = [false,false]
+        updateNetwork();
+        showUserAddedANode();
+      } else {
+        handleAjaxError(this);
+      }
+    }
+    addNodeHttp.send();
+  }
+}
+
+function showPercolation(data) {
+  graph.links = data.remainingLinks.map(function(e) { return {source: parseInt(e[0]), target: parseInt(e[1])};});
+  graph.links.forEach(addLink);
+  nodes.classed("win",n=>data.winners.includes(n.id));
+  nodes.classed("lost",n=>!data.winners.includes(n.id));
+  updateVisualization();
+}
+
+function recomputeDegrees() {
+  graph.nodes.forEach(n => n.degree=0);
+  graph.links.forEach(function(e) {
+    e.source.degree++;
+    e.target.degree++;
+  });
+  nodes.each(function(n) {
+    for (let i = 1; i <= MAX_DEGREE; ++i) {
+        this.classList.toggle(`degree-${i}`, n.degree === i);
+    }
+  });
+}
+
+
+// Retrieve all newly added nodes and update the visualization
+function updateNetwork() {
+  var n = graph.nodes.length;
+  var updateHttp = new XMLHttpRequest();
+  updateHttp.overrideMimeType("application/json");
+  updateHttp.open("GET", `${URL_PREFIX}/updatedata?n=${n}`);
+  updateHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+        data = JSON.parse(this.responseText);
+        data.neighbors.forEach(addLinksFromNeighbors);
+        updateVisualization();
+        recomputeDegrees();
+    } else {
+      handleAjaxError(this);
+    }
+  }
+  updateHttp.send();
+}
+
+function createAlert(message, type = 'danger', title = false) {
+  if (title === false)  title = i18n.t('error') + '.'
+  var $alert = $(`
+    <div class="alert alert-${type} mt-3 alert-dismissible fade show" role="alert">
+      <strong>${title}</strong> ${message}
+      <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+        <span aria-hidden="true">&times;</span>
+      </button>
+    </div>
+  `);
+  $('#alerts').append($alert);
+  $alert.alert();
+}
+
+function handleAjaxError(req) {
+  if (req.readyState === 4 && req.status === 400) {
+    createAlert(req.getResponseHeader('message'));
+  }
+}
+
+function showUserAddedANode() {
+  d3.selectAll('.selected').classed('selected', false);
+  const $instructions = $('#instructions-container, #add-node-container');
+  if ($instructions.is(':visible')) {
+    $instructions.hide();
+    createAlert(i18n.t('node-added'), 'success', i18n.t('node-added-title'));
+  }
+}
+
+function toggleInstructions() {
+  var toggled = $('#instructions-container').children().toggle();
+  $('#add-node-container > button').toggle(toggled.is(':hidden'));
+}
+
+// A mapping from node/link to its id name
+var node2id = v=>`node${v.id}`;
+var link2id = e=>`e${e.source.id}-${e.target.id}`;
+
+// Update the visualization after graph is changed.
+var nodes,circles,labels,links,drag,simulation=null,svg;
+drag = simulation => {
+  function dragstarted(event) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    event.subject.fx = event.subject.x;
+    event.subject.fy = event.subject.y;
+  }
+
+  function dragged(event) {
+    event.subject.fx = event.x;
+    event.subject.fy = event.y;
+  }
+
+  function dragended(event) {
+    if (!event.active) simulation.alphaTarget(0);
+    event.subject.fx = null;
+    event.subject.fy = null;
+  }
+
+  return d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended);
+}
+function updateVisualization() {
+  links = d3.select("#links").selectAll("line").data(graph.links,link2id);
+  var linkEnter = links.enter()
+                       .append("line")
+                       .attr("id",link2id)
+                       .attr("x1",e=>e.x1)
+                       .attr("y1",e=>e.y1)
+                       .attr("x2",e=>e.x2)
+                       .attr("y2",e=>e.y2)
+                       .attr("stroke-width", 1.5);
+  links.exit().remove();
+  links = linkEnter.merge(links);
+
+  nodes = d3.select("#nodes").selectAll("g").data(graph.nodes,node2id);
+  var nodeEnter = nodes.enter()
+                       .append("g")
+                       .attr("id",node2id)
+                       .attr("transform", d => "translate("+d.x+","+d.y+")")
+                       .call(drag(simulation));
+  circles = nodeEnter.append("circle")
+                 .attr("r", 12)
+                 .on("click",nodeSelected);
+  labels = nodeEnter.append("text")
+                .attr("stroke","black")
+                .attr("stroke-width",0.5)
+                .text(d => d.name)
+                .attr('x', 14)
+                .attr('y', 0);
+  nodes.exit().remove();
+  nodes = nodeEnter.merge(nodes);
+  // Update the simulation elements and restart
+  simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(node2id));
+  simulation.alpha(1).restart();
+}
+
+function showGraph() {
+  if (graph === null)  return; // ignore early call from ResizeObserver
+
+  if (simulation === null) {
+    simulation = d3.forceSimulation(graph.nodes);
+  } else {
+    simulation.nodes(graph.nodes);
+  }
+  simulation.force("link", d3.forceLink(graph.links).id(node2id))
+            //.force("boundary", forceBoundary(15,15,width-15, height-15))
+            .force("charge", d3.forceManyBody().strength(-200))
+            .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
+
+  svg = d3SelectOrCreate(`#${containerID}`, 'svg')
+          .attr('width', width)
+          .attr('height', height)
+          .attr('viewBox', `0 0 ${width} ${height}`);
+  d3SelectOrCreate(svg, 'rect')
+    .attr("width", width)
+    .attr("height", height)
+    .style("fill", "none")
+    .style("pointer-events", "all");
+
+  let parent = d3SelectOrCreate(svg, 'g', '.zoom-container');
+  links = d3SelectOrCreate(parent, 'g', '#links')
+            .attr("stroke", "#999")
+            .attr("stroke-opacity", 0.6);
+  nodes = d3SelectOrCreate(parent, 'g', '#nodes')
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5);
+
+  svg.call(d3.zoom().scaleExtent([0.1, 2]).on('zoom', zoomed));
+
+  updateVisualization();
+  simulation.on("tick", () => {
+    links.attr("x1", d => d.source.x)
+         .attr("y1", d => d.source.y)
+         .attr("x2", d => d.target.x)
+         .attr("y2", d => d.target.y);
+    nodes.attr("transform", d => "translate("+d.x+","+d.y+")");
+  });
+}
+
+function addNodesFromName(n) {
+  graph.nodes.push({name: n, x: width/2, y: height/2})
+}
+
+function addLinksFromNeighbors(v) {
+  graph.nodes.push({
+    'id': v.id,
+    'name': v.name,
+    'x': width/2,
+    'y': height/2
+  });
+  graph.links.push({
+    source: graph.nodes[v.id],
+    target: graph.nodes[v.neighbor1],
+    x1: graph.nodes[v.id].x,
+    y1: graph.nodes[v.id].x,
+    x2: graph.nodes[v.neighbor1].x,
+    y2: graph.nodes[v.neighbor1].y,
+  });
+  graph.links.push({
+    "source": graph.nodes[v.id],
+    "target": graph.nodes[v.neighbor2],
+    x1: graph.nodes[v.id].x,
+    y1: graph.nodes[v.id].x,
+    x2: graph.nodes[v.neighbor2].x,
+    y2: graph.nodes[v.neighbor2].y,
+  });
+}
+
+function addLink(e) {
+  e.source = graph.nodes[e.source];
+  e.target = graph.nodes[e.target];
+  e.x1 = e.source.x;
+  e.y1 = e.source.y;
+  e.x2 = e.target.x;
+  e.y2 = e.target.y;
+}
+
+function d3SelectOrCreate(parentSelector, tagName, childSelector = null) {
+  const parentIsD3 = (parentSelector instanceof d3.selection);
+  var result;
+  const qs = (childSelector === null ? tagName : childSelector);
+  if (parentIsD3) {
+    result = parentSelector.select(qs);
+  } else {
+    result = d3.select(parentSelector + ' ' + qs);
+  }
+  if (result.size() === 0) {
+    result = (parentIsD3 ? parentSelector : d3.select(parentSelector))
+               .append(tagName);
+    if (childSelector !== null) {
+      let name = childSelector.substring(1);
+      if (childSelector[0] === '#')  result.attr('id', name);
+      if (childSelector[0] === '.')  result.classed(name, true);
+    }
+  }
+  return result;
+}
+
+// based on https://stackoverflow.com/a/27078401
+// not perfect, but good enough (can be called faster after trailing call)
+function throttle(callback, limit) {
+  var waiting = false,
+      needTrailing = false;
+  return function() {
+    if (!waiting) {
+      callback.apply(this, arguments);
+      waiting = true;
+      setTimeout(function() {
+        waiting = false;
+        if (needTrailing !== false) {
+          callback.apply(this, needTrailing);
+          needTrailing = false;
+        }
+      }, limit);
+    } else {
+      needTrailing = arguments;
+    }
+  };
+}
+
+function zoomed(e) {
+  d3.select('.zoom-container').attr('transform', e.transform);
+}
+
+// Retrieve graph
+var xmlHttp = new XMLHttpRequest();
+xmlHttp.overrideMimeType("application/json");
+xmlHttp.onreadystatechange = function() {
+  if (this.readyState == 4 && this.status == 200) {
+    graph = JSON.parse(this.responseText);
+    for (const id in graph.nodes) {
+      const n = graph.nodes[id];
+      n.x = width/2;
+      n.y = height/2;
+      if (n.yours === true) {
+        showUserAddedANode();
+      }
+    }
+    graph.links.forEach(addLink);
+    showGraph();
+    recomputeDegrees();
+    if (graph.percolation) {
+      showPercolation(graph.percolation);
+    }
+  } else {
+    handleAjaxError(this);
+  }
+};
+xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}`);
+xmlHttp.send();
+
+
+// respond to changes in canvas size
+// from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
+  var containerWidth, containerHeight;
+  for (const entry of entries) {
+    if (entry.contentBoxSize) {
+      if (entry.contentBoxSize[0]) {
+        containerWidth = entry.contentBoxSize[0].inlineSize;
+        containerHeight = entry.contentBoxSize[0].blockSize;
+      } else {
+        containerWidth = entry.contentBoxSize.inlineSize;
+        containerHeight = entry.contentBoxSize.blockSize;
+      }
+    } else {
+      containerWidth = entry.contentRect.width;
+      containerHeight = entry.contentRect.height;
+    }
+  }
+  [width, height] = [containerWidth, containerHeight];
+  showGraph();
+}, 1000));
+canvasResizeObserver.observe(document.getElementById(containerID));
+
+</script>
