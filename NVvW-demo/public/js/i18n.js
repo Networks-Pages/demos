@@ -8,10 +8,11 @@
       'title': 'Instructions',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
-        can only connect to nodes that have <b>less than 5 neighbors</b>. At the
+        can only connect to nodes that have <b>less than 5 neighbors</b>. `,
+      'instructions-2': `At the
         end of the game, we will percolate the graph: half of the links will be
-        removed at random.`,
-      'instructions-2': `The game is won by the players whose nodes end up in
+        removed at random.
+        The game is won by the players whose nodes end up in
         the <i>largest</i> connected component after percolation. When multiple
         components have equal size, all win.`,
       'instructions-3': `You can <b>add your node</b> by clicking the two
@@ -40,11 +41,12 @@
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
         hun naam aan het netwerk toevoegen, die verbonden moet zijn met precies
         twee andere knopen. Je kunt alleen verbinding maken met knopen die
-        <b>minder dan vijf buren</b> hebben. Aan het eind van het spel wordt
+        <b>minder dan vijf buren</b> hebben.`,
+      'instructions-2': `Aan het eind van het spel wordt
         een willekeurige helft van de verbindingen verwijderd. Hierdoor zullen
-        gedeelten van het netwerk losgekoppeld worden van de rest.`,
-      'instructions-2': `De spelers die vervolgens in het grootste overgebleven
-        verbonden deelnetwerk zitten, winnen het spel. Wanneer er meerdere
+        gedeelten van het netwerk losgekoppeld worden van de rest.
+        De spelers die vervolgens in het grootste overgebleven
+        verbonden deelnetwerk zitten, winnen het spel. Als er meerdere
         deelnetwerken met evenveel knopen overblijven, winnen spelers in al deze
         deelnetwerken.`,
       'instructions-3': `Je kunt <b>jouw knoop toevoegen</b> aan het netwerk
@@ -55,11 +57,9 @@
         oorspronkelijk uit de materiaalkunde. Binnen de wiskunde wordt percolatie beschouwd als
         het proces van het willekeurig verwijderen van verbindingen in een netwerk.
         De eenvoudigste manier om percolatie te doen is door voor iedere verbinding
-        een (mogelijk oneerlijke) munt op te gooien en de verbinding bij kop te verwijderen en bij munt te behouden.
-        De vraag nu is, nadat we dit proces gedaan hebben, hoe ziet het netwerk
-        eruit? In dit spelletje gaan we samen live kijken hoe percolatie werkt
-        op een netwerk gemaakt door jullie, aangezien jullie allemaal elkaar
-        niet kennen kunnen we het gemaakte netwerk zien als een willekeurig netwerk! `,
+        een (mogelijk oneerlijke) munt op te gooien en de verbinding bij kop te verwijderen.
+        Men is vervolgens geïnteresseerd in hoe het resulterende netwerk eruit ziet.
+        In dit spel gaan we dit samen live ontdekken!`,
       'page-title': 'Netwerkspel',
       'refresh': 'Verversen',
       'your-name': 'Jouw naam',
