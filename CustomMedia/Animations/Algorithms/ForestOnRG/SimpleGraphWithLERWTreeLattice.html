@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+<style>
+    .link {
+        stroke: #777;
+        stroke-opacity: 1.2;
+        stroke-width:0.7px;
+    }
+    .node{
+        stroke:#fff;
+        stroke-width:0px;
+    }
+    .lnnode{
+        stroke:#fff;
+        stroke-width:0px;
+    }
+
+    .axisLine {
+        stroke: #111;
+        stroke-opacity: 1.2;
+        stroke-width:3px;
+    }
+
+</style>
+<body onload="draw()">
+    <script src="d3.min.js"></script>
+
+    <script>
+    var width = 0.99 * window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = 0.99 * window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            graph = {}, dc = {};
+
+    dc.defaultLineGray = "#777";
+    dc.color = ["#f25006", "#80ba01", "#ffb902", "#02a4ef", "#8b1599", "#726906","#3366cc", "#dc3912", "#ff9900", "#109618", "#990099", "#0099c6", "#dd4477", "#66aa00", "#b82e2e", "#316395", "#994499", "#22aa99", "#aaaa11", "#6633cc", "#e67300", "#8b0707", "#651067", "#329262", "#5574a6", "#3b3eac"];
+    dc.colorDim = ["#632102", "#354c03", "#563f01", "#002d42", "#3e0844", "#3a3604"];
+    dc.SIRColorMap = ["#c81919", "#7cb714", "#517bba", "#517bba", "#517bba"];
+    dc.intervalID = [];
+    dc.status;
+    dc.cc = 0;
+    dc.textspace = 60;
+    dc.animationTime = 500;
+    dc.dyingProb = 0.04;
+    var picC = {};
+    var picPlot = {};
+
+
+    function getUrlVars() {
+        var vars = {};
+        var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
+            vars[key] = value;
+        });
+        return vars;
+    }
+
+    function setModelParameters() {
+        var passedParameters = getUrlVars();
+        if (isNaN(passedParameters.n))
+            graph.nrNodes = 60;
+        else
+            graph.nrNodes = parseInt(passedParameters.n);
+
+        if (isNaN(passedParameters.alpha))
+            graph.alpha = 4.5;
+        else
+            graph.alpha = parseFloat(passedParameters.alpha);
+
+        if (isNaN(passedParameters.pdie))
+            dc.dyingProb = 0.04;
+        else
+            dc.dyingProb = parseFloat(passedParameters.pdie);
+
+        graph.gamma = graph.alpha * (graph.tau - 1) * 1.0 / 2;
+    }
+
+    function draw() {
+        setModelParameters();
+        dc.status = 1;
+        createGraph();
+        initializeGraphic();
+        startFirstWalker();
+    }
+    ;
+
+
+
+
+    function startFirstWalker(walker) {
+        var walker = {pathID: 1};
+        walker.position = getRandomElement(graph.nodes);
+        walker.formerPositions = [];
+        walker.formerEdges = [];
+        walker.formerPositions.push(walker.position);
+        dc.usedId = 100000;
+        dc.intervalID.push(setTimeout(function () {
+            processStep(walker);
+        }, dc.animationTime));
+    }
+
+
+    function startLaterWalker(id) {
+        var walker = {pathID: id};
+        var possibleStarts = graph.nodes.filter(function (item) {
+            return (item.group === 0);
+        });
+        if (possibleStarts.length > 0) {
+            walker.position = getRandomElement(possibleStarts);
+            walker.formerPositions = [];
+            walker.formerEdges = [];
+            walker.formerPositions.push(walker.position);
+            dc.intervalID.push(setTimeout(function () {
+                processStep(walker);
+            }, dc.animationTime));
+        }
+    }
+    function processStep(walker) {
+        dc.cc++;
+        if (walker.position.group === walker.pathID) {
+            // We hit ourself so we need to erase the loop
+            eraseLoop(walker); //TODO
+            dc.intervalID.push(setTimeout(function () {
+                makeStep(walker);//TODO
+                dc.intervalID.push(setTimeout(function () {
+                    processStep(walker);
+                }, dc.animationTime));
+            }, dc.animationTime));
+        } else if (walker.position.group !== 0) {
+            mergePaths(walker);//TODO
+        } else {
+            var dying = (Math.random() > dc.dyingProb);
+            if ((graph.undirectedSimple[walker.position.name].length > 0) && dying) {
+                makeStep(walker);
+                dc.intervalID.push(setTimeout(function () {
+                    processStep(walker);
+                }, dc.animationTime));
+            } else {
+                makeRootAndFinalize(walker);
+            }
+        }
+    }
+
+    function makeStep(walker) {
+        dc.svg.selectAll(walker.position.id).style("fill", groupColor(walker.pathID));
+        walker.position.group = walker.pathID;
+        var next = graph.nodes[getRandomElement(graph.undirectedSimple[walker.position.name])];
+        var newEdge = {};
+        newEdge.source = walker.position.name;
+        newEdge.target = next.name;
+        newEdge.notjetanimated = true;
+        if (next.name > walker.position.name) {
+            newEdge.id = "line#" + "idlink" + next.name + "t" + walker.position.name;
+        } else {
+            newEdge.id = "line#" + "idlink" + walker.position.name + "t" + next.name;
+        }
+        animateEdge(newEdge, walker);
+        walker.formerPositions.push(walker.position);
+        walker.formerEdges.push(newEdge);
+        walker.position = next;
+    }
+
+    function eraseLoop(walker) {
+        var firstPosition = -1;
+        for (i = 0; i < walker.formerPositions.length; i++) {
+            if (walker.formerPositions[i].name === walker.position.name) {
+                firstPosition = i;
+                i = walker.formerPositions.length + 10;
+            }
+        }
+        if (firstPosition === -1) {
+            console.log("Mistake, not self-intersection occured, but we called erase loop.");
+        } else {
+            var cutoff = walker.formerPositions.splice(firstPosition + 1);
+            cutoff.forEach(function (item) {
+                item.group = 0;
+                dc.svg.selectAll(item.id).style("fill", "#559");
+            });
+            var cutoff2 = walker.formerEdges.splice(firstPosition);
+            cutoff2.forEach(function (item) {
+                dc.svg.selectAll(item.id).attr("status", 0).attr("group", 0).transition().duration(dc.animationTime * 0.7)
+                        .style("stroke-width", "0.4px").style("stroke", dc.defaultLineGray);
+            });
+            return false;
+        }
+    }
+
+    function makeRootAndFinalize(walker) {
+        dc.svg.selectAll(walker.position.id).attr("r", 12).style("fill", groupColor(walker.pathID));
+        walker.position.group = walker.pathID;
+
+        walker.formerEdges.forEach(function (item) {
+            dc.svg.selectAll(item.id).style("stroke-width", "2px").style("stroke", groupColor(walker.pathID)).attr("status", 2).attr("group", walker.pathID);
+        });
+        startLaterWalker(walker.pathID+1);
+        //dc.link.style("fill", function(d) {return groupColor(d.group);});
+    }
+
+    function mergePaths(walker) {
+        var groupLabel = walker.position.group;
+        dc.svg.selectAll(walker.position.id).style("fill", groupColor(groupLabel));
+        walker.position.group = groupLabel;
+        
+        walker.formerPositions.forEach(function (item) {
+                item.group = groupLabel;
+                dc.svg.selectAll(item.id).style("fill", groupColor(groupLabel));
+        });
+            
+        walker.formerEdges.forEach(function (item) {
+            dc.svg.selectAll(item.id).style("stroke-width", "2px").style("stroke", groupColor(groupLabel)).attr("status", 2).attr("group", groupLabel);
+        });
+        // that very last edge needs manual care:
+        //console.log(walker.formerPositions[walker.formerPositions.length-1].name+ " to "+walker.position.name);
+        var source = walker.formerPositions[walker.formerPositions.length-1].name;
+        var target = walker.position.name;
+        var id ="";
+        if (source > target) {
+            id = "line#" + "idlink" + source + "t" + target;
+        } else {
+            id = "line#" + "idlink" + target + "t" + source;
+        }
+         dc.intervalID.push(setTimeout(function () {
+             dc.svg.selectAll(id).style("stroke-width", "2px").style("stroke", groupColor(groupLabel)).attr("status", 2).attr("group", groupLabel);
+         }, dc.animationTime));
+
+        startLaterWalker(walker.pathID);
+        
+    }
+
+    function animateEdge(edge, walker) {
+        if (edge.notjetanimated) {
+            edge.notjetanimated = false;
+            dc.svg.selectAll(edge.id).attr("status", 1).attr("group", walker.pathID);
+            dc.svg.selectAll(edge.id).transition().duration(dc.animationTime * 0.4).style("stroke-width", "4px").style("stroke", groupColor(walker.pathID));
+
+            dc.intervalID.push(setTimeout(function () {
+                dc.svg.selectAll(edge.id).transition().duration(dc.animationTime * 0.5).style("stroke-width", "2px").style("stroke", groupColor(walker.pathID));
+            }, dc.animationTime * 0.4));
+
+            dc.usedId++;
+            var start = graph.nodes[edge.source];
+            var end = graph.nodes[edge.target];
+            dc.svg.append("circle").attr("class", "walker")
+                    .attr("id", "id" + dc.usedId).attr("cx", start.x).attr("cy", start.y).attr("r", 2).style("fill", groupColor(walker.pathID));
+            var nodeIdtag = "circle#id" + dc.usedId;
+
+            var timeStart = 0.15 * dc.animationTime;
+            var timeTravel = 0.7 * dc.animationTime;
+            var timeEnter = 0.1 * dc.animationTime;
+
+            dc.svg.selectAll(nodeIdtag).attr("r", 1).attr("cy", start.y);
+            dc.svg.selectAll(nodeIdtag).transition().duration(timeStart * 0.95).attr("r", 7).attr("cy", start.y - 5);
+            dc.intervalID.push(setTimeout(function () {
+                dc.svg.selectAll(nodeIdtag).transition().duration(timeTravel * 0.95).attr("r", 6).attr("cx", end.x).attr("cy", end.y - 5);
+                dc.intervalID.push(setTimeout(function () {
+                    dc.svg.selectAll(nodeIdtag).transition().duration(timeEnter * 0.95).attr("r", 2).attr("cx", end.x).attr("cy", end.y);
+                    dc.intervalID.push(setTimeout(function () {
+                        dc.svg.selectAll(nodeIdtag).remove();
+                    }, timeEnter));
+                }, timeTravel));
+            }, timeStart));
+        }
+    }
+
+    function randomInt(max) {
+        return Math.floor(Math.random() * max);
+    }
+
+
+    function groupColor(group) {
+        if (group === 0)
+            return dc.defaultLineGray;
+        else {
+            return dc.color[(group - 1) % dc.color.length];
+        }
+    }
+//====================Graph creation
+
+    function createGraph() {
+        dc.boundary = Math.max(10, width * 0.001);
+        var effectivewidth = (width - 2 * dc.boundary);
+        var effectiveheight = (height - 2 * dc.boundary);
+        var syswidth = 100;
+        var sysheight = 100.0 * effectiveheight / effectivewidth;
+        
+        var nrColom = Math.ceil(Math.sqrt(syswidth/sysheight*graph.nrNodes));
+        var nrRows = Math.ceil(graph.nrNodes/nrColom);
+        var cellwidth = Math.floor((effectivewidth)/(nrColom+1));
+        var rowheight = Math.floor((effectiveheight)/(nrRows+1));
+        
+        
+        graph.nodes = [];
+        for (var i = 0; i < nrColom; i++) {
+            for (var j = 0; j < nrRows; j++) {
+                var node = {name: graph.nodes.length, id: "circle#id" + graph.nodes.length, degree: 0};
+                node.sysx = (i+0.5)/nrColom*syswidth;
+                node.sysy = (j+0.5)/nrRows*sysheight;
+                node.x = dc.boundary + node.sysx *nrColom/syswidth * cellwidth;
+                node.y = dc.boundary + node.sysy *nrRows/sysheight * rowheight;
+                node.group = 0;
+                node.weight = 1;
+                graph.nodes.push(node);
+            }
+        }
+        graph.nrNodes=graph.nodes.length;
+        graph.links = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            var possibleNeighbors=[i+1,i+nrRows];
+            if (i%nrRows===nrRows-1) possibleNeighbors=[i+nrRows];
+            for (var j = 0; j < possibleNeighbors.length; j++) {
+                if((possibleNeighbors[j]>=0)&&(possibleNeighbors[j]<graph.nrNodes)){
+                    var link = {source: i, target: possibleNeighbors[j], le: 1};
+
+                    graph.links.push(link);
+                    link.name = "idlink" + link.source + "t" + link.target;
+                    graph.nodes[i].degree++;
+                    graph.nodes[j].degree++;
+                }
+            }
+        }
+        graph.maxDegree = graph.nodes[0].degree;
+        for (var i = 1; i < graph.nrNodes; i++) {
+            graph.maxDegree = Math.max(graph.nodes[i].degree, graph.maxDegree);
+        }
+        createUndirectedSimpleGraphSparse();
+    }
+    
+    
+    function createGraphTwo() {
+        dc.boundary = Math.max(10, width * 0.001);
+        var effectivewidth = (width - 2 * dc.boundary);
+        var effectiveheight = (height - 2 * dc.boundary);
+        var syswidth = 100;
+        var sysheight = 100.0 * effectiveheight / effectivewidth;
+        graph.nodes = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            var node = {name: i, id: "circle#id" + i, degree: 0};
+            node.sysx = syswidth * Math.random();
+            node.sysy = sysheight * Math.random();
+            node.x = dc.boundary + node.sysx / 100 * effectivewidth;
+            node.y = dc.boundary + node.sysy / sysheight * effectiveheight;
+            node.group = 0;
+            node.weight = 1;
+            graph.nodes.push(node);
+        }
+
+        graph.links = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            for (var j = i + 1; j < graph.nrNodes; j++) {
+                var distance = Math.sqrt(Math.pow(graph.nodes[i].sysx - graph.nodes[j].sysx, 2) + Math.pow(graph.nodes[i].sysy - graph.nodes[j].sysy, 2));
+
+                var linkprob = graph.lambda / Math.pow(distance, graph.alpha);
+
+                if (linkprob > Math.random()) {
+                    var link = {source: i, target: j, le: Math.ceil(distance)};
+                    graph.links.push(link);
+                    link.name = "idlink" + i + "t" + j;
+                    graph.nodes[i].degree++;
+                    graph.nodes[j].degree++;
+                }
+            }
+        }
+        graph.maxDegree = graph.nodes[0].degree;
+        for (var i = 1; i < graph.nrNodes; i++) {
+            graph.maxDegree = Math.max(graph.nodes[i].degree, graph.maxDegree);
+        }
+        createUndirectedSimpleGraphSparse();
+    }
+
+    function removeRandomElement(array) {
+        var index = Math.floor(Math.random() * array.length);
+        var ca = array.splice(index, 1)[0];
+        return ca;
+    }
+
+    function removeElements(array, toRemove) {
+        var result = array.filter(function (item) {
+            return (toRemove.indexOf(item) === -1);
+        });
+        return result;
+    }
+
+
+    function getRandomElement(array) {
+        var index = Math.floor(Math.random() * array.length);
+        return array[index];
+    }
+
+    function createUndirectedSimpleGraphSparse() {
+        graph.undirectedSimple = [];
+        for (i = 0; i < graph.nodes.length; i++) {
+            graph.undirectedSimple[i] = [];
+        }
+
+        for (i = 0; i < graph.links.length; i++) {
+            var start = graph.links[i].source,
+                    end = graph.links[i].target;
+            graph.undirectedSimple[start].push(end);
+            graph.undirectedSimple[end].push(start);
+        }
+    }
+
+
+
+    //====================================Visual=========================
+
+    function initializeGraphic() {
+        dc.svg = d3.select("body").append("svg")
+                .attr("width", width).attr("height", height);
+        dc.backpannel = dc.svg.append("rect").attr("x", 0).attr("y", 0).attr("width", width).attr("height", height).style("fill", "#eee");
+
+        dc.link = dc.svg.selectAll("link")
+                .data(graph.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    var sourceNode = graph.nodes[l.source];
+                    d3.select(this).attr("y1", sourceNode.y);
+                    return sourceNode.x
+                })
+                .attr("x2", function (l) {
+                    var targetNode = graph.nodes[l.target];
+                    d3.select(this).attr("y2", targetNode.y);
+                    return targetNode.x
+                }).attr("id", function (d) {
+            if (d.source.name < d.target.name)
+                return "idlink" + d.source + "t" + d.target;
+            else
+                return "idlink" + d.target + "t" + d.source;
+        }).attr("status", 0).attr("group", 0);
+
+        dc.node = dc.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("id", function (n) {
+                    return "id" + n.name;
+                }).attr("status", 0).attr("group", 0).attr("fill", "#333").attr("r", 2).attr("cx", function (d) {
+            return d.x
+        }).attr("cy", function (d) {
+            return d.y
+        });/*.on('mouseover', function (d) {
+         highlightPoint(d);
+         }).on('mouseout', function (d) {
+         unhighlightPoint(d);
+         });  */
+    }
+    ;
+
+    function unhighlightPoint() {
+        dc.link.style("stroke", "#777");
+        dc.node.attr("fill", function (d) {
+            return colorMap(d.degree, 1, graph.maxDegree);
+        });
+    }
+
+    function highlightPoint(node) {
+        dc.node.attr("fill", "#567769");
+        dc.link.style("stroke", "#444");
+
+        for (i = 0; i < graph.undirectedSimple[node.name].length; i++) {
+            var nn = graph.nodes[graph.undirectedSimple[node.name][i]];
+            for (j = 0; j < graph.undirectedSimple[nn.name].length; j++) {
+                var nnn = graph.nodes[graph.undirectedSimple[nn.name][j]];
+                dc.svg.selectAll(nnn.id).attr("fill", "#199916");
+            }
+        }
+        for (i = 0; i < graph.undirectedSimple[node.name].length; i++) {
+            var nn = graph.nodes[graph.undirectedSimple[node.name][i]];
+            dc.svg.selectAll(nn.id).attr("fill", "#28d6d3");
+        }
+        dc.svg.selectAll(node.id).attr("fill", "#ffe900");
+    }
+
+    </script>
+

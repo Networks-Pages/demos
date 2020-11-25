@@ -1,0 +1,291 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Raleway" />
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+    <script src="../SharedResources/d3.min.js"></script>
+
+    <h2 style="font-family: Raleway">
+        Dijkstra-Algorithm
+    </h2>
+
+    <script>
+var graph = {
+   nodes: [
+       { name: 0,  x: 150, y: 80, dist: 0, solved:true },
+       { name: 1,  x: 120, y: 270, dist: -1, solved:false },
+       { name: 2,  x: 270, y: 110, dist: -1, solved:false },
+       { name: 3,  x: 290, y: 250, dist: -1, solved:false },
+       { name: 4,  x: 370, y: 60, dist: -1, solved:false },
+       { name: 5,  x: 380, y: 160, dist: -1, solved:false },
+       { name: 6,  x: 560, y: 50, dist: -1, solved:false },
+       { name: 7,  x: 500, y: 170, dist: -1, solved:false },
+       { name: 8,  x: 480, y: 250, dist: -1, solved:false },
+       { name: 9,  x: 690, y: 110, dist: -1, solved:false }, 
+       { name: 10,  x: 700, y: 210, dist: -1, solved:false }
+       ],
+   links: [
+       { source: 0,  target: 1},
+       { source: 0,  target: 2},
+       { source: 0,  target: 3},
+       { source: 1,  target: 2},
+       { source: 1,  target: 3},
+       { source: 2,  target: 4},
+       { source: 2,  target: 5},
+       { source: 3,  target: 8},
+       { source: 4,  target: 6},
+       { source: 5,  target: 6},
+       { source: 5,  target: 8},
+       { source: 6,  target: 7},
+       { source: 6,  target: 9},
+       { source: 7,  target: 8},
+       { source: 7,  target: 9},
+       { source: 7,  target: 10},
+       { source: 8,  target: 10},
+       { source: 9,  target: 10},
+    ], maxx:460, maxy:230
+ };
+    var width = window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+        height = window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+        color = d3.scale.category20(),
+        displaycontainer={};
+        displaycontainer.animationTime=1000;
+
+    function draw() {
+    for(i=0;i<graph.links.length;i++){
+        graph.links[i].le=Math.ceil(Math.random()*10);
+    }
+    graph.activeNode=0;
+    graph.checkedNodes=[];
+    displaycontainer.animationStep=0;
+    displaycontainer.svg = d3.select("body")
+      .append("svg").attr("width", width).attr("height", height);
+
+    displaycontainer.links = displaycontainer.svg.selectAll("link")
+      .data(graph.links)
+      .enter()
+      .append("line")
+      .attr("class", "link")
+      .attr("x1", function(l) {
+        var sourceNode = graph.nodes.filter(function(d, i) {
+          return i === l.source
+        })[0];
+        d3.select(this).attr("y1", sourceNode.y);
+        return sourceNode.x
+      })
+      .attr("x2", function(l) {
+        var targetNode = graph.nodes.filter(function(d, i) {
+          return i == l.target
+        })[0];
+        d3.select(this).attr("y2", targetNode.y);
+        return targetNode.x
+      })
+      .attr("fill", "none")
+      .attr("stroke", "white");
+      
+       displaycontainer.linkLabel=[];
+       for(i=0;i<graph.links.length;i++){
+        var d=graph.links[i];
+        displaycontainer.linkLabel.push(displaycontainer.svg.append('svg:text')
+              .attr('class', 'aEnd')
+              .attr('x', (graph.nodes[d.source].x+graph.nodes[d.target].x)/2-20 )
+              .attr('y', (graph.nodes[d.source].y+graph.nodes[d.target].y)/2 )
+              .attr('text-anchor', 'right')
+              .text(d.le).attr("font-size", "20px"));
+        }
+  
+  
+  
+     displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+    .data(graph.nodes)
+    .enter().append("g")
+    .attr("class", "node");
+    
+    displaycontainer.nodes.append("circle")
+    .attr("r", 21).attr("cx", function(d) {
+        return d.x
+      })
+      .attr("cy", function(d) {
+        return d.y
+      }).attr("fill","#000000");
+
+    displaycontainer.innerCycles=displaycontainer.nodes.append("circle")
+    .attr("r", 20).attr("cx", function(d) {
+        return d.x
+      })
+      .attr("cy", function(d) {
+        return d.y
+      }).attr("fill", function(d) {
+        if (d.name===graph.activeNode) return "#FFFF00";
+        else return "#FFFFFF";
+      });
+
+    displaycontainer.distanceLabels=displaycontainer.nodes.append("text").attr("x", function(d) {
+        if (d.dist>9)  return d.x-13;
+        else if (d.dist===-1) return d.x-10;
+        else return d.x-7;
+      })
+      .attr("y", function(d) {
+        return d.y+8;
+      })
+    .text(function(d) { 
+        if (d.dist===-1) return "∞";
+        else return d.dist }).attr('text-anchor', 'center').attr("font-size", "27px");
+    
+    displaycontainer.intervalID=setTimeout(function () {
+            showAlgorithm();
+    }, displaycontainer.animationTime);
+        
+    }
+    
+    function showAlgorithm(){
+        //Step ONE color links
+        if (displaycontainer.animationStep === 0){
+        graph.activeNeighbors=[];
+        displaycontainer.links.transition().duration(500).attr("stroke-width", function (d){ 
+            if ((graph.nodes[d.source].name===graph.activeNode)||(graph.nodes[d.target].name===graph.activeNode)) {
+               if ((graph.nodes[d.source].name===graph.activeNode)&&(graph.nodes[d.target].name===graph.activeNode)){
+                   return "1px";// both end already considered, so no need to do is once more
+               }
+               else return "3px";
+            }
+            else return "1px"; 
+        }).style("stroke", function (d){ 
+            if ((graph.nodes[d.source].name===graph.activeNode)||(graph.nodes[d.target].name===graph.activeNode)) {
+               if ((graph.nodes[d.source].name===graph.activeNode)&&(graph.nodes[d.target].name===graph.activeNode)){
+                   return "#999999";// both end already considered, so no need to do is once more
+               }
+               else {
+                   if (graph.nodes[d.source].name===graph.activeNode) graph.activeNeighbors.push(graph.nodes[d.target].name);
+                   else graph.activeNeighbors.push(graph.nodes[d.source].name);
+                   return "#00CC00";
+               }
+            }
+            else return "#999999"; 
+        });
+        displaycontainer.animationStep=1;
+        }
+        else if (displaycontainer.animationStep === 1){
+        //Step two color neighbors
+                displaycontainer.innerCycles.transition().duration(500).attr("fill", function(d) {
+                if (graph.activeNode===d.name) return "#FFFF00";
+                else if (graph.checkedNodes.indexOf(d.name)!==-1) return "#DDDDDD";
+                else if (graph.activeNeighbors.indexOf(d.name)!==-1) return "#00CC00";
+                else return "#FFFFFF";
+            });
+            displaycontainer.animationStep=2;
+        }
+        else if (displaycontainer.animationStep === 2){
+        //Step three update distances
+            computeNextDistances();
+            displaycontainer.distanceLabels.text(function(d) { 
+            if (d.dist===-1) return "∞";
+            else return d.dist }).attr("x", function(d) {
+                if (d.dist>9)  return d.x-13;
+                else if (d.dist===-1) return d.x-10;
+                else return d.x-7;
+              })
+              .attr("y", function(d) {
+                return d.y+8;
+              });
+             displaycontainer.animationStep=3; 
+        } else if (displaycontainer.animationStep === 3){
+            computeRolesOfNodes();
+            displaycontainer.links.transition().duration(500).attr("stroke-width", "1px" ).style("stroke",  "#999999");
+            displaycontainer.innerCycles.transition().duration(500).attr("fill", function(d) {
+                if (graph.checkedNodes.indexOf(d.name)===-1) return "#FFFFFF";
+                else return "#DDDDDD";
+            });
+            displaycontainer.animationStep=0;
+        }
+    
+        if (graph.checkedNodes.length!==graph.nodes.length) {
+            displaycontainer.intervalID=setTimeout(function () {
+                showAlgorithm();
+            }, displaycontainer.animationTime);
+        }
+        else {
+             displaycontainer.intervalID=setTimeout(function () {
+                resetInitialData();
+            }, 15000);
+        }
+    }
+    
+    function computeNextDistances(){
+        for(i=0;i<graph.links.length;i++){
+            var base=graph.nodes[graph.activeNode].dist;
+            var len=graph.links[i].le;
+            if (graph.links[i].source===graph.activeNode){
+                var oldvalue=graph.nodes[graph.links[i].target].dist;
+                if (oldvalue===-1) graph.nodes[graph.links[i].target].dist=base+len;
+                else graph.nodes[graph.links[i].target].dist=Math.min(oldvalue,base+len);
+            } else if (graph.links[i].target===graph.activeNode){
+                var oldvalue=graph.nodes[graph.links[i].source].dist;
+                if (oldvalue===-1) graph.nodes[graph.links[i].source].dist=base+len;
+                else graph.nodes[graph.links[i].source].dist=Math.min(oldvalue,base+len);
+            }
+        }
+    }
+    function computeRolesOfNodes(){
+        // find the point with the smallest distance. 
+        graph.checkedNodes.push(graph.activeNode);
+        var minindex=-1, minvalue=40000;
+        if (graph.checkedNodes.length!==graph.nodes.length){
+            for(i=0;i<graph.nodes.length;i++){
+                if (graph.checkedNodes.indexOf(i)===-1){
+                    if (graph.nodes[i].dist!==-1){
+                        if (minindex===-1) {
+                            minindex=i;
+                            minvalue=graph.nodes[i].dist;
+                        } else {
+                            if(minvalue>graph.nodes[i].dist)
+                            {
+                                minindex=i;
+                                minvalue=graph.nodes[i].dist;
+                            }
+                        }
+                    } 
+                }
+            } 
+        }
+        
+        graph.activeNode=minindex;
+        console.log("Set "+graph.activeNode);
+    }
+    
+    function resetInitialData(){
+        for(i=0;i<graph.links.length;i++){
+            graph.links[i].le=Math.ceil(Math.random()*10);
+        }
+        for(i=1;i<graph.nodes.length;i++){
+            graph.nodes[i].dist=-1;
+        }
+        for(i=0;i<graph.links.length;i++){
+            displaycontainer.linkLabel[i].text(graph.links[i].le);
+        }
+        displaycontainer.distanceLabels.text(function(d) { 
+            if (d.dist===-1) return "∞";
+            else return d.dist }).attr("x", function(d) {
+                if (d.dist>9)  return d.x-13;
+                else if (d.dist===-1) return d.x-10;
+                else return d.x-7;
+              })
+              .attr("y", function(d) {
+                return d.y+8;
+              });
+  
+        graph.activeNode=0;
+        graph.checkedNodes=[];
+        displaycontainer.animationStep=0;
+        displaycontainer.intervalID=setTimeout(function () {
+            showAlgorithm();
+        }, displaycontainer.animationTime);
+        
+    }
+    </script>

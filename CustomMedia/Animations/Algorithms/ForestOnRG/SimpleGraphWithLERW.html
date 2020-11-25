@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+
+
+<style>
+    .link {
+        stroke: #777;
+        stroke-opacity: 1.2;
+        stroke-width:0.7px;
+    }
+    .node{
+        stroke:#fff;
+        stroke-width:0px;
+    }
+</style>
+<body onload="draw()">
+    <script src="d3.min.js"></script>
+
+    <script>
+    var width = 0.99 * window.innerWidth || document.documentElement.clientWidth || document.getElementsByTagName('body')[0].clientWidth,
+            height = 0.99 * window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight,
+            graph = {}, dc = {};
+
+    dc.defaultLineGray = "#777";
+    dc.color = ["#f25006", "#80ba01", "#ffb902", "#02a4ef", "#8b1599", "#726906"];
+    dc.SIRColorMap = ["#c81919", "#7cb714", "#517bba", "#517bba", "#517bba"];
+    dc.intervalID = [];
+    dc.status;
+    dc.cc=0;
+    dc.textspace = 60;
+    dc.animationTime =20;
+    var picC = {};
+    var picPlot = {};
+
+
+    function getUrlVars() {
+        var vars = {};
+        var parts = window.location.href.replace(/[?&]+([^=&]+)=([^&]*)/gi, function (m, key, value) {
+            vars[key] = value;
+        });
+        return vars;
+    }
+
+    function setModelParameters() {
+        var passedParameters = getUrlVars();
+        if (isNaN(passedParameters.n))
+            graph.nrNodes = 800;
+        else
+            graph.nrNodes = parseInt(passedParameters.n);
+
+        if (isNaN(passedParameters.alpha))
+            graph.alpha = 3.4;
+        else
+            graph.alpha = parseFloat(passedParameters.alpha);
+
+        if (isNaN(passedParameters.lambda))
+            graph.lambda = 10;
+        else
+            graph.lambda = parseFloat(passedParameters.lambda);
+
+        graph.gamma = graph.alpha * (graph.tau - 1) * 1.0 / 2;
+    }
+
+    function draw() {
+        setModelParameters();
+        dc.status = 1;
+        createGraph();
+        initializeGraphic();
+        startWalker();
+        var att=[];
+        for(i=0;i<12;i++){
+            att.push(i);
+        }
+    }
+    ;
+
+    function startWalker() {
+        var walker={pathID : 1};
+        walker.position = getRandomElement(graph.nodes);
+        walker.formerPositions=[];
+        walker.formerEdges=[];
+        walker.formerPositions.push(walker.position);
+        dc.usedId=100000;
+        dc.intervalID.push(setTimeout(function () {
+                animateWalker(walker);
+        }, dc.animationTime));
+    }
+
+    function eraseLoopWalking(walker) {
+        var firstPosition=-1;
+        for (i=0;i<walker.formerPositions.length;i++){
+            if (walker.formerPositions[i].name===walker.position.name){
+                firstPosition=i;
+                i=walker.formerPositions.length+10;
+            }
+        }
+        if (firstPosition===-1) {
+            walker.formerPositions.push(walker.position);
+            return true;
+        } else {
+            var cutoff= walker.formerPositions.splice(firstPosition+1);
+            cutoff.forEach(function (item) {
+                dc.svg.selectAll(item.id).style("fill", "#00e");
+            });
+            var cutoff2= walker.formerEdges.splice(firstPosition);
+            if(dc.cc%20==0){
+                dc.link.style("stroke-width", "0.5px").style("stroke", dc.defaultLineGray);
+                walker.formerEdges.forEach(function (item) {
+                        dc.svg.selectAll(item.id).style("stroke-width", "2px").style("stroke",dc.SIRColorMap[0]);
+                    });
+            } else {
+            cutoff2.forEach(function (item) {
+                dc.svg.selectAll(item.id).transition().duration(dc.animationTime*0.8).style("stroke-width", "0.4px").style("stroke",dc.defaultLineGray );
+            });}
+            return false;
+        }
+    }
+    
+    function animateWalker(walker) {
+        dc.cc++;
+        var position=walker.position;
+        position.group = 0;
+        dc.svg.selectAll(position.id).style("fill", dc.color[0]);
+        var tmpList = [];
+        graph.undirectedSimple[position.name].forEach(function (item) {
+            if (graph.nodes[item].group === 0) {
+                tmpList.push(item);
+            }
+        });
+        if (tmpList.length > 0) {
+            var next =graph.nodes[getRandomElement(tmpList)];
+            var newEdge = {};
+            newEdge.source = position.name;
+            newEdge.target = next.name;
+            newEdge.notjetanimated = true;
+            if (next.name > position.name) {
+                newEdge.id = "line#" + "idlink" + next.name + "t" + position.name;
+            } else {
+                newEdge.id = "line#" + "idlink" + position.name + "t" + next.name;
+            }
+
+            animateEdge(newEdge);  
+            
+            dc.intervalID.push(setTimeout(function () {
+                walker.position=next;
+                if (eraseLoopWalking(walker))
+                    walker.formerEdges.push(newEdge);
+                animateWalker(walker);
+            }, dc.animationTime));
+        }
+     
+
+    }
+
+    function animateEdge(edge) {
+        if (edge.notjetanimated) {
+            edge.notjetanimated = false;
+            dc.svg.selectAll(edge.id).transition().duration(dc.animationTime*0.4).style("stroke-width", "4px").style("stroke", dc.SIRColorMap[0]);
+            
+            dc.intervalID.push(setTimeout(function () {
+                dc.svg.selectAll(edge.id).transition().duration(dc.animationTime*0.5).style("stroke-width", "2px").style("stroke", dc.SIRColorMap[0]);
+            }, dc.animationTime*0.4));  
+                
+            dc.usedId++;
+            var start = graph.nodes[edge.source];
+            var end = graph.nodes[edge.target];
+            dc.svg.append("circle").attr("class", "walker")
+                    .attr("id", "id" + dc.usedId).attr("cx", start.x).attr("cy", start.y).attr("r", 2).style("fill", dc.SIRColorMap[0]);
+            var nodeIdtag = "circle#id" + dc.usedId;
+
+            var timeStart = 0.15 * dc.animationTime;
+            var timeTravel = 0.7 * dc.animationTime;
+            var timeEnter = 0.1 * dc.animationTime;
+
+            dc.svg.selectAll(nodeIdtag).attr("r", 1).attr("cy", start.y);
+            dc.svg.selectAll(nodeIdtag).transition().duration(timeStart * 0.95).attr("r", 6).attr("cy", start.y - 5);
+            dc.intervalID.push(setTimeout(function () {
+                dc.svg.selectAll(nodeIdtag).transition().duration(timeTravel * 0.95).attr("r", 4).attr("cx", end.x).attr("cy", end.y - 5);
+                dc.intervalID.push(setTimeout(function () {
+                    dc.svg.selectAll(nodeIdtag).transition().duration(timeEnter * 0.95).attr("r", 2).attr("cx", end.x).attr("cy", end.y);
+                    dc.intervalID.push(setTimeout(function () {
+                        dc.svg.selectAll(nodeIdtag).remove();
+                    }, timeEnter));
+                }, timeTravel));
+            }, timeStart));
+        
+        }
+    }
+    
+    function randomInt(max) {
+        return Math.floor(Math.random() * max);
+    }
+
+
+
+//====================Graph creation
+    function createGraph() {
+        dc.boundary = Math.max(10, width * 0.001);
+        var effectivewidth = (width - 2 * dc.boundary);
+        var effectiveheight = (height - 2 * dc.boundary);
+        var syswidth = 100;
+        var sysheight = 100.0 * effectiveheight / effectivewidth;
+        graph.nodes = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            var node = {name: i, id: "circle#id" + i, degree: 0};
+            node.sysx = syswidth * Math.random();
+            node.sysy = sysheight * Math.random();
+            node.x = dc.boundary + node.sysx / 100 * effectivewidth;
+            node.y = dc.boundary + node.sysy / sysheight * effectiveheight;
+            node.group = 0;
+            node.weight = 1;
+            graph.nodes.push(node);
+        }
+        console.log(graph.nodes.length + "  given " + graph.nrNodes);
+        graph.links = [];
+        for (var i = 0; i < graph.nrNodes; i++) {
+            for (var j = i + 1; j < graph.nrNodes; j++) {
+                var distance = Math.sqrt(Math.pow(graph.nodes[i].sysx - graph.nodes[j].sysx, 2) + Math.pow(graph.nodes[i].sysy - graph.nodes[j].sysy, 2));
+
+                var linkprob = graph.lambda / Math.pow(distance, graph.alpha);
+                //console.log(distance+"  --> "+ linkprob);
+
+                if (linkprob > Math.random()) {
+                    var link = {source: i, target: j, le: Math.ceil(distance)};
+                    graph.links.push(link);
+                    link.name = "idlink" + i + "t" + j;
+                    graph.nodes[i].degree++;
+                    graph.nodes[j].degree++;
+                }
+            }
+        }
+        graph.maxDegree = graph.nodes[0].degree;
+        for (var i = 1; i < graph.nrNodes; i++) {
+            graph.maxDegree = Math.max(graph.nodes[i].degree, graph.maxDegree);
+        }
+        createUndirectedSimpleGraphSparse();
+    }
+
+    function removeRandomElement(array) {
+        var index = Math.floor(Math.random() * array.length);
+        var ca = array.splice(index, 1)[0];
+        return ca;
+    }
+
+    function getRandomElement(array) {
+        var index = Math.floor(Math.random() * array.length);
+        return array[index];
+    }
+
+    function createUndirectedSimpleGraphSparse() {
+        graph.undirectedSimple = [];
+        for (i = 0; i < graph.nodes.length; i++) {
+            graph.undirectedSimple[i] = [];
+        }
+
+        for (i = 0; i < graph.links.length; i++) {
+            var start = graph.links[i].source,
+                    end = graph.links[i].target;
+            graph.undirectedSimple[start].push(end);
+            graph.undirectedSimple[end].push(start);
+        }
+        graph.maxDegree=graph.undirectedSimple[0].length;
+        for (i = 1; i < graph.nodes.length; i++) {
+            graph.maxDegree=Math.max(graph.maxDegree,graph.undirectedSimple[i].length);
+        }
+    }
+
+
+
+    //====================================Visual=========================
+
+    function initializeGraphic() {
+        dc.svg = d3.select("body").append("svg")
+                .attr("width", width).attr("height", height);
+        dc.backpannel = dc.svg.append("rect").attr("x", 0).attr("y", 0).attr("width", width).attr("height", height).style("fill", "#eee");
+
+        dc.link = dc.svg.selectAll("link")
+                .data(graph.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    var sourceNode = graph.nodes[l.source];
+                    d3.select(this).attr("y1", sourceNode.y);
+                    return sourceNode.x
+                })
+                .attr("x2", function (l) {
+                    var targetNode = graph.nodes[l.target];
+                    d3.select(this).attr("y2", targetNode.y);
+                    return targetNode.x
+                }).attr("id", function (d) {
+            if (d.source.name < d.target.name)
+                return "idlink" + d.source + "t" + d.target;
+            else
+                return "idlink" + d.target + "t" + d.source;
+        });
+
+        dc.node = dc.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("id", function (n) {
+                    return "id" + n.name;
+                }).attr("fill", "#333").attr("r", 4).attr("cx", function (d) {
+            return d.x
+        }).attr("cy", function (d) {
+            return d.y
+        });/*.on('mouseover', function (d) {
+         highlightPoint(d);
+         }).on('mouseout', function (d) {
+         unhighlightPoint(d);
+         });  */
+    }
+    ;
+
+    function unhighlightPoint() {
+        dc.link.style("stroke", "#777");
+        dc.node.attr("fill", function (d) {
+            return colorMap(d.degree, 1, graph.maxDegree);
+        });
+    }
+
+    function highlightPoint(node) {
+        dc.node.attr("fill", "#567769");
+        dc.link.style("stroke", "#444");
+
+        for (i = 0; i < graph.undirectedSimple[node.name].length; i++) {
+            var nn = graph.nodes[graph.undirectedSimple[node.name][i]];
+            for (j = 0; j < graph.undirectedSimple[nn.name].length; j++) {
+                var nnn = graph.nodes[graph.undirectedSimple[nn.name][j]];
+                dc.svg.selectAll(nnn.id).attr("fill", "#199916");
+            }
+        }
+        for (i = 0; i < graph.undirectedSimple[node.name].length; i++) {
+            var nn = graph.nodes[graph.undirectedSimple[node.name][i]];
+            dc.svg.selectAll(nn.id).attr("fill", "#28d6d3");
+        }
+        dc.svg.selectAll(node.id).attr("fill", "#ffe900");
+    }
+
+    </script>
+
