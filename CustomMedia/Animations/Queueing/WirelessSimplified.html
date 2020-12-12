@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="http://fonts.googleapis.com/css?family=Raleway" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
+          integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
+          crossorigin="anonymous">
+    <style>
+      body,
+      html,
+      .container-fluid {
+        height: 100%;
+      }
+
+      body {
+        font-family: 'Raleway', sans-serif !important;
+      }
+
+      input[type="number"] {
+        max-width: 6rem;
+      }
+
+      #canvas {
+        height: 100%;
+        overflow: hidden;
+        margin: 0 -15px;
+        border-top: 1px solid #000;
+      }
+
+      .divider-horizontal,
+      .divider-vertical {
+        stroke: #000;
+        stroke-width: 1;
+      }
+
+      .hist-bar {
+        fill: #e5f5e0;
+        stroke: #31a354;
+        stroke-width: 1;
+      }
+
+      .link {
+        stroke: #555;
+        stroke-width: 1;
+      }
+
+      .node circle { /* actual node */
+        fill: #DDFFFF;
+        stroke: #000;
+        stroke-width: 1;
+      }
+
+      .node path { /* messages in the node's queue */
+        fill: #000;
+      }
+
+      .tm {
+        fill: rgba(255, 170, 170, 0.5);
+        stroke: #7f5555;
+        stroke-width: 0.5;
+      }
+
+      .x-axis path,
+      .x-axis line,
+      .y-axis path,
+      .y-axis line {
+          fill: none;
+          stroke: #000;
+          stroke-width: 1;
+          shape-rendering: crispEdges;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="../SharedResources/d3.min.js"></script>
+
+    <div class="container-fluid d-flex flex-column">
+      <div class="row">
+        <div class="col-12">
+          <h2 class="mt-3">Interference avoidance in wireless networks</h2>
+
+          <div class="form-inline my-3">
+            <div class="input-group mr-3">
+              <input type="number" class="form-control" id="nr-nodes"
+                  name="nr-nodes" aria-label="Number of nodes"
+                  min="10" max="50" value="30" />
+              <div class="input-group-append">
+                <span class="input-group-text">nodes</span>
+              </div>
+            </div>
+
+            <div class="input-group mr-3">
+              <input type="number" class="form-control" id="length-queues"
+                  name="length-queues" aria-label="Queue length"
+                  min="2" max="20" value="10" />
+              <div class="input-group-append">
+                <span class="input-group-text">queue length</span>
+              </div>
+            </div>
+          </div><!-- /.form-inline -->
+        </div>
+      </div>
+      <div class="row flex-grow-1 overflow-hidden">
+        <div class="col-12 h-100">
+          <div id="canvas"></div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ----- CONSTANTS -------------------------------------------------------
+      const NODE_MIN_DIST_SQUARED = 3600,
+            TRANSMISSION_RANGE_MIN = 50,
+            TRANSMISSION_RANGE_MAX = 50;
+
+      // ----- GLOBALS ---------------------------------------------------------
+      var model = {},
+          vis = {
+            padding: {
+              chart: 75,
+              network: 25
+            },
+            nodeRadius: 14
+          };
+
+      // ----- CLASSES ---------------------------------------------------------
+      function InputValues() {
+        this.getNumberInputValue = function(id) {
+          return parseInt(document.getElementById(id).value, 10);
+        }
+
+        this.dimensions = [vis.width, vis.height];
+        this.nrNodes = this.getNumberInputValue('nr-nodes');
+        this.queueLength = this.getNumberInputValue('length-queues');
+
+        this.equals = function(that) {
+          if (!(that instanceof InputValues))  return false;
+          if (this.dimensions[0] !== that.dimensions[0])  return false;
+          if (this.dimensions[1] !== that.dimensions[1])  return false;
+          if (this.nrNodes !== that.nrNodes)  return false;
+          if (this.queueLength !== that.queueLength)  return false;
+          return true;
+        }
+      }
+
+      function Node(toCopy = null) {
+        /**
+         * Sleep either randomly, or dependent on queue length.
+         */
+        this.activateLater = function() {
+          if (this.graph === 0) {
+            callLater(this, this.tryActivate, 250, 500);
+          } else {
+            let ratio = (model.inputs.queueLength - this.queueLength + 1) /
+                    (model.inputs.queueLength + 1);
+            callLater(this, this.tryActivate, 0.5 * ratio * 500, ratio * 500);
+          }
+        }
+
+        this.addPacket = function() {
+          this.queueLength++;
+          this.repaintQueue();
+          callLater(this, this.tryActivate, 0, 50);
+        }
+
+        this.copy = function() {
+          return new Node(this);
+        }
+
+        this.deactivate = function() {
+          var node = this;
+          this.d3transmission.transition()
+            .duration(400)
+            .attr('r', 0)
+            .each('end', function() {
+              node.active = 0;
+              node.activateLater();
+            });
+        }
+
+        this.distanceTo = function(node, squared = false) {
+          var dx = node.x - this.x,
+              dy = node.y - this.y,
+              distSquared = dx * dx + dy * dy;
+          if (squared)  return distSquared;
+          return Math.sqrt(distSquared);
+        }
+
+        this.isCloseToAnotherNode = function() {
+          for (let node of model.graphs[0].nodes) {
+            if (this.distanceTo(node, true) < NODE_MIN_DIST_SQUARED) {
+              return true;
+            }
+          }
+          return false;
+        }
+
+        this.isNeighborActive = function() {
+          return this.neighbors.some((n) => (n.active > 0));
+        }
+
+        this.repaintQueue = function() {
+          this.d3node.selectAll('.queue').remove();
+          var anglePerQueue = (2 * Math.PI) / model.inputs.queueLength;
+          for (let i = 0; i < this.queueLength; ++i) {
+            this.d3node.append('path')
+              .classed('queue', true)
+              .attr('d', d3.svg.arc()
+                .innerRadius(1)
+                .outerRadius(vis.nodeRadius * 0.8)
+                .startAngle(i * anglePerQueue)
+                .endAngle((i + 1) * anglePerQueue)
+                .padAngle(0.1)
+              )
+              .attr('transform', `translate(${this.x}, ${this.y})`);
+          }
+        }
+
+        this.tryActivate = function() {
+          // only do something if we are sleeping and have packets queued
+          if (this.active === 0 && this.queueLength > 0) {
+            // we are woken up, try to activate
+            if (this.isNeighborActive()) {
+              // failed attempt
+              model.activations[this.graph].fail++;
+              this.activateLater();
+            } else {
+              // successful attempt at activating
+              model.activations[this.graph].success++;
+              this.active = 1;
+              this.d3transmission.transition()
+                .duration(400)
+                .attr('r', this.transmissionRange);
+              this.queueLength--;
+              this.repaintQueue();
+              callLater(this, this.deactivate, 1600);
+            }
+          }
+        }
+
+        // constructor
+        if (toCopy === null) {
+          do {
+              this.x = randomInt(vis.padding.network,
+                                 vis.width / 2 - vis.padding.network);
+              this.y = randomInt(vis.padding.network,
+                                 vis.height / 2 - vis.padding.network);
+          } while (this.isCloseToAnotherNode());
+          this.active = 0;
+          this.transmissionRange = randomInt(TRANSMISSION_RANGE_MIN,
+                                             TRANSMISSION_RANGE_MAX);
+          this.queueLength = 0;
+          this.neighbors = [];
+        } else {
+          this.x = toCopy.x;
+          this.y = toCopy.y;
+          this.active = toCopy.active;
+          this.transmissionRange = toCopy.transmissionRange;
+          this.queueLength = toCopy.queueLength;
+          this.neighbors = [];
+        }
+      }
+
+      // ----- FUNCTIONS -------------------------------------------------------
+      function callLater(context, func, minDelay, maxDelay = false) {
+        if (maxDelay === false)  maxDelay = minDelay;
+        setTimeout(function() {
+          func.call(context);
+        }, randomInt(minDelay, maxDelay));
+      }
+
+      /**
+       * Either select an existing element using D3, or create an element
+       * at expected location and with specified classname or ID.
+       */
+      function d3SelectOrCreate(parentSelector, tagName, childSelector = null) {
+        const parentIsD3 = (parentSelector instanceof d3.selection);
+        var result;
+        const qs = (childSelector === null ? tagName : childSelector);
+        if (parentIsD3) {
+          result = parentSelector.select(qs);
+        } else {
+          result = d3.select(parentSelector + ' ' + qs);
+        }
+        if (result.size() === 0) {
+          result = (parentIsD3 ? parentSelector : d3.select(parentSelector))
+                    .append(tagName);
+          if (childSelector !== null) {
+            let name = childSelector.substring(1);
+            if (childSelector[0] === '#')  result.attr('id', name);
+            if (childSelector[0] === '.')  result.classed(name, true);
+          }
+        }
+        return result;
+      }
+
+      /**
+       * Generate a graph for the model, based on the inputs.
+       * This function in fact generates two copies of the same graph, for the
+       * purpose of comparing different models on the same graph.
+       */
+      function generateGraph(numCopies = 2) {
+        var graph = {nodes: []};
+        model.graphs = [graph];
+        for (let i = 0; i < model.inputs.nrNodes; ++i) {
+          let node = new Node();
+          node.graph = 0;
+          graph.nodes.push(node);
+        }
+
+        var links = [];
+        for (let i = 0; i < model.inputs.nrNodes; ++i) {
+            let nodeI = graph.nodes[i];
+            for (let j = 0; j < i; ++j) {
+                let nodeJ = graph.nodes[j];
+                if (nodeI.transmissionRange + nodeJ.transmissionRange >=
+                        nodeI.distanceTo(nodeJ)) {
+                    links.push([i, j]);
+                }
+            }
+        }
+
+        for (let i = 1; i < numCopies; ++i) {
+          let copyGraph = {nodes: []};
+          for (let node of graph.nodes) {
+            let copyNode = node.copy();
+            copyNode.graph = i;
+            copyGraph.nodes.push(copyNode);
+          }
+          model.graphs.push(copyGraph);
+        }
+
+        var graphId = 0;
+        for (let graph of model.graphs) {
+          graph.id = graphId++;
+          graph.links = [];
+          for (let link of links) {
+            let node0 = graph.nodes[link[0]],
+                node1 = graph.nodes[link[1]];
+            graph.links.push([node0, node1]);
+            node0.neighbors.push(node1);
+            node1.neighbors.push(node0);
+          }
+        }
+      }
+
+      function randomInt(min, max) {
+        if (min === max || max < min)  return min; // minor optimization
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+      }
+
+      // based on https://stackoverflow.com/a/27078401
+      // not perfect, but good enough (can be called faster after trailing call)
+      function throttle(callback, limit) {
+        var waiting = false,
+            needTrailing = false;
+        return function() {
+          if (!waiting) {
+            callback.apply(this, arguments);
+            waiting = true;
+            setTimeout(function() {
+              waiting = false;
+              if (needTrailing !== false) {
+                callback.apply(this, needTrailing);
+                needTrailing = false;
+              }
+            }, limit);
+          } else {
+            needTrailing = arguments;
+          }
+        };
+      }
+
+      /**
+       * Called periodically: add packets to nodes randomly; activate nodes if
+       * needed/possible; update charts.
+       */
+      function tick() {
+        model.activations = [];
+        model.packets = [];
+        model.queueLengths = [];
+        for (let _ of model.graphs) {
+          model.activations.push({fail: 0, success: 0});
+          model.packets.push(0);
+          model.queueLengths.push([]);
+        }
+
+        for (let i = 0; i < model.inputs.nrNodes; ++i) {
+          if (Math.random() < 0.2) {
+            for (let graph of model.graphs) {
+              if (graph.nodes[i].queueLength < model.inputs.queueLength) {
+                graph.nodes[i].addPacket();
+              }
+            }
+          }
+
+          for (let graph of model.graphs) {
+            model.packets[graph.id] += graph.nodes[i].queueLength;
+            model.queueLengths[graph.id].push(graph.nodes[i].queueLength);
+          }
+        }
+
+        updateCharts();
+      }
+
+      /**
+       * Create or update the canvas with content, reflecting the values of the
+       * inputs at the top of the page.
+       */
+      function updateCanvas() {
+        vis.svg = d3SelectOrCreate('#canvas', 'svg')
+          .attr('width', vis.width)
+          .attr('height', vis.height)
+          .attr('viewBox', `0 0 ${vis.width} ${vis.height}`);
+
+        {
+          let inputs = new InputValues();
+          if (!model.hasOwnProperty('inputs') || !model.inputs.equals(inputs)) {
+            model.inputs = inputs;
+            delete model.charts;
+            generateGraph();
+          }
+        }
+
+        updateClippingPaths();
+        updateDividers();
+
+        for (let component of ['links', 'transmissions', 'nodes']) {
+          vis[component] = [
+            d3SelectOrCreate(vis.svg, 'g', `#${component}-1`),
+            d3SelectOrCreate(vis.svg, 'g', `#${component}-2`)
+          ];
+          let funcName = `update${component[0].toUpperCase()}` +
+                component.substr(1);
+          window[funcName](vis[component][0], 0, 0, 0, 'network');
+          window[funcName](vis[component][1], 1, vis.width / 2, 0, 'network');
+        }
+      }
+
+      function updateCharts() {
+        // ensure that data exists
+        if (!model.hasOwnProperty('charts')) {
+          model.charts = {
+            data: [],
+            d3: []
+          };
+          for (let _ of model.graphs) {
+            model.charts.d3.push({});
+          }
+        }
+
+        for (let i = 0; i < model.graphs.length; ++i) {
+          let g = d3SelectOrCreate(vis.svg, 'g', `#chart-${i + 1}`)
+            .attr('transform', `translate(${i * (vis.width / 2) +
+                  vis.padding.chart}, ${vis.height / 2 + vis.padding.chart})`);
+
+          // update chart title
+          d3SelectOrCreate(g, 'text', '.title')
+            .attr('x', 0)
+            .attr('y', -vis.padding.chart / 3)
+            .text((i === 0 ? 'Independent activation' : 'Queue length dependent' +
+                ' activation') + ` (${model.packets[i]} packets queued)`);
+
+          // add entries
+          model.charts.data[i] = Object.keys(model.queueLengths[i])
+              .map((j) => model.queueLengths[i][j]);
+
+          // update or create charts
+          let d3vars = model.charts.d3[i];
+          d3vars.x = d3.scale.linear()
+            .range([0, vis.width / 2 - 2 * vis.padding.chart])
+            .domain([0, model.inputs.queueLength]);
+          d3vars.y = d3.scale.linear()
+            .range([vis.height / 2 - 2 * vis.padding.chart, 0])
+            .domain([0, model.inputs.nrNodes]);
+          d3vars.xAxis = d3.svg.axis().scale(d3vars.x)
+            .orient('bottom').ticks(5);
+          d3vars.yAxis = d3.svg.axis().scale(d3vars.y)
+            .orient('left').ticks(5);
+          d3vars.hist = d3.layout.histogram()
+            .range(d3vars.x.domain())
+            .bins(d3vars.x.domain()[1] + 1);
+          d3vars.bins = d3vars.hist(model.charts.data[i]);
+
+          let bars = g.selectAll('.hist-bar').data(d3vars.bins);
+          bars.exit().remove();
+          bars.enter().append('rect').classed('hist-bar', true)
+            .attr('x', (d) => d3vars.x(d.x))
+            .attr('y', d3vars.y(0))
+            .attr('width', (d) => d3vars.x(d.dx))
+            .attr('height', 0);
+          bars.transition().duration(400)
+            .attr('x', (d) => d3vars.x(d.x))
+            .attr('y', (d) => d3vars.y(d.y))
+            .attr('width', (d) => d3vars.x(d.dx))
+            .attr('height', (d) => d3vars.y(0) - d3vars.y(d.y));
+
+          d3SelectOrCreate(g, 'g', '.x-axis')
+            .attr('transform', `translate(0, ${vis.height / 2 -
+                2 * vis.padding.chart})`)
+            .call(d3vars.xAxis);
+          d3SelectOrCreate(g, 'g', '.y-axis')
+            .call(d3vars.yAxis);
+        }
+      }
+
+      /**
+       * Update or create clipping paths for a couple of quadrants. Uses global
+       * dimensions (\c vis.width, \c vis.height) and sets \c vis.clipPaths.
+       */
+      function updateClippingPaths() {
+        vis.clipPaths = [
+            d3SelectOrCreate(vis.svg, 'clipPath', '#clip-network')
+        ];
+
+        // clipping path for the network (also used for other quadrant by
+        // translating the entire group)
+        d3SelectOrCreate(vis.clipPaths[0], 'rect')
+            .attr('x', 0)
+            .attr('y', 0)
+            .attr('width', vis.width / 2)
+            .attr('height', vis.height / 2);
+      }
+
+      /**
+       * Set dimensions of the canvas, and make sure they are updated on
+       * resize of the container element that contains the canvas.
+       */
+      function updateDimensions() {
+        vis.width = vis.container.offsetWidth;
+        vis.height = vis.container.offsetHeight;
+
+        // respond to changes in canvas size
+        // from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+        const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
+          var containerWidth, containerHeight;
+          for (const entry of entries) {
+            if (entry.contentBoxSize) {
+              if (entry.contentBoxSize[0]) {
+                containerWidth = entry.contentBoxSize[0].inlineSize;
+                containerHeight = entry.contentBoxSize[0].blockSize;
+              } else {
+                containerWidth = entry.contentBoxSize.inlineSize;
+                containerHeight = entry.contentBoxSize.blockSize;
+              }
+            } else {
+              containerWidth = entry.contentRect.width;
+              containerHeight = entry.contentRect.height;
+            }
+          }
+          [vis.width, vis.height] = [containerWidth, containerHeight];
+          updateCanvas();
+        }, 1000));
+        canvasResizeObserver.observe(vis.container);
+      }
+
+      /**
+       * Update or create dividers between the four quadrants. Uses global
+       * dimensions (\c vis.width, \c vis.height) and sets \c vis.dividers.
+       */
+      function updateDividers() {
+        vis.dividers = [
+          d3SelectOrCreate(vis.svg, 'line', '.divider-horizontal'),
+          d3SelectOrCreate(vis.svg, 'line', '.divider-vertical')
+        ];
+
+        vis.dividers[0].attr('x1', 0);
+        vis.dividers[0].attr('y1', vis.height / 2);
+        vis.dividers[0].attr('x2', vis.width);
+        vis.dividers[0].attr('y2', vis.height / 2);
+
+        vis.dividers[1].attr('x1', vis.width / 2);
+        vis.dividers[1].attr('y1', 0);
+        vis.dividers[1].attr('x2', vis.width / 2);
+        vis.dividers[1].attr('y2', vis.height);
+      }
+
+      function updateLinks(container, graph, xOffset, yOffset, clipPath) {
+          container.attr('clip-path', `url(#clip-${clipPath})`)
+            .attr('transform', `translate(${xOffset}, ${yOffset})`);
+          let d3links = container.selectAll('.link')
+                .data(model.graphs[graph].links);
+          d3links.exit().remove();
+          d3links.enter().append('line')
+            .classed('link', true);
+          d3links
+            .attr('x1', (d) => d[0].x)
+            .attr('y1', (d) => d[0].y)
+            .attr('x2', (d) => d[1].x)
+            .attr('y2', (d) => d[1].y);
+      }
+
+      function updateNodes(container, graph, xOffset, yOffset, clipPath) {
+          container.attr('clip-path', `url(#clip-${clipPath})`)
+            .attr('transform', `translate(${xOffset}, ${yOffset})`);
+          let d3nodes = container.selectAll('.node')
+                .data(model.graphs[graph].nodes);
+          d3nodes.exit().remove();
+          d3nodes.enter().append('g')
+            .classed('node', true)
+            .append('circle')
+              .attr('r', vis.nodeRadius);
+          d3nodes.select('circle')
+            .attr('cx', (d) => d.x)
+            .attr('cy', (d) => d.y);
+
+          d3nodes.each(function(d) {
+            d.d3node = d3.select(this);
+            d.repaintQueue();
+          });
+      }
+
+      function updateTransmissions(container, graph, xOffset, yOffset,
+                                   clipPath) {
+          container.attr('clip-path', `url(#clip-${clipPath})`)
+            .attr('transform', `translate(${xOffset}, ${yOffset})`);
+          let d3tms = container.selectAll('.tm')
+                .data(model.graphs[graph].nodes);
+          d3tms.exit().remove();
+          d3tms.enter().append('circle')
+            .classed('tm', true);
+          d3tms
+            .attr('cx', (d) => d.x)
+            .attr('cy', (d) => d.y)
+            .attr('r', 0);
+
+          d3tms.each(function(d) {
+            d.d3transmission = d3.select(this);
+          });
+      }
+
+      // ----- MAIN ------------------------------------------------------------
+      vis.containerID = 'canvas';
+      vis.container = document.getElementById(vis.containerID);
+      updateDimensions();
+      updateCanvas();
+
+      for (let input of document.querySelectorAll('input')) {
+        input.addEventListener('change', () => updateCanvas());
+      }
+
+      setInterval(tick, 1000);
+    </script>
+  </body>
+</html>
