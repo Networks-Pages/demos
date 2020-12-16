@@ -110,7 +110,10 @@
 
     <script>
       // ----- CONSTANTS -------------------------------------------------------
-      const NODE_MIN_DIST_SQUARED = 3600,
+      const ACTIVATION_RATE_MS = 750,
+            ACTIVATION_RATE_OFFSET = 0.9,
+            NODE_MIN_DIST_SQUARED = 1200,
+            PACKET_SPAWN_PROBABILITY = 0.1,
             TRANSMISSION_RANGE_MIN = 50,
             TRANSMISSION_RANGE_MAX = 50;
 
@@ -150,18 +153,21 @@
          */
         this.activateLater = function() {
           if (this.graph === 0) {
-            callLater(this, this.tryActivate, 250, 500);
+            callLater(this, this.tryActivate,
+                ACTIVATION_RATE_OFFSET * ACTIVATION_RATE_MS,
+                ACTIVATION_RATE_MS);
           } else {
             let ratio = (model.inputs.queueLength - this.queueLength + 1) /
                     (model.inputs.queueLength + 1);
-            callLater(this, this.tryActivate, 0.5 * ratio * 500, ratio * 500);
+            callLater(this, this.tryActivate,
+                ACTIVATION_RATE_OFFSET * ratio * ACTIVATION_RATE_MS,
+                ratio * ACTIVATION_RATE_MS);
           }
         }
 
         this.addPacket = function() {
           this.queueLength++;
           this.repaintQueue();
-          callLater(this, this.tryActivate, 0, 50);
         }
 
         this.copy = function() {
@@ -175,7 +181,6 @@
             .attr('r', 0)
             .each('end', function() {
               node.active = 0;
-              node.activateLater();
             });
         }
 
@@ -218,13 +223,21 @@
         }
 
         this.tryActivate = function() {
+          // indicate the activation attempt
+          this.d3node.select('circle').transition()
+            .duration(100)
+            .attr('r', vis.nodeRadius * 1.1)
+            .each('end', function() {
+              d3.select(this).transition()
+                .duration(100)
+                .attr('r', vis.nodeRadius);
+            });
           // only do something if we are sleeping and have packets queued
           if (this.active === 0 && this.queueLength > 0) {
             // we are woken up, try to activate
             if (this.isNeighborActive()) {
               // failed attempt
               model.activations[this.graph].fail++;
-              this.activateLater();
             } else {
               // successful attempt at activating
               model.activations[this.graph].success++;
@@ -237,16 +250,19 @@
               callLater(this, this.deactivate, 1600);
             }
           }
+          // activate again
+          this.activateLater();
         }
 
         // constructor
         if (toCopy === null) {
+          let attempts = 0;
           do {
               this.x = randomInt(vis.padding.network,
                                  vis.width / 2 - vis.padding.network);
               this.y = randomInt(vis.padding.network,
                                  vis.height / 2 - vis.padding.network);
-          } while (this.isCloseToAnotherNode());
+          } while (this.isCloseToAnotherNode() && ++attempts <= 100);
           this.active = 0;
           this.transmissionRange = randomInt(TRANSMISSION_RANGE_MIN,
                                              TRANSMISSION_RANGE_MAX);
@@ -260,6 +276,7 @@
           this.queueLength = toCopy.queueLength;
           this.neighbors = [];
         }
+        callLater(this, this.tryActivate, 1400);
       }
 
       // ----- FUNCTIONS -------------------------------------------------------
@@ -387,7 +404,7 @@
         }
 
         for (let i = 0; i < model.inputs.nrNodes; ++i) {
-          if (Math.random() < 0.2) {
+          if (Math.random() < PACKET_SPAWN_PROBABILITY) {
             for (let graph of model.graphs) {
               if (graph.nodes[i].queueLength < model.inputs.queueLength) {
                 graph.nodes[i].addPacket();
@@ -409,6 +426,13 @@
        * inputs at the top of the page.
        */
       function updateCanvas() {
+        var called = +Date.now();
+        if (vis.hasOwnProperty('updateCanvasLastCalled') &&
+            called - vis.updateCanvasLastCalled < 100) {
+          return;
+        }
+        vis.updateCanvasLastCalled = called;
+
         vis.svg = d3SelectOrCreate('#canvas', 'svg')
           .attr('width', vis.width)
           .attr('height', vis.height)
