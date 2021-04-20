@@ -110,7 +110,8 @@
     </div>
   </div><!-- /.container-fluid -->
 </body>
-<script src="/network/js/i18n.js"></script>
+<script src="/percolation-game/js/i18n.js"></script>
+<script src="/percolation-game/socket.io/socket.io.js"></script>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <!--<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>-->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
@@ -119,7 +120,6 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/js/bootstrap.bundle.min.js"
         integrity="sha384-ho+j7jyWK8fNQe+A12Hb8AhRq26LrZ/JpcUGGOn+Y7RsweNrtN/tE3MoK7ZeZDyx"
         crossorigin="anonymous"></script>
-<script src="https://cdn.jsdelivr.net/npm/socket.io-client@2.3.0/dist/socket.io.slim.js"></script>
 <script>
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
@@ -129,6 +129,7 @@ const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
 const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
 
 const socket = io({
+  path: '/percolation-game/socket.io',
   query: {
     id: userID
   },

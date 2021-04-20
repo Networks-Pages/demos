@@ -9,14 +9,15 @@ const url = require('url');
 // --- constants ---------------------------------------------------------------
 const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
     '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b';
-const DEBUG = (process.env.DEBUG === 'true');
+const IS_PASSENGER = (typeof(PhusionPassenger) !== 'undefined');
 const MAX_DEGREE = 5;
-const STANDALONE = (process.env.STANDALONE === 'true');
+const STANDALONE = (process.env.STANDALONE === 'true' || IS_PASSENGER);
 const SURVIVAL_P = 0.5;
-const URL_PREFIX = '/network';
+const URL_PREFIX = '/percolation-game';
 
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
+const logger = require('./logging');
 const nodes = new Map();
 const idx2id = [];
 const links = [];
@@ -97,7 +98,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
     throw `Neighbor2 ${n2ID} already has ${MAX_DEGREE} connections.`;
 
   // add node, update metadata
-  debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
+  logger.debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
   let idx = nodes.size;
   nodes.set(newIDi, {
     name: name,
@@ -134,6 +135,7 @@ function _getdata_internal(ip, id = false) {
       id: n.idx,
       name: n.name
     };
+    logger.debug(`checking if ${n.ip} equals ${ip}...`);
     if ((id === false && n.ip === ip) || (id !== false && id === nodeId)) {
       newNode.yours = true;
     }
@@ -192,7 +194,7 @@ function _percolate(res) {
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
-  debug(remainingLinks);
+  logger.debug(remainingLinks);
   let outputLinks = [];
   remainingLinks.forEach(function (link) {
     const [i, j] = link;
@@ -248,12 +250,6 @@ function _restart() {
 
 function close(server) {
   server.destroy();
-}
-
-function debug() {
-  if (DEBUG) {
-    console.log.apply(this, arguments);
-  }
 }
 
 function emitAll(connections) {
@@ -317,11 +313,12 @@ function open(server) {
 
   // initialize socket.io; closing logic from
   // https://github.com/socketio/socket.io/issues/1602#issuecomment-120561951
-  const io = require('socket.io')(server, { serveClient: false });
+  const io = require('socket.io')(server, {path: '/percolation-game/socket.io'});
   const connections = {};
 
   io.on('connection', socket => {
     const ip = socket.handshake.headers['x-real-ip'] ||
+                socket.handshake.headers['!~passenger-client-address'] ||
                 socket.conn.remoteAddress;
     const userID = (socket.handshake.query.hasOwnProperty('userID') &&
         socket.handshake.query.userID !== 'NaN' ?
@@ -389,12 +386,16 @@ function open(server) {
 
 function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  const reqPath = url.pathname.split('/');
-  const prefixPath = URL_PREFIX.split('/');
-  const splicedPath = reqPath.splice(0, prefixPath.length); // remove prefix
-  if (!_.isEqual(splicedPath, prefixPath)) {
-    res.writeHead(307, {'Location': prefixPath.concat(reqPath).join('/')});
-    return res.end();
+  let reqPath = url.pathname.split('/');
+  if ([...url.searchParams.keys()].length > 0 && url.searchParams.has('path')) {
+    reqPath = url.searchParams.get('path').split('/');
+  } else {
+    const prefixPath = URL_PREFIX.split('/');
+    const splicedPath = reqPath.splice(0, prefixPath.length); // remove prefix
+    if (!_.isEqual(splicedPath, prefixPath)) {
+      res.writeHead(307, {'Location': prefixPath.concat(reqPath).join('/')});
+      return res.end();
+    }
   }
 
   if (reqPath.length > 1 && fs.existsSync(
@@ -452,13 +453,16 @@ module.exports = {
   'route': route
 };
 
-if (STANDALONE && require.main === module) {
+if (IS_PASSENGER || (STANDALONE && require.main === module)) {
   let port = process.env.PORT;
+  if (IS_PASSENGER) {
+    port = 'passenger';
+  }
   let server = http.createServer(route);
   open(server);
   process.on('SIGINT', function() {
     close(server);
   });
   server.listen(port);
-  debug(`Running on port ${port}`);
+  logger.info(`Running on port ${port}`);
 }
