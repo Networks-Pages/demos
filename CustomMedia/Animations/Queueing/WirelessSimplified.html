@@ -230,6 +230,7 @@
         }
 
         this.tryActivate = function() {
+          this.lastActivationAttempt = Date.now();
           // indicate the activation attempt
           this.d3node.select('circle').transition()
             .duration(100)
@@ -284,6 +285,7 @@
           this.queueLength = toCopy.queueLength;
           this.neighbors = [];
         }
+        this.lastActivationAttempt = Number.POSITIVE_INFINITY;
         callLater(this, this.tryActivate, 1400);
       }
 
@@ -411,15 +413,27 @@
           model.queueLengths.push([]);
         }
 
+        var now = Date.now();
         for (let i = 0; i < model.inputs.nrNodes; ++i) {
+          // spawn a packet, possibly
           if (Math.random() < PACKET_SPAWN_PROBABILITY) {
+            // do so in all graphs simultaneously, that's only fair
             for (let graph of model.graphs) {
               if (graph.nodes[i].queueLength < model.inputs.queueLength) {
                 graph.nodes[i].addPacket();
               }
+
+              // make doubly sure that nodes keep on activating
+              if (now - graph.nodes[i].lastActivationAttempt >
+                  ACTIVATION_RATE_MS * 2) {
+                graph.nodes[i].tryActivate();
+                console.warn(`node ${i} in graph ${graph.id} stopped ` +
+                    'activating, restarted the activation cycle on it');
+              }
             }
           }
 
+          // update stats
           for (let graph of model.graphs) {
             model.packets[graph.id] += graph.nodes[i].queueLength;
             model.queueLengths[graph.id].push(graph.nodes[i].queueLength);
