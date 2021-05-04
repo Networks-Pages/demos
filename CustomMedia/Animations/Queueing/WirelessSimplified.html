@@ -28,6 +28,11 @@
         border-top: 1px solid #000;
       }
 
+      #length-queues-cnt,
+      #nr-nodes-cnt {
+        display: none;
+      }
+
       .divider-horizontal,
       .divider-vertical {
         stroke: #000;
@@ -81,7 +86,7 @@
           <h2 class="mt-3">Interference avoidance in wireless networks</h2>
 
           <div class="form-inline my-3">
-            <div class="input-group mr-3">
+            <div class="input-group mr-3" id="nr-nodes-cnt">
               <input type="number" class="form-control" id="nr-nodes"
                   name="nr-nodes" aria-label="Number of nodes"
                   min="10" max="50" value="30" />
@@ -90,7 +95,7 @@
               </div>
             </div>
 
-            <div class="input-group mr-3">
+            <div class="input-group mr-3" id="length-queues-cnt">
               <input type="number" class="form-control" id="length-queues"
                   name="length-queues" aria-label="Queue length"
                   min="2" max="20" value="10" />
