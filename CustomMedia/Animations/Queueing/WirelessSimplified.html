@@ -274,8 +274,8 @@
           this.active = 0;
           this.transmissionRange = randomInt(TRANSMISSION_RANGE_MIN,
                                              TRANSMISSION_RANGE_MAX);
-          this.queueLength = Math.floor(1 +
-            Math.random() * model.inputs.queueLength / 3);
+          this.queueLength = randomInt(model.inputs.queueLength * 0.6,
+                                       model.inputs.queueLength);
           this.neighbors = [];
         } else {
           this.x = toCopy.x;
@@ -582,6 +582,7 @@
 
         // respond to changes in canvas size
         // from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+        /*
         const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
           var containerWidth, containerHeight;
           for (const entry of entries) {
@@ -601,7 +602,7 @@
           [vis.width, vis.height] = [containerWidth, containerHeight];
           updateCanvas();
         }, 1000));
-        canvasResizeObserver.observe(vis.container);
+        canvasResizeObserver.observe(vis.container);*/
       }
 
       /**
