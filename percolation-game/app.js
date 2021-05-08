@@ -244,6 +244,7 @@ function _restart() {
   percolationDone = false;
   percolationResult = null;
   db.query("INSERT INTO nodes VALUES (1, 'Dummy A', null), (2, 'Dummy B', null)");
+  db.query('INSERT INTO links VALUES (1, 2)');
   initFromDB();
 }
 
@@ -300,7 +301,9 @@ function initFromDB() {
       nodes.get(row.id_source).degree++;
       nodes.get(row.id_target).degree++;
     });
-  });
+  }, [
+    {id_source: 1, id_target: 2}
+  ]);
 }
 
 function open(server) {
