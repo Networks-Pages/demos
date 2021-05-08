@@ -386,16 +386,12 @@ function open(server) {
 
 function route(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
-  let reqPath = url.pathname.split('/');
-  if ([...url.searchParams.keys()].length > 0 && url.searchParams.has('path')) {
-    reqPath = url.searchParams.get('path').split('/');
-  } else {
-    const prefixPath = URL_PREFIX.split('/');
-    const splicedPath = reqPath.splice(0, prefixPath.length); // remove prefix
-    if (!_.isEqual(splicedPath, prefixPath)) {
-      res.writeHead(307, {'Location': prefixPath.concat(reqPath).join('/')});
-      return res.end();
-    }
+  const reqPath = url.pathname.split('/');
+  const prefixPath = URL_PREFIX.split('/');
+  const splicedPath = reqPath.splice(0, prefixPath.length); // remove prefix
+  if (!_.isEqual(splicedPath, prefixPath)) {
+    res.writeHead(307, {'Location': prefixPath.concat(reqPath).join('/')});
+    return res.end();
   }
 
   if (reqPath.length > 1 && fs.existsSync(
