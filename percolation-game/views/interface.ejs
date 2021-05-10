@@ -97,8 +97,6 @@
                data-i18n-key="your-name" data-i18n-attr="placeholder"></input>
         <button class="btn btn-primary my-1" onclick="addNode()"
                 data-i18n-key="add-node"></button>
-        <button class="btn btn-primary my-1 ml-2" onclick="updateNetwork()"
-                data-i18n-key="refresh"></button>
       </form>
       <button class="btn btn-secondary btn-sm ml-2" style="display: none;"
               onclick="toggleInstructions()" data-i18n-key="show"></button>
@@ -216,37 +214,13 @@ function addNode() {
     return;
   }
 
-  if (socket.connected) {
-    socket.emit('add-node', {
-      name: name,
-      neighbors: selected,
-      id: (isNaN(userID) ? false : userID),
-      room: roomPath
-    });
-    socket.once('node-added', showUserAddedANode);
-  } else {
-    const addNodeHttp = new XMLHttpRequest();
-    addNodeHttp.overrideMimeType("application/json");
-    let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
-          `neighbor2=${selected[1]}&room=${roomPath}`;
-    if (!isNaN(userID)) {
-      url += "&id="+userID;
-    }
-
-    addNodeHttp.open("GET",url);
-    addNodeHttp.onreadystatechange = function() {
-      if (this.readyState == 4 && this.status == 200) {
-        document.getElementById('node'+selected[0]).classList.remove('selected');
-        document.getElementById('node'+selected[1]).classList.remove('selected');
-        selected = [false,false]
-        updateNetwork();
-        showUserAddedANode();
-      } else {
-        handleAjaxError(this);
-      }
-    }
-    addNodeHttp.send();
-  }
+  socket.emit('add-node', {
+    name: name,
+    neighbors: selected,
+    id: (isNaN(userID) ? false : userID),
+    room: roomPath
+  });
+  socket.once('node-added', showUserAddedANode);
 }
 
 function showPercolation(data) {
@@ -270,25 +244,6 @@ function recomputeDegrees() {
   });
 }
 
-
-// Retrieve all newly added nodes and update the visualization
-function updateNetwork() {
-  var n = graph.nodes.length;
-  var updateHttp = new XMLHttpRequest();
-  updateHttp.overrideMimeType("application/json");
-  updateHttp.open("GET", `${URL_PREFIX}/updatedata?n=${n}`);
-  updateHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-        data = JSON.parse(this.responseText);
-        data.neighbors.forEach(addLinksFromNeighbors);
-        updateVisualization();
-        recomputeDegrees();
-    } else {
-      handleAjaxError(this);
-    }
-  }
-  updateHttp.send();
-}
 
 function createAlert(message, type = 'danger', title = false) {
   if (title === false)  title = i18n.t('error') + '.'

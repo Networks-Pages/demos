@@ -172,47 +172,6 @@ function _getdata_internal(ip, id = false, roomPath = false) {
   return returnData;
 }
 
-function _rooms(req, url, res) {
-  res.setHeader('Content-Type', 'application/json');
-  var roomsResult = [];
-  rooms.forEach((room) => {
-    roomsResult.push({
-      id: room.id,
-      path: room.path,
-      name: room.name,
-      numNodes: room.nodes.size
-    });
-  });
-  res.end(JSON.stringify(roomsResult));
-}
-
-function _updatedata(req, url, res) {
-  const data = url.searchParams;
-  if (!data.has('n')) {
-    return res.writeHead(400, {message: "Missing parameter n."}).end()
-  }
-  return res.end(JSON.stringify({
-    neighbors: Array.from(nodes).slice(data.get('n')).map((nodeInfo) => {
-      var [id, node] = nodeInfo,
-          neighbors = [];
-      for (let link of links) {
-        if (link[0] === id) {
-          neighbors.push(nodes.get(link[1]).idx);
-          if (neighbors.length === 2) {
-            break;
-          }
-        }
-      }
-      return {
-        id: nodes.get(id).idx,
-        name: node.name,
-        neighbor1: neighbors[0],
-        neighbor2: neighbors[1]
-      }
-    })
-  }));
-}
-
 function _percolate(res, room) {
   room.percolationDone = false;
   const node2component = new Map();
@@ -476,9 +435,14 @@ function route(req, res) {
         return res.end('Internal server error.');
       }
 
-      if (Object.keys(body).indexOf('secret') < 0 || !rooms.has(reqPath[1]) ||
-          rooms.get(reqPath[1]).secret !== body.secret) {
-        res.writeHead(303, {'Location': `${URL_PREFIX}?error=invalid_secret`});
+      if (Object.keys(body).indexOf('secret') < 0 || !rooms.has(reqPath[1])) {
+        res.writeHead(303, {'Location': URL_PREFIX});
+        return res.end();
+      }
+      if (rooms.get(reqPath[1]).secret !== body.secret) {
+        res.writeHead(303, {
+          'Location': `${URL_PREFIX}?error=invalid_secret&room=${reqPath[1]}`
+        });
         return res.end();
       }
 
@@ -496,19 +460,25 @@ function route(req, res) {
 
   // route request
   switch (reqPath[0]) {
-    case 'addnode':
-      return _addnode(req, url, res);
     case 'getdata':
       return _getdata(req, url, res);
     case 'r':
       serveHtml(res, 'views/interface.ejs');
       break;
-    case 'rooms':
-      return _rooms(req, url, res);
-    case 'updatedata':
-      return _updatedata(req, url, res);
     default:
-      serveHtml(res, 'views/index.ejs', {search: url.searchParams});
+      var roomsResult = [];
+      rooms.forEach((room) => {
+        roomsResult.push({
+          id: room.id,
+          path: room.path,
+          name: room.name,
+          numNodes: room.nodes.size
+        });
+      });
+      serveHtml(res, 'views/index.ejs', {
+        rooms: roomsResult,
+        search: url.searchParams
+      });
   }
 }
 
