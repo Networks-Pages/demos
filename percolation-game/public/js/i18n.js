@@ -5,8 +5,9 @@
     en: {
       // interface elements
       'add-node': 'Add node',
+      'back': 'Back to overview',
       'hide': 'Hide instructions',
-      'index-title': 'Netwerk Game',
+      'index-title': 'Network Game',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
         can only connect to nodes that have <b>less than 5 neighbors</b>. `,
@@ -28,7 +29,11 @@
         The question then, is what the network looks like after this process.
         In this game, we will experience this process in practice!`,
       'page-title': 'Network Game',
+      'percolation-do': 'Do percolation',
+      'percolation-speed': 'Percolation speed',
       'refresh': 'Refresh',
+      'reset': 'Reset network',
+      'secret': 'secret',
       'show': 'Show instructions',
       'title': 'Instructions',
       'welcome-1': `This is the overview page of the network game. Select your
@@ -45,6 +50,7 @@
     nl: {
       // interface elements
       'add-node': 'Voeg knoop toe',
+      'back': 'Terug naar overzicht',
       'hide': 'Verberg instructies',
       'index-title': 'Netwerkspel',
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
@@ -70,7 +76,11 @@
         Men is vervolgens geïnteresseerd in hoe het resulterende netwerk eruit ziet.
         In dit spel gaan we dit samen live ontdekken!`,
       'page-title': 'Netwerkspel',
+      'percolation-do': 'Voer percolatie uit',
+      'percolation-speed': 'Percolatie snelheid',
       'refresh': 'Verversen',
+      'reset': 'Reset netwerk',
+      'secret': 'wachtwoord',
       'show': 'Toon instructies',
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je

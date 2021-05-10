@@ -10,10 +10,21 @@
         href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
         integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
         crossorigin="anonymous">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css">
 </head>
 <body>
   <div class="container">
-    <div class="row flex-column align-items-center" id="alerts"></div>
+    <div class="row flex-column align-items-center" id="alerts">
+<% if (search.has('error') && search.get('error') === 'invalid_secret') { %>
+      <div class="alert alert-danger mt-3 alert-dismissible fade show" role="alert">
+        <strong>Error.</strong> Incorrect secret.
+        <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+          <span aria-hidden="true">&times;</span>
+        </button>
+      </div>
+<% } %>
+    </div>
 
     <div class="row mt-3">
       <div class="col-12">
@@ -24,7 +35,7 @@
     </div>
   </div><!-- /.container -->
 
-  <script src="/percolation-game/js/i18n.js"></script>
+  <script src="<%= URL_PREFIX %>/js/i18n.js"></script>
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
           integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
           crossorigin="anonymous"></script>
@@ -67,10 +78,34 @@
         data.forEach((room) => {
           url.pathname = `${URL_PREFIX}/r/${room.path}`;
           $list.append($('<a />', {
-            class: 'list-group-item list-group-item-action',
+            class: 'list-group-item list-group-item-action ' +
+                'd-flex justify-content-between align-items-center',
             href: url.href,
             text: room.name
-          }));
+          }).append($('<span />', {
+            class: 'badge badge-info badge-pill',
+            text: `${room.numNodes} nodes`
+          })).append($(`<button type="button" class="btn btn-dark">
+            <i class="bi bi-toggles"></i></button>`)));
+
+          $list.on('click', 'input', (event) => event.preventDefault());
+          $list.on('click', 'button', function(event) {
+            event.preventDefault();
+
+            var $btn = $(this),
+                roomURL = new URL($btn.parent().attr('href')),
+                $input = $(`<input type="text" class="form-control"
+                    name="secret" placeholder="${i18n.t('secret')}">`),
+                $form = $(`<form method="post" action="${roomURL}"
+                    autocomplete="off" />`);
+            $btn.replaceWith($form.append($input));
+            $input.on('keypress', (event) => {
+              if (event.keyCode === 13) { // prevent enter key from activating
+                event.preventDefault();   // the outer anchor, instead submit
+                $form.submit();           // the form that the input is in
+              }
+            }).focus();
+          });
         });
       } else {
         handleAjaxError(this);

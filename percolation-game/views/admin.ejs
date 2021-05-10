@@ -54,33 +54,36 @@ form {
   <div class="container">
     <div class="row justify-content-center" id="add-node-container">
       <form class="form-inline mt-3">
-        <label class="my-1 mr-2" for="speed">Percolation speed</label>
+        <a href="<%= URL_PREFIX %>" class="btn btn-secondary my-1 mr-2"
+            data-i18n-key="back"></a>
+        <label class="my-1 mr-2" for="speed" data-i18n-key="percolation-speed"></label>
         <input type="range" class="my-1 mr-2" min="1" max="10" id="speed" value="1" onchange="updateSpeed(this.value)">
-        <button class="btn btn-danger my-1 mr-2" onclick="percolate()">
-          DO PERCOLATION
-        </button>
-        <button class="btn btn-danger my-1" onclick="restart()">
-          RESET NETWORK
-        </button>
+        <button class="btn btn-danger my-1 mr-2" onclick="percolate()"
+            data-i18n-key="percolation-do"></button>
+        <button class="btn btn-danger my-1" onclick="restart()"
+            data-i18n-key="reset"></button>
       </form>
     </div>
   </div>
   <div id="canvas"></div>
 </body>
-<script src="/percolation-game/socket.io/socket.io.js"></script>
+<script src="<%= URL_PREFIX %>/js/i18n.js"></script>
+<script src="<%= URL_PREFIX %>/socket.io/socket.io.js"></script>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
         integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
         crossorigin="anonymous"></script>
 <script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
 <script>
-const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
+const pathSplit = window.location.pathname.split('/');
+const URL_PREFIX = '/' + pathSplit[1];
+const roomPath = pathSplit[3];
 
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
 
 const socket = io({
-    path: '/percolation-game/socket.io',
+    path: '<%= URL_PREFIX %>/socket.io',
     transports: ['polling']
 });
 socket.on('connect', () => {
@@ -134,49 +137,18 @@ function percolate() {
     dramaticallyRemoveLinks(source2remaining, originalIDs, 0);
   };
 
-  if (socket.connected) {
-    socket.emit('percolate');
-    socket.once('percolate-start', onPercolateStarted);
-  } else {
-    let percolateHttp = new XMLHttpRequest();
-    percolateHttp.open("GET", './percolate');
-    percolateHttp.onreadystatechange = function() {
-      if (this.readyState == 4 && this.status == 200) {
-        data = JSON.parse(this.responseText);
-        onPercolateStarted(data);
-      }
-    }
-    percolateHttp.send();
-  }
+  socket.emit('percolate', roomPath);
+  socket.once('percolate-start', onPercolateStarted);
 }
 
 function restart() {
-  if (socket.connected) {
-    socket.emit('restart');
-  } else {
-    let restartHttp = new XMLHttpRequest();
-    restartHttp.open("GET", './restart');
-    restartHttp.overrideMimeType('text/plain');
-    restartHttp.onreadystatechange = function() {
-      if (this.readyState == 4 && this.status == 200) {
-        retrieveGraph();
-        nodes.classed('win', false);
-      }
-    }
-    restartHttp.send();
-  }
+  socket.emit('restart', roomPath);
 }
 
 function dramaticallyRemoveLinks(source2remaining,originalIDs,idx) {
   if (idx>=originalIDs.length) {
     // Notify the server that the percolation has ended
-    if (socket.connected) {
-      socket.emit('percolate-done');
-    } else {
-      let percolateEndedHttp = new XMLHttpRequest();
-      percolateEndedHttp.open("GET", './finishPercolation');
-      percolateEndedHttp.send();
-    }
+    socket.emit('percolate-done', roomPath);
     // Make winners green
     nodes.classed("win",n=>winners.includes(n.id));
     return;
@@ -353,7 +325,7 @@ function retrieveGraph() {
       showGraph();
     }
   };
-  xmlHttp.open("GET", `${URL_PREFIX}/getdata`);
+  xmlHttp.open('GET', `${URL_PREFIX}/getdata?room=${roomPath}`);
   xmlHttp.send();
 }
 

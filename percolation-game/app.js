@@ -1,5 +1,7 @@
 // --- libraries ---------------------------------------------------------------
 const _ = require('underscore');
+const ejs = require('ejs');
+const formBody = require('body/form');
 const fs = require('fs');
 const http = require('http');
 const mime = require('mime-types');
@@ -8,8 +10,6 @@ const url = require('url');
 
 
 // --- constants ---------------------------------------------------------------
-const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
-    '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b';
 const IS_PASSENGER = (typeof(PhusionPassenger) !== 'undefined');
 const MAX_DEGREE = 5;
 const STANDALONE = (process.env.STANDALONE === 'true' || IS_PASSENGER);
@@ -179,7 +179,8 @@ function _rooms(req, url, res) {
     roomsResult.push({
       id: room.id,
       path: room.path,
-      name: room.name
+      name: room.name,
+      numNodes: room.nodes.size
     });
   });
   res.end(JSON.stringify(roomsResult));
@@ -212,17 +213,18 @@ function _updatedata(req, url, res) {
   }));
 }
 
-function _percolate(res) {
-  percolationDone = false;
+function _percolate(res, room) {
+  room.percolationDone = false;
   const node2component = new Map();
   // Assign each node to a component consisting only of itself
-  for (const id of nodes.keys()) {
+  for (const id of room.nodes.keys()) {
     node2component.set(id, {
       members: [id]
     });
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
-  const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
+  const remainingLinks = _.sample(room.links,
+                                  Math.ceil(room.links.length * SURVIVAL_P));
   let outputLinks = [];
   remainingLinks.forEach(function (link) {
     const [i, j] = link;
@@ -233,48 +235,49 @@ function _percolate(res) {
         node2component.get(i).members.push(m);
       });
     }
-    outputLinks.push([nodes.get(i).idx,nodes.get(j).idx]);
+    outputLinks.push([room.nodes.get(i).idx, room.nodes.get(j).idx]);
   });
   // Find the size of the largest component
   let largestComponentSize = 0;
-  for (const id of nodes.keys()) {
+  for (const id of room.nodes.keys()) {
     if (node2component.get(id).members.length > largestComponentSize) {
       largestComponentSize = node2component.get(id).members.length;
     }
   }
   // We need to find the winners separately in case their are multiple components of equal size.
   let winners = [];
-  for (const id of nodes.keys()) {
+  for (const id of room.nodes.keys()) {
     if (node2component.get(id).members.length == largestComponentSize) {
-      winners.push(nodes.get(id).idx);
+      winners.push(room.nodes.get(id).idx);
     }
   }
 
-  percolationResult = {
+  room.percolationResult = {
     "winners": winners,
     "remainingLinks": outputLinks
   };
 
   if (typeof res === 'boolean') {
-    return percolationResult;
+    return room.percolationResult;
   }
-  return res.end(JSON.stringify(percolationResult));
+  return res.end(JSON.stringify(room.percolationResult));
 }
 
-function _restart() {
-  throw 'not implemented; to be done';
-  db.query(`SET FOREIGN_KEY_CHECKS = 0;
-            TRUNCATE links;
-            TRUNCATE nodes;
-            SET FOREIGN_KEY_CHECKS = 1`);
-  nodes.clear();
-  idx2id.length = 0;
-  links.length = 0;
-  percolationDone = false;
-  percolationResult = null;
-  db.query("INSERT INTO nodes VALUES (1, 'Dummy A', null), (2, 'Dummy B', null)");
-  db.query('INSERT INTO links VALUES (1, 2)');
-  initFromDB();
+function _restart(room) {
+  db.query(`DELETE FROM links WHERE NOT EXISTS (SELECT 1 FROM nodes
+              WHERE nodes.room = ${room.id} AND (nodes.id = links.id_source OR
+              nodes.id = links.id_target));
+            DELETE FROM nodes WHERE room = ${room.id};`);
+  room.nodes.clear();
+  room.idx2id.length = 0;
+  room.links.length = 0;
+  room.percolationDone = false;
+  room.percolationResult = null;
+  db.query(`INSERT INTO nodes (room, name) VALUES (${room.id}, 'Dummy A'),
+              (${room.id}, 'Dummy B')`);
+  // TODO: find IDs of inserted nodes
+  //db.query('INSERT INTO links VALUES (1, 2)');
+  initRoomFromDB(room);
 }
 
 
@@ -310,55 +313,56 @@ function initFromDB() {
   rooms.clear();
   db.query('SELECT * FROM rooms', function(roomResults) {
     roomResults.forEach((roomRow) => {
-      db.query(`SELECT * FROM nodes WHERE room = ${roomRow.id}`, function(nodeResults) {
-        // find nodes in this room and store in memory
-        var nodes = new Map(),
-            idx2id = [],
-            links = [];
-        nodeResults.forEach((nodeRow, idx) => {
-          nodes.set(nodeRow.id, {
-            name: nodeRow.name,
-            degree: 0,
-            idx: idx,
-            ip: nodeRow.ip_address
-          });
-          idx2id.push(nodeRow.id);
-        });
-
-        // store room in memory
-        rooms.set(roomRow.path, {
-          // metadata
-          id: roomRow.id,
-          name: roomRow.name,
-          path: roomRow.path,
-          // network data
-          nodes: nodes,
-          idx2id: idx2id,
-          links: links,
-          // percolation data
-          percolationDone: false,
-          percolationResult: null
-        });
-
-        // add links to the room
-        db.query('SELECT `id_source`, `id_target` FROM `links` ' +
-            'LEFT JOIN `nodes` ON `links`.`id_source` = `nodes`.`id` WHERE ' +
-            '`nodes`.`room` = ' + roomRow.id, function(linkResults) {
-          linkResults.forEach((linkRow) => {
-            links.push([linkRow.id_source, linkRow.id_target]);
-            nodes.get(linkRow.id_source).degree++;
-            nodes.get(linkRow.id_target).degree++;
-          });
-        }, [
-          {id_source: 1, id_target: 2}
-        ]);
-      }, [
-        {id: 1, name: 'Dummy A', ip_address: null},
-        {id: 2, name: 'Dummy B', ip_address: null}
-      ]);
+      // store room in memory
+      rooms.set(roomRow.path, {
+        // metadata
+        id: roomRow.id,
+        name: roomRow.name,
+        path: roomRow.path,
+        secret: roomRow.secret,
+        // network data
+        nodes: new Map(),
+        idx2id: [],
+        links: [],
+        // percolation data
+        percolationDone: false,
+        percolationResult: null
+      });
+      initRoomFromDB(rooms.get(roomRow.path));
     });
   }, [
-    {id: 1, name: 'Dummy Room', path: 'abcdefgh'}
+    {id: 1, name: 'Dummy Room', path: 'abcdefgh', secret: 'secret'}
+  ]);
+}
+
+function initRoomFromDB(room) {
+  db.query(`SELECT * FROM nodes WHERE room = ${room.id}`, function(nodeResults) {
+    // find nodes in this room and store in memory
+    nodeResults.forEach((nodeRow, idx) => {
+      room.nodes.set(nodeRow.id, {
+        name: nodeRow.name,
+        degree: 0,
+        idx: idx,
+        ip: nodeRow.ip_address
+      });
+      room.idx2id.push(nodeRow.id);
+    });
+
+    // add links to the room
+    db.query('SELECT `id_source`, `id_target` FROM `links` ' +
+        'LEFT JOIN `nodes` ON `links`.`id_source` = `nodes`.`id` WHERE ' +
+        '`nodes`.`room` = ' + room.id, function(linkResults) {
+      linkResults.forEach((linkRow) => {
+        room.links.push([linkRow.id_source, linkRow.id_target]);
+        room.nodes.get(linkRow.id_source).degree++;
+        room.nodes.get(linkRow.id_target).degree++;
+      });
+    }, [
+      {id_source: 1, id_target: 2}
+    ]);
+  }, [
+    {id: 1, name: 'Dummy A', ip_address: null},
+    {id: 2, name: 'Dummy B', ip_address: null}
   ]);
 }
 
@@ -415,22 +419,32 @@ function open(server) {
       });
     });
 
-    socket.on('percolate', () =>
-        emitAll(connections, 'percolate-start', _percolate(true)));
-
-    socket.on('percolate-done', () => {
-        percolationDone = true;
-        emitAll(connections, 'percolate-done', percolationResult);
+    socket.on('percolate', (roomPath) => {
+        if (rooms.has(roomPath)) {
+          emitAll(connections, 'percolate-start',
+                  _percolate(true, rooms.get(roomPath)));
+        }
     });
 
-    socket.on('restart', () => {
-      _restart();
-      setTimeout(() => {
-        for (let key in connections) {
-          connections[key].socket.emit('restart', _getdata_internal(ip,
-            connections[key].userID));
+    socket.on('percolate-done', (roomPath) => {
+        if (rooms.has(roomPath)) {
+          const room = rooms.get(roomPath);
+          room.percolationDone = true;
+          emitAll(connections, 'percolate-done', room.percolationResult);
         }
-      }, 250);
+    });
+
+    socket.on('restart', (roomPath) => {
+      if (rooms.has(roomPath)) {
+        const room = rooms.get(roomPath);
+        _restart(room);
+        setTimeout(() => {
+          for (let key in connections) {
+            connections[key].socket.emit('restart', _getdata_internal(ip,
+              connections[key].userID, roomPath));
+          }
+        }, 250);
+      }
     });
   });
 
@@ -444,6 +458,7 @@ function open(server) {
 }
 
 function route(req, res) {
+  // determine the requested path, redirect to URL prefix if needed
   const url = new URL(req.url, `http://${req.headers.host}`);
   const reqPath = url.pathname.split('/');
   const prefixPath = URL_PREFIX.split('/');
@@ -453,54 +468,84 @@ function route(req, res) {
     return res.end();
   }
 
+  // handle post submissions
+  if (req.method === 'POST') {
+    formBody(req, res, (err, body) => {
+      if (err || reqPath[0] !== 'r') {
+        res.statusCode = 500;
+        return res.end('Internal server error.');
+      }
+
+      if (Object.keys(body).indexOf('secret') < 0 || !rooms.has(reqPath[1]) ||
+          rooms.get(reqPath[1]).secret !== body.secret) {
+        res.writeHead(303, {'Location': `${URL_PREFIX}?error=invalid_secret`});
+        return res.end();
+      }
+
+      routeAdmin(reqPath, res);
+    });
+    return;
+  }
+
+  // serve files in the public directory
   if (reqPath.length > 1 && fs.existsSync(
         path.resolve(__dirname, 'public', reqPath.join('/')))) {
     serveHtml(res, ['public'].concat(reqPath).join('/'));
     return;
   }
 
+  // route request
   switch (reqPath[0]) {
     case 'addnode':
       return _addnode(req, url, res);
     case 'getdata':
       return _getdata(req, url, res);
     case 'r':
-      serveHtml(res, 'views/interface.html');
+      serveHtml(res, 'views/interface.ejs');
       break;
     case 'rooms':
       return _rooms(req, url, res);
     case 'updatedata':
       return _updatedata(req, url, res);
-    case ADMIN_PAGE:
-      switch (reqPath[1]) {
-        case 'finishPercolation':
-          percolationDone = true;
-          return res.end('okay');
-        case 'percolate':
-          return _percolate(res);
-        case 'restart':
-          _restart();
-          setTimeout(() => res.end('okay'), 250);
-          return;
-        case 'undoPercolation':
-          percolationDone = false;
-          percolationResult = null;
-          return res.end('okay');
-        default:
-          serveHtml(res, 'views/admin.html');
-      }
-      break;
     default:
-      serveHtml(res, 'views/index.html');
+      serveHtml(res, 'views/index.ejs', {search: url.searchParams});
   }
 }
 
-function serveHtml(res, filename) {
-  fs.readFile(path.resolve(__dirname, filename), function(err, data) {
+function routeAdmin(reqPath, res) {
+  const room = rooms.get(reqPath[1]);
+  switch (reqPath[1]) {
+    case 'finishPercolation':
+      room.percolationDone = true;
+      return res.end('okay');
+    case 'percolate':
+      return _percolate(res, room);
+    case 'restart':
+      _restart(room);
+      setTimeout(() => res.end('okay'), 250);
+      return;
+    case 'undoPercolation':
+      room.percolationDone = false;
+      room.percolationResult = null;
+      return res.end('okay');
+    default:
+      serveHtml(res, 'views/admin.ejs');
+  }
+}
+
+function serveHtml(res, filename, vars = {}) {
+  vars['URL_PREFIX'] = URL_PREFIX;
+  fs.readFile(path.resolve(__dirname, filename), 'utf-8', function(err, data) {
+    var contentType = mime.lookup(filename) || 'application/octet-stream',
+        dynamic = false;
+    if (filename.endsWith('ejs')) {
+      contentType = mime.lookup('html');
+      dynamic = true;
+    }
     res.writeHead(200, {
-      'Content-Type': mime.lookup(filename) || 'application/octet-stream'
+      'Content-Type': contentType
     });
-    res.write(data);
+    res.write(dynamic ? ejs.render(data, vars) : data);
     res.end();
   });
 }
@@ -524,5 +569,5 @@ if (IS_PASSENGER || (STANDALONE && require.main === module)) {
     close(server);
   });
   server.listen(port);
-  logger.info(`Running on port ${port}`);
+  logger.info(`running; listening on port ${port}`);
 }
