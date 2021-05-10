@@ -124,9 +124,15 @@
 // disable form submission; we handle everything using AJAX
 $('form').on('submit', (e) => e.preventDefault());
 
+const pathSplit = window.location.pathname.split('/');
+const searchParams = new URLSearchParams(window.location.search);
+
 const MAX_DEGREE = 5;
-const URL_PREFIX = '/' + window.location.pathname.split('/')[1];
-const userID = parseInt(new URLSearchParams(window.location.search).get('id'), 10);
+const URL_PREFIX = '/' + pathSplit[1];
+
+const roomPath = pathSplit[3];
+const userID = parseInt(searchParams.get('id'), 10);
+
 
 const socket = io({
   path: '/percolation-game/socket.io',
@@ -214,14 +220,15 @@ function addNode() {
     socket.emit('add-node', {
       name: name,
       neighbors: selected,
-      id: (isNaN(userID) ? false : userID)
+      id: (isNaN(userID) ? false : userID),
+      room: roomPath
     });
     socket.once('node-added', showUserAddedANode);
   } else {
     const addNodeHttp = new XMLHttpRequest();
     addNodeHttp.overrideMimeType("application/json");
     let url = `${URL_PREFIX}/addnode?name=${name}&neighbor1=${selected[0]}&` +
-          `neighbor2=${selected[1]}`;
+          `neighbor2=${selected[1]}&room=${roomPath}`;
     if (!isNaN(userID)) {
       url += "&id="+userID;
     }
@@ -509,55 +516,61 @@ function zoomed(e) {
   d3.select('.zoom-container').attr('transform', e.transform);
 }
 
-// Retrieve graph
-var xmlHttp = new XMLHttpRequest();
-xmlHttp.overrideMimeType("application/json");
-xmlHttp.onreadystatechange = function() {
-  if (this.readyState == 4 && this.status == 200) {
-    graph = JSON.parse(this.responseText);
-    for (const id in graph.nodes) {
-      const n = graph.nodes[id];
-      n.x = width/2;
-      n.y = height/2;
-      if (n.yours === true) {
-        showUserAddedANode();
+
+// check if we have a room
+if (typeof(roomPath) !== 'string') {
+  createAlert('Room not found.');
+} else {
+  // Retrieve graph
+  var xmlHttp = new XMLHttpRequest();
+  xmlHttp.overrideMimeType("application/json");
+  xmlHttp.onreadystatechange = function() {
+    if (this.readyState == 4 && this.status == 200) {
+      graph = JSON.parse(this.responseText);
+      for (const id in graph.nodes) {
+        const n = graph.nodes[id];
+        n.x = width/2;
+        n.y = height/2;
+        if (n.yours === true) {
+          showUserAddedANode();
+        }
       }
-    }
-    graph.links.forEach(addLink);
-    showGraph();
-    recomputeDegrees();
-    if (graph.percolation) {
-      showPercolation(graph.percolation);
-    }
-  } else {
-    handleAjaxError(this);
-  }
-};
-xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}`);
-xmlHttp.send();
-
-
-// respond to changes in canvas size
-// from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
-const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
-  var containerWidth, containerHeight;
-  for (const entry of entries) {
-    if (entry.contentBoxSize) {
-      if (entry.contentBoxSize[0]) {
-        containerWidth = entry.contentBoxSize[0].inlineSize;
-        containerHeight = entry.contentBoxSize[0].blockSize;
-      } else {
-        containerWidth = entry.contentBoxSize.inlineSize;
-        containerHeight = entry.contentBoxSize.blockSize;
+      graph.links.forEach(addLink);
+      showGraph();
+      recomputeDegrees();
+      if (graph.percolation) {
+        showPercolation(graph.percolation);
       }
     } else {
-      containerWidth = entry.contentRect.width;
-      containerHeight = entry.contentRect.height;
+      handleAjaxError(this);
     }
-  }
-  [width, height] = [containerWidth, containerHeight];
-  showGraph();
-}, 1000));
-canvasResizeObserver.observe(document.getElementById(containerID));
+  };
+  xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}&room=${roomPath}`);
+  xmlHttp.send();
+
+
+  // respond to changes in canvas size
+  // from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+  const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
+    var containerWidth, containerHeight;
+    for (const entry of entries) {
+      if (entry.contentBoxSize) {
+        if (entry.contentBoxSize[0]) {
+          containerWidth = entry.contentBoxSize[0].inlineSize;
+          containerHeight = entry.contentBoxSize[0].blockSize;
+        } else {
+          containerWidth = entry.contentBoxSize.inlineSize;
+          containerHeight = entry.contentBoxSize.blockSize;
+        }
+      } else {
+        containerWidth = entry.contentRect.width;
+        containerHeight = entry.contentRect.height;
+      }
+    }
+    [width, height] = [containerWidth, containerHeight];
+    showGraph();
+  }, 1000));
+  canvasResizeObserver.observe(document.getElementById(containerID));
+}
 
 </script>

@@ -6,6 +6,7 @@ const mime = require('mime-types');
 const path = require('path');
 const url = require('url');
 
+
 // --- constants ---------------------------------------------------------------
 const ADMIN_PAGE = 'd431ee08-3835-07b8-e139-e8497ce03398-baa1489e-6cc7-d2f9-' +
     '26de-1885e246dae4-ec7669e4-ac07-a63b-0691-15d2be2f2c7b';
@@ -15,21 +16,19 @@ const STANDALONE = (process.env.STANDALONE === 'true' || IS_PASSENGER);
 const SURVIVAL_P = 0.5;
 const URL_PREFIX = '/percolation-game';
 
+
 // --- globals -----------------------------------------------------------------
 const db = require('./db');
 const logger = require('./logging');
-const nodes = new Map();
-const idx2id = [];
-const links = [];
+const rooms = new Map();
 
-var percolationDone = false;
-var percolationResult = null;
 
 // --- functions ---------------------------------------------------------------
 function _addnode(req, url, res) {
   const ip = getIP(req);
   const data = url.searchParams;
   const id = (data.has('id') ? parseInt(data.id, 10) : false);
+  const roomPath = data.get('room', false);
 
   for (let param of ['name', 'neighbor1', 'neighbor2']) {
     if (!data.has(param)) {
@@ -42,7 +41,7 @@ function _addnode(req, url, res) {
 
   try {
     _addnode_internal(ip, data.get('name'), parseInt(data.get('neighbor1'), 10),
-                      parseInt(data.get('neighbor2'), 10), id);
+                      parseInt(data.get('neighbor2'), 10), id, roomPath);
   } catch (errorMessage) {
       return res.writeHead(400, {
         message: errorMessage,
@@ -52,9 +51,15 @@ function _addnode(req, url, res) {
 
   return res.end('okay');
 }
-function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
+function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false) {
+  // check if room exists
+  if (!rooms.has(roomPath)) {
+    throw 'Room not found.';
+  }
+  const room = rooms.get(roomPath);
+
   // check if percolation has started
-  if (percolationResult) {
+  if (room.percolationResult) {
     throw 'Cannot add nodes anymore, percolation has started.';
   }
 
@@ -64,7 +69,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
 
   // check if ip is unique
   let ipUnique = true;
-  nodes.forEach(function (n) {
+  room.nodes.forEach(function (n) {
     if (n.ip == ip) ipUnique = false;
   });
   if (!ipUnique && id === false) {
@@ -74,47 +79,46 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false) {
   // define ID for the new node
   let newIDi;
   if (id === false) {
-    newIDi = 500 + idx2id.length;
+    newIDi = 500 + room.idx2id.length;
   } else {
     newIDi = id;
   }
 
   // some checks on properties of the node
-  if (nodes.has(newIDi))
+  if (room.nodes.has(newIDi))
     throw `The id ${newIDi} has already been taken.`;
   if (isNaN(n1Idx) || typeof n1Idx !== 'number')
     throw 'Please select neighbor 1.';
-  if (n1Idx >= idx2id.length)
+  if (n1Idx >= room.idx2id.length)
     throw `Neighbor 1 (${n1Idx}) does not exist.`;
   if (isNaN(n2Idx) || typeof n2Idx !== 'number')
     throw 'Please select neighbor 2.';
-  if (n2Idx >= idx2id.length)
+  if (n2Idx >= room.idx2id.length)
     throw `Neighbor 2 (${n2Idx}) does not exist.`;
-  n1ID = idx2id[n1Idx];
-  n2ID = idx2id[n2Idx];
-  if (nodes.get(n1ID).degree >= MAX_DEGREE)
+  n1ID = room.idx2id[n1Idx];
+  n2ID = room.idx2id[n2Idx];
+  if (room.nodes.get(n1ID).degree >= MAX_DEGREE)
     throw `Neighbor1 ${n1ID} already has ${MAX_DEGREE} connections.`;
-  if (nodes.get(n2ID).degree >= MAX_DEGREE)
+  if (room.nodes.get(n2ID).degree >= MAX_DEGREE)
     throw `Neighbor2 ${n2ID} already has ${MAX_DEGREE} connections.`;
 
   // add node, update metadata
-  logger.debug(`adding node ${newIDi} with neighbors ${n1ID} and ${n2ID}`);
-  let idx = nodes.size;
-  nodes.set(newIDi, {
+  let idx = room.nodes.size;
+  room.nodes.set(newIDi, {
     name: name,
     degree: 2,
     idx: idx,
     ip: ip
   });
-  idx2id.push(newIDi);
-  db.query(`INSERT INTO nodes VALUES (${newIDi}, '${name}', ` +
+  room.idx2id.push(newIDi);
+  db.query(`INSERT INTO nodes VALUES (${newIDi}, ${room.id}, '${name}', ` +
       `'${ip}')`);
-  links.push([newIDi,n1ID]);
-  db.query(`INSERT INTO links VALUES (${newIDi}, ${n1ID})`);
-  links.push([newIDi,n2ID]);
-  db.query(`INSERT INTO links VALUES (${newIDi}, ${n2ID})`);
-  nodes.get(n1ID).degree++;
-  nodes.get(n2ID).degree++;
+  room.links.push([newIDi,n1ID]);
+  db.query(`INSERT INTO links (id_source, id_target) VALUES (${newIDi}, ${n1ID})`);
+  room.links.push([newIDi,n2ID]);
+  db.query(`INSERT INTO links (id_source, id_target) VALUES (${newIDi}, ${n2ID})`);
+  room.nodes.get(n1ID).degree++;
+  room.nodes.get(n2ID).degree++;
 
   return {id: newIDi, idx: idx};
 }
@@ -125,17 +129,29 @@ function _getdata(req, url, res) {
   const data = url.searchParams;
   const id = (data.has('id') && typeof data.get('id') === 'string' &&
               data.get('id') !== 'NaN' ? parseInt(data.get('id'), 10) : false);
+  const roomPath = data.get('room', false);
 
-  return res.end(JSON.stringify(_getdata_internal(ip, id)));
+  try {
+    return res.end(JSON.stringify(_getdata_internal(ip, id, roomPath)));
+  } catch (errorMessage) {
+    return res.writeHead(400, {
+      message: errorMessage,
+      errorfield: false
+    }).end();
+  }
 }
-function _getdata_internal(ip, id = false) {
+function _getdata_internal(ip, id = false, roomPath = false) {
+  if (!rooms.has(roomPath)) {
+    throw 'Room not found.';
+  }
+  const room = rooms.get(roomPath);
+
   var returnNodes = [];
-  nodes.forEach((n, nodeId) => {
+  room.nodes.forEach((n, nodeId) => {
     let newNode = {
       id: n.idx,
       name: n.name
     };
-    logger.debug(`checking if ${n.ip} equals ${ip}...`);
     if ((id === false && n.ip === ip) || (id !== false && id === nodeId)) {
       newNode.yours = true;
     }
@@ -143,17 +159,30 @@ function _getdata_internal(ip, id = false) {
   });
   var returnData = {
       nodes: returnNodes,
-      links: links.map((link) => {
+      links: room.links.map((link) => {
         return {
-          source: nodes.get(link[0]).idx,
-          target: nodes.get(link[1]).idx
+          source: room.nodes.get(link[0]).idx,
+          target: room.nodes.get(link[1]).idx
         }
       })
   };
-  if (percolationDone) {
-    returnData.percolation = percolationResult;
+  if (room.percolationDone) {
+    returnData.percolation = room.percolationResult;
   }
   return returnData;
+}
+
+function _rooms(req, url, res) {
+  res.setHeader('Content-Type', 'application/json');
+  var roomsResult = [];
+  rooms.forEach((room) => {
+    roomsResult.push({
+      id: room.id,
+      path: room.path,
+      name: room.name
+    });
+  });
+  res.end(JSON.stringify(roomsResult));
 }
 
 function _updatedata(req, url, res) {
@@ -194,7 +223,6 @@ function _percolate(res) {
   }
   // (Randomly) decide which links remain and merge connected components of remaining links
   const remainingLinks = _.sample(links, Math.ceil(links.length * SURVIVAL_P));
-  logger.debug(remainingLinks);
   let outputLinks = [];
   remainingLinks.forEach(function (link) {
     const [i, j] = link;
@@ -234,6 +262,7 @@ function _percolate(res) {
 }
 
 function _restart() {
+  throw 'not implemented; to be done';
   db.query(`SET FOREIGN_KEY_CHECKS = 0;
             TRUNCATE links;
             TRUNCATE nodes;
@@ -278,31 +307,58 @@ function getNodesArray() {
 }
 
 function initFromDB() {
-  nodes.clear();
-  links.length = 0;
-  idx2id.length = 0;
-  db.query('SELECT * from nodes', function(results) {
-    results.forEach((row, idx) => {
-      nodes.set(row.id, {
-        name: row.name,
-        degree: 0,
-        idx: idx,
-        ip: row.ip_address
-      });
-      idx2id.push(row.id);
+  rooms.clear();
+  db.query('SELECT * FROM rooms', function(roomResults) {
+    roomResults.forEach((roomRow) => {
+      db.query(`SELECT * FROM nodes WHERE room = ${roomRow.id}`, function(nodeResults) {
+        // find nodes in this room and store in memory
+        var nodes = new Map(),
+            idx2id = [],
+            links = [];
+        nodeResults.forEach((nodeRow, idx) => {
+          nodes.set(nodeRow.id, {
+            name: nodeRow.name,
+            degree: 0,
+            idx: idx,
+            ip: nodeRow.ip_address
+          });
+          idx2id.push(nodeRow.id);
+        });
+
+        // store room in memory
+        rooms.set(roomRow.path, {
+          // metadata
+          id: roomRow.id,
+          name: roomRow.name,
+          path: roomRow.path,
+          // network data
+          nodes: nodes,
+          idx2id: idx2id,
+          links: links,
+          // percolation data
+          percolationDone: false,
+          percolationResult: null
+        });
+
+        // add links to the room
+        db.query('SELECT `id_source`, `id_target` FROM `links` ' +
+            'LEFT JOIN `nodes` ON `links`.`id_source` = `nodes`.`id` WHERE ' +
+            '`nodes`.`room` = ' + roomRow.id, function(linkResults) {
+          linkResults.forEach((linkRow) => {
+            links.push([linkRow.id_source, linkRow.id_target]);
+            nodes.get(linkRow.id_source).degree++;
+            nodes.get(linkRow.id_target).degree++;
+          });
+        }, [
+          {id_source: 1, id_target: 2}
+        ]);
+      }, [
+        {id: 1, name: 'Dummy A', ip_address: null},
+        {id: 2, name: 'Dummy B', ip_address: null}
+      ]);
     });
   }, [
-    {id: 1, name: 'Dummy A', ip_address: null},
-    {id: 2, name: 'Dummy B', ip_address: null}
-  ]);
-  db.query('SELECT * from links', function(results) {
-    results.forEach((row) => {
-      links.push([row.id_source, row.id_target]);
-      nodes.get(row.id_source).degree++;
-      nodes.get(row.id_target).degree++;
-    });
-  }, [
-    {id_source: 1, id_target: 2}
+    {id: 1, name: 'Dummy Room', path: 'abcdefgh'}
   ]);
 }
 
@@ -346,7 +402,7 @@ function open(server) {
       }
       try {
         var node = _addnode_internal(ip, data.name, data.neighbors[0],
-                                    data.neighbors[1], data.id);
+                                    data.neighbors[1], data.id, data.room);
       } catch (errorMessage) {
         socket.emit('oops', errorMessage);
         return;
@@ -408,6 +464,11 @@ function route(req, res) {
       return _addnode(req, url, res);
     case 'getdata':
       return _getdata(req, url, res);
+    case 'r':
+      serveHtml(res, 'views/interface.html');
+      break;
+    case 'rooms':
+      return _rooms(req, url, res);
     case 'updatedata':
       return _updatedata(req, url, res);
     case ADMIN_PAGE:
@@ -426,11 +487,11 @@ function route(req, res) {
           percolationResult = null;
           return res.end('okay');
         default:
-          serveHtml(res, 'admin.html');
+          serveHtml(res, 'views/admin.html');
       }
       break;
     default:
-      serveHtml(res, 'interface.html');
+      serveHtml(res, 'views/index.html');
   }
 }
 

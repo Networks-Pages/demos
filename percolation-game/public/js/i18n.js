@@ -6,6 +6,7 @@
       // interface elements
       'add-node': 'Add node',
       'hide': 'Hide instructions',
+      'index-title': 'Netwerk Game',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
         can only connect to nodes that have <b>less than 5 neighbors</b>. `,
@@ -30,6 +31,8 @@
       'refresh': 'Refresh',
       'show': 'Show instructions',
       'title': 'Instructions',
+      'welcome-1': `This is the overview page of the network game. Select your
+        room to start.`,
       'your-name': 'Your name',
 
       // alerts and other interactive elements
@@ -43,6 +46,7 @@
       // interface elements
       'add-node': 'Voeg knoop toe',
       'hide': 'Verberg instructies',
+      'index-title': 'Netwerkspel',
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
         hun naam aan het netwerk toevoegen, die verbonden moet zijn met precies
         twee andere knopen. Je kunt alleen verbinding maken met knopen die
@@ -69,6 +73,8 @@
       'refresh': 'Verversen',
       'show': 'Toon instructies',
       'title': 'Instructies',
+      'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je
+        klaslokaal om te beginnen.`,
       'your-name': 'Jouw naam',
 
       // alerts and other interactive elements
