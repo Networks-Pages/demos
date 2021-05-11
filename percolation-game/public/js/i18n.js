@@ -4,10 +4,21 @@
   const i18n = {
     en: {
       // interface elements
+      'about': `This game introduces percolation theory in a light-mannered way.
+        It was designed and built originally for the <a
+        href="https://nvvw.nl/jaarvergadering/jaarvergadering-studiedag-2020/">
+        NVvW study day 2020</a> and has since been improved and extended to
+        support concurrent "play sessions" in so-called rooms. Development was
+        done by Thom Castermans and Martijn Gösgens. Special thanks to Nicos
+        Starreveld for the idea and coordination. You can find the code on <a
+        href="https://github.com/Networks-Pages/demos/tree/master/percolation-game">
+        GitHub</a>; try to run it locally if you are interested, improvements
+        and additions are welcome.`,
       'add-node': 'Add node',
       'back': 'Back to overview',
       'hide': 'Hide instructions',
       'index-title': 'Network Game',
+      'index-title-about': 'About the Game',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
         can only connect to nodes that have <b>less than 5 neighbors</b>. `,
@@ -48,10 +59,12 @@
     },
     nl: {
       // interface elements
+      'about': 'Over het spel...',
       'add-node': 'Voeg knoop toe',
       'back': 'Terug naar overzicht',
       'hide': 'Verberg instructies',
       'index-title': 'Netwerkspel',
+      'index-title-about': 'Over het spel',
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
         hun naam aan het netwerk toevoegen, die verbonden moet zijn met precies
         twee andere knopen. Je kunt alleen verbinding maken met knopen die

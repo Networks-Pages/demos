@@ -491,7 +491,8 @@ function routeAdmin(reqPath, res) {
 
 function serveHtml(res, filename, vars = {}) {
   vars['URL_PREFIX'] = URL_PREFIX;
-  fs.readFile(path.resolve(__dirname, filename), 'utf-8', function(err, data) {
+  var enc = (filename.endsWith('ejs') ? 'utf-8' : null);
+  fs.readFile(path.resolve(__dirname, filename), enc, function(err, data) {
     var contentType = mime.lookup(filename) || 'application/octet-stream',
         dynamic = false;
     if (filename.endsWith('ejs')) {
