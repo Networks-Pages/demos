@@ -83,10 +83,23 @@ const roomPath = pathSplit[3];
 $('form').on('submit', (e) => e.preventDefault());
 
 const socket = io({
-    path: '<%= URL_PREFIX %>/socket.io',
-    transports: ['polling']
+  path: '<%= URL_PREFIX %>/socket.io',
+  query: {
+    room: roomPath
+  },
+  transports: ['polling']
 });
 socket.on('connect', () => {
+  socket.once('get-data', (g) => {
+    graph = g; // populate global variable
+    graph.nodes.forEach(function(v) {
+      v.x = width/2;
+      v.y = height/2;
+    });
+    graph.links.forEach(addLink);
+    showGraph();
+  });
+
   socket.on('node-added', (node) => {
     addLinksFromNeighbors(node);
     updateVisualization();
@@ -311,24 +324,5 @@ function addLink(e) {
   e.x2 = e.target.x;
   e.y2 = e.target.y;
 }
-
-function retrieveGraph() {
-  var xmlHttp = new XMLHttpRequest();
-  xmlHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      graph = JSON.parse(this.responseText);
-      graph.nodes.forEach(function(v) {
-        v.x = width/2;
-        v.y = height/2;
-      });
-      graph.links.forEach(addLink);
-      showGraph();
-    }
-  };
-  xmlHttp.open('GET', `${URL_PREFIX}/getdata?room=${roomPath}`);
-  xmlHttp.send();
-}
-
-retrieveGraph();
 
 </script>

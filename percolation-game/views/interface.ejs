@@ -135,14 +135,17 @@ const userID = parseInt(searchParams.get('id'), 10);
 const socket = io({
   path: '/percolation-game/socket.io',
   query: {
-    id: userID
+    id: userID,
+    room: roomPath
   },
   transports: ['polling']
 });
 socket.on('connect', () => {
-  let btn = document.querySelector('button[data-i18n-key="refresh"]');
-  if (btn !== null) {
-    btn.parentNode.removeChild(btn);
+  // check if we have a room
+  if (typeof(roomPath) !== 'string') {
+    createAlert('Room not found.');
+  } else {
+    socket.once('get-data', loadGraph);
   }
 
   socket.on('node-added', (node) => {
@@ -445,6 +448,47 @@ function d3SelectOrCreate(parentSelector, tagName, childSelector = null) {
   return result;
 }
 
+function loadGraph(g) {
+  graph = g; // populate global variable
+  for (const id in graph.nodes) {
+    const n = graph.nodes[id];
+    n.x = width/2;
+    n.y = height/2;
+    if (n.yours === true) {
+      showUserAddedANode();
+    }
+  }
+  graph.links.forEach(addLink);
+  showGraph();
+  recomputeDegrees();
+  if (graph.percolation) {
+    showPercolation(graph.percolation);
+  }
+
+  // respond to changes in canvas size
+  // from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
+  const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
+    var containerWidth, containerHeight;
+    for (const entry of entries) {
+      if (entry.contentBoxSize) {
+        if (entry.contentBoxSize[0]) {
+          containerWidth = entry.contentBoxSize[0].inlineSize;
+          containerHeight = entry.contentBoxSize[0].blockSize;
+        } else {
+          containerWidth = entry.contentBoxSize.inlineSize;
+          containerHeight = entry.contentBoxSize.blockSize;
+        }
+      } else {
+        containerWidth = entry.contentRect.width;
+        containerHeight = entry.contentRect.height;
+      }
+    }
+    [width, height] = [containerWidth, containerHeight];
+    showGraph();
+  }, 1000));
+  canvasResizeObserver.observe(document.getElementById(containerID));
+}
+
 // based on https://stackoverflow.com/a/27078401
 // not perfect, but good enough (can be called faster after trailing call)
 function throttle(callback, limit) {
@@ -469,63 +513,6 @@ function throttle(callback, limit) {
 
 function zoomed(e) {
   d3.select('.zoom-container').attr('transform', e.transform);
-}
-
-
-// check if we have a room
-if (typeof(roomPath) !== 'string') {
-  createAlert('Room not found.');
-} else {
-  // Retrieve graph
-  var xmlHttp = new XMLHttpRequest();
-  xmlHttp.overrideMimeType("application/json");
-  xmlHttp.onreadystatechange = function() {
-    if (this.readyState == 4 && this.status == 200) {
-      graph = JSON.parse(this.responseText);
-      for (const id in graph.nodes) {
-        const n = graph.nodes[id];
-        n.x = width/2;
-        n.y = height/2;
-        if (n.yours === true) {
-          showUserAddedANode();
-        }
-      }
-      graph.links.forEach(addLink);
-      showGraph();
-      recomputeDegrees();
-      if (graph.percolation) {
-        showPercolation(graph.percolation);
-      }
-    } else {
-      handleAjaxError(this);
-    }
-  };
-  xmlHttp.open("GET", `${URL_PREFIX}/getdata?id=${userID}&room=${roomPath}`);
-  xmlHttp.send();
-
-
-  // respond to changes in canvas size
-  // from https://developer.mozilla.org/en-US/docs/Web/API/ResizeObserver#Examples
-  const canvasResizeObserver = new ResizeObserver(throttle((entries) => {
-    var containerWidth, containerHeight;
-    for (const entry of entries) {
-      if (entry.contentBoxSize) {
-        if (entry.contentBoxSize[0]) {
-          containerWidth = entry.contentBoxSize[0].inlineSize;
-          containerHeight = entry.contentBoxSize[0].blockSize;
-        } else {
-          containerWidth = entry.contentBoxSize.inlineSize;
-          containerHeight = entry.contentBoxSize.blockSize;
-        }
-      } else {
-        containerWidth = entry.contentRect.width;
-        containerHeight = entry.contentRect.height;
-      }
-    }
-    [width, height] = [containerWidth, containerHeight];
-    showGraph();
-  }, 1000));
-  canvasResizeObserver.observe(document.getElementById(containerID));
 }
 
 </script>

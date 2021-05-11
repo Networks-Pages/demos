@@ -123,23 +123,6 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false)
   return {id: newIDi, idx: idx};
 }
 
-function _getdata(req, url, res) {
-  res.setHeader('Content-Type', 'application/json');
-  const ip = getIP(req);
-  const data = url.searchParams;
-  const id = (data.has('id') && typeof data.get('id') === 'string' &&
-              data.get('id') !== 'NaN' ? parseInt(data.get('id'), 10) : false);
-  const roomPath = data.get('room', false);
-
-  try {
-    return res.end(JSON.stringify(_getdata_internal(ip, id, roomPath)));
-  } catch (errorMessage) {
-    return res.writeHead(400, {
-      message: errorMessage,
-      errorfield: false
-    }).end();
-  }
-}
 function _getdata_internal(ip, id = false, roomPath = false) {
   if (!rooms.has(roomPath)) {
     throw 'Room not found.';
@@ -345,9 +328,14 @@ function open(server) {
     const userID = (socket.handshake.query.hasOwnProperty('userID') &&
         socket.handshake.query.userID !== 'NaN' ?
         parseInt(socket.handshake.query.userID, 10) : false);
+    const roomPath = (socket.handshake.query.hasOwnProperty('room') &&
+        socket.handshake.query.room !== 'NaN' ?
+        socket.handshake.query.room : false);
     const key = socket.conn.id;
     connections[key] = {socket, userID};
-    socket.conn.on('close', () => delete connections[key]);
+    socket.once('disconnect', () => delete connections[key]);
+
+    socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
 
     socket.on('add-node', (data) => {
       if (typeof data !== 'object') {
@@ -460,8 +448,6 @@ function route(req, res) {
 
   // route request
   switch (reqPath[0]) {
-    case 'getdata':
-      return _getdata(req, url, res);
     case 'r':
       serveHtml(res, 'views/interface.ejs');
       break;
