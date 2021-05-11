@@ -227,6 +227,29 @@ function close(server) {
   server.destroy();
 }
 
+/**
+ * Creates a room in memory and inserts it into the DB if the `id` is `false`.
+ */
+function createRoom(roomRow) {
+  rooms.set(roomRow.path, {
+    // metadata
+    id: roomRow.id,
+    name: roomRow.name,
+    path: roomRow.path,
+    secret: roomRow.secret,
+    // internal data
+    connections: {},
+    // network data
+    nodes: new Map(),
+    idx2id: [],
+    links: [],
+    // percolation data
+    percolationDone: false,
+    percolationResult: null
+  });
+  // TODO: insert into DB if needed, populate ID
+}
+
 function emitAll(connections, room) {
   const emitArgs = Array.from(arguments).slice(2);
   // emit to all connections in the same room, if this came from a room
@@ -264,27 +287,35 @@ function getNodesArray() {
   });
 }
 
+function getRoomsForIndex() {
+  const roomsResult = [{
+    id: -1,
+    path: 'dummy',
+    name: 'template',
+    numNodes: 0
+  }];
+  rooms.forEach((room) => {
+    roomsResult.push({
+      id: room.id,
+      path: room.path,
+      name: room.name,
+      numNodes: room.nodes.size
+    });
+  });
+  roomsResult.sort((r1, r2) => {
+    if (r1.id < 0)  return -1;
+    if (r2.id < 0)  return 1;
+    return r1.name.localeCompare(r2.name);
+  });
+  return roomsResult;
+}
+
 function initFromDB() {
   rooms.clear();
   db.query('SELECT * FROM rooms', function(roomResults) {
     roomResults.forEach((roomRow) => {
       // store room in memory
-      rooms.set(roomRow.path, {
-        // metadata
-        id: roomRow.id,
-        name: roomRow.name,
-        path: roomRow.path,
-        secret: roomRow.secret,
-        // internal data
-        connections: {},
-        // network data
-        nodes: new Map(),
-        idx2id: [],
-        links: [],
-        // percolation data
-        percolationDone: false,
-        percolationResult: null
-      });
+      createRoom(roomRow);
       initRoomFromDB(rooms.get(roomRow.path));
     });
   }, [
@@ -321,6 +352,16 @@ function initRoomFromDB(room) {
     {id: 1, name: 'Dummy A', ip_address: null},
     {id: 2, name: 'Dummy B', ip_address: null}
   ]);
+}
+
+function makeId(length) {
+  var result = [],
+      chars = 'abcdefghijklmnopqrstuvwxyz0123456789',
+      charsLen = chars.length;
+  for (let i = 0; i < length; ++i) {
+    result.push(chars.charAt(Math.floor(Math.random() * charsLen)));
+  }
+  return result.join('');
 }
 
 function open(server) {
@@ -391,6 +432,23 @@ function open(server) {
         name: data.name,
         neighbor1: data.neighbors[0],
         neighbor2: data.neighbors[1]
+      });
+    });
+
+    socket.on('add-room', (name, secret) => {
+      const roomPath = makeId(8);
+      createRoom({
+        id: false,
+        name: name,
+        path: roomPath,
+        secret: secret
+      });
+      const room = rooms.get(roomPath);
+      initRoomFromDB(room);
+      emitAll(connections, null, 'room-added', {
+        name: name,
+        path: roomPath,
+        numNodes: room.nodes.size
       });
     });
 
@@ -483,17 +541,8 @@ function route(req, res) {
       serveHtml(res, 'views/interface.ejs');
       break;
     default:
-      var roomsResult = [];
-      rooms.forEach((room) => {
-        roomsResult.push({
-          id: room.id,
-          path: room.path,
-          name: room.name,
-          numNodes: room.nodes.size
-        });
-      });
       serveHtml(res, 'views/index.ejs', {
-        rooms: roomsResult,
+        rooms: getRoomsForIndex(),
         search: url.searchParams
       });
   }

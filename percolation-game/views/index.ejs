@@ -11,10 +11,14 @@
         integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
         crossorigin="anonymous">
   <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.4.1/font/bootstrap-icons.css">
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
   <style>
     .mw-25 {
       max-width: 25% !important;
+    }
+
+    .spinner-border.spinner-border-sm {
+      vertical-align: -.125rem; /* copy .bi style */
     }
   </style>
 </head>
@@ -28,14 +32,18 @@
         <p data-i18n-key="welcome-1"></p>
         <div class="list-group" id="rooms">
 <% rooms.forEach((room) => { %>
-          <a class="list-group-item list-group-item-action
-               d-flex justify-content-between align-items-center"
+          <a class="list-group-item list-group-item-action<%=
+                  room.id < 0 ? ' d-none' : ' d-flex'
+                %> justify-content-between align-items-center"
              href="<%= URL_PREFIX %>/r/<%= room.path %>"
-             id="r-<%= room.path %>">
-            <%= room.name %>
-            <span class="badge badge-info badge-pill">
-              <span class="num-nodes"><%= room.numNodes %></span>
-              <span data-i18n-key="nodes"></span>
+             id="r-<%= room.path %>"
+             data-name="<%= room.name %>">
+            <span>
+              <%= room.name %>
+              <span class="badge badge-info badge-pill ml-3">
+                <span class="num-nodes"><%= room.numNodes %></span>
+                <span data-i18n-key="nodes"></span>
+              </span>
             </span>
             <button type="button" class="btn btn-dark">
               <i class="bi bi-toggles"></i>
@@ -43,6 +51,20 @@
           </a>
 <% }); %>
         </div>
+      </div>
+      <div class="col-12 mt-3 d-flex justify-content-end align-items-start">
+        <form class="mr-sm-3">
+          <input type="text" class="form-control" id="room-name"
+              data-i18n-key="room-name" data-i18n-attr="placeholder">
+          <div class="invalid-feedback" data-i18n-key="room-feedback"></div>
+          <div class="valid-feedback"></div>
+        </form>
+        <button class="btn btn-dark" id="btn-add-room" disabled>
+          <i class="bi bi bi-plus-lg"></i>
+          <div class="spinner-border spinner-border-sm d-none" role="status">
+            <span class="sr-only">Loading...</span>
+          </div>
+        </button>
       </div>
     </div>
 
@@ -91,9 +113,30 @@
       }
     }
 
+    function indicateRoomLoading(loading) {
+      $addRoom.children().each((i, el) => {
+        var $el = $(el);
+        $el.toggleClass('d-none', ($el.is('i') === loading));
+      });
+    }
+
+    function makeId(length) {
+      var result = [],
+          chars = 'abcdefghijklmnopqrstuvwxyz0123456789',
+          charsLen = chars.length;
+      for (let i = 0; i < length; ++i) {
+        result.push(chars.charAt(Math.floor(Math.random() * charsLen)));
+      }
+      return result.join('');
+    }
+
+
+    // remove first item from rooms list, it is a template
+    const $list = $('#rooms'),
+          $roomTemplate = $list.children().eq(0);
+    $roomTemplate.remove().removeClass('d-none').addClass('d-flex');
 
     // let user enter a secret when clicking a button in the rooms list
-    var $list = $('#rooms');
     $list.on('click', 'input', (event) => event.preventDefault());
     $list.on('click', 'button', function(event) {
       event.preventDefault();
@@ -129,6 +172,8 @@
       transports: ['polling']
     });
     socket.on('connect', () => {
+      $('#btn-add-room').prop('disabled', false);
+
       socket.on('node-added', (room, node) => {
         var $span = $(`#r-${room} .num-nodes`);
         $span.text(parseInt($span.text(), 10) + 1);
@@ -137,6 +182,48 @@
       socket.on('restart', (room, graph) => {
         $(`#r-${room} .num-nodes`).text(graph.nodes.length);
       });
+
+      socket.on('room-added', (room) => {
+        indicateRoomLoading(false);
+        let $room = $roomTemplate.clone();
+        $room.data('name', room.name);
+        $room.attr('href', `${URL_PREFIX}/r/${room.path}`);
+        $room.attr('id', `r-${room.path}`);
+        $room.find('span:eq(0)').contents().get(0).nodeValue = room.name;
+        $room.find('.num-nodes').text(room.numNodes);
+
+        let inserted = false;
+        $list.children().each(function() {
+          let $otherRoom = $(this);
+          if (room.name.localeCompare($otherRoom.data('name')) < 0) {
+            $otherRoom.before($room);
+            inserted = true;
+            return false; // break
+          }
+        });
+        if (!inserted)  $list.append($room);
+      });
     });
+
+    // enable adding a room
+    const $roomName = $('#room-name'),
+          $addRoom = $('#btn-add-room');
+    $addRoom.prev('form').on('submit', (event) => {
+      event.preventDefault();
+      $addRoom.click();
+    });
+    $addRoom.on('click', () => {
+      if ($roomName.val().trim() === '') {
+        $roomName.addClass('is-invalid');
+      } else {
+        indicateRoomLoading(true);
+        let secret = makeId(8);
+        socket.emit('add-room', $roomName.val().trim(), secret);
+        $roomName.addClass('is-valid');
+        $roomName.siblings('.valid-feedback').text(
+            i18n.t('secret-is').replace(/%s/g, secret));
+      }
+    });
+    $roomName.on('keyup', () => $roomName.removeClass('is-invalid is-valid'));
   </script>
 </body>

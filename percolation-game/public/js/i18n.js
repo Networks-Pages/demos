@@ -44,7 +44,10 @@
       'percolation-do': 'Do percolation',
       'percolation-speed': 'Percolation speed',
       'reset': 'Reset network',
+      'room-feedback': 'Cannot be empty or only whitespace.',
+      'room-name': 'Room name',
       'secret': 'secret',
+      'secret-is': 'Your secret is %s.',
       'show': 'Show instructions',
       'title': 'Instructions',
       'welcome-1': `This is the overview page of the network game. Select your
@@ -103,7 +106,10 @@
       'percolation-do': 'Voer percolatie uit',
       'percolation-speed': 'Percolatie snelheid',
       'reset': 'Reset netwerk',
+      'room-feedback': 'Mag niet leeg zijn of alleen witruimte.',
+      'room-name': 'Naam klaslokaal',
       'secret': 'wachtwoord',
+      'secret-is': 'Je wachtwoord is %s.',
       'show': 'Toon instructies',
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je
