@@ -403,7 +403,7 @@ function open(server) {
     });
 
     if (roomPath !== false) {
-        socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
+      socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
     }
 
     socket.on('add-node', (data) => {

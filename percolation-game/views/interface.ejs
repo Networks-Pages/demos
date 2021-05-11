@@ -135,7 +135,7 @@ const userID = parseInt(searchParams.get('id'), 10);
 const socket = io({
   path: '/percolation-game/socket.io',
   query: {
-    id: userID,
+    userID: userID,
     room: roomPath
   },
   transports: ['polling']
