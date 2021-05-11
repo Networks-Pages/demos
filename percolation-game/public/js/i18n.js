@@ -59,7 +59,17 @@
     },
     nl: {
       // interface elements
-      'about': 'Over het spel...',
+      'about': `Dit spel introduceert percolatie theorie en bovenal netwerken,
+        op een speelse manier. Het is oorspronkelijk bedacht en gebouwd voor de
+        <a href="https://nvvw.nl/jaarvergadering/jaarvergadering-studiedag-2020/">
+        NVvW studiedag 2020</a> en is daarna verbeterd en uitgebreid met
+        functionaliteit om parallelle speelsessies in zogenaamde klaslokalen te
+        ondersteunen. Thom Castermans en Martijn Gösgens hebben het spel
+        ontwikkeld, met dank aan Nicos Starreveld voor het idee en de
+        coördinatie. Je kunt de broncode terugvinden op <a
+        href="https://github.com/Networks-Pages/demos/tree/master/percolation-game">
+        GitHub</a>; probeer het eens lokaal uit te voeren als je geïnteresseerd
+        bent, verbeteringen en aanvullingen zijn welkom.`,
       'add-node': 'Voeg knoop toe',
       'back': 'Terug naar overzicht',
       'hide': 'Verberg instructies',
