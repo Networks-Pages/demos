@@ -467,6 +467,17 @@ function open(server) {
         }
     });
 
+    socket.on('remove-room', (roomPath, secret) => {
+      const room = rooms.get(roomPath);
+      if (room.secret !== secret) {
+        socket.emit('remove-room-error', roomPath, 'invalid_secret');
+        return;
+      }
+      rooms.delete(roomPath);
+      // TODO: delete from DB, reuse _restart?
+      emitAll(connections, room, 'room-removed', roomPath);
+    });
+
     socket.on('restart', (roomPath) => {
       if (rooms.has(roomPath)) {
         const room = rooms.get(roomPath);

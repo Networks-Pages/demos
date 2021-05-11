@@ -45,15 +45,20 @@
                 <span data-i18n-key="nodes"></span>
               </span>
             </span>
-            <button type="button" class="btn btn-dark">
-              <i class="bi bi-toggles"></i>
-            </button>
+            <div class="btn-group" role="group" aria-label="room actions">
+              <button type="button" class="btn btn-dark" data-action="admin">
+                <i class="bi bi-toggles"></i>
+              </button>
+              <button type="button" class="btn btn-dark" data-action="trash">
+                <i class="bi bi-trash-fill"></i>
+              </button>
+            </div>
           </a>
 <% }); %>
         </div>
       </div>
       <div class="col-12 mt-3 d-flex justify-content-end align-items-start">
-        <form class="mr-sm-3">
+        <form class="mr-sm-3" autocomplete="off">
           <input type="text" class="form-control" id="room-name"
               data-i18n-key="room-name" data-i18n-attr="placeholder">
           <div class="invalid-feedback" data-i18n-key="room-feedback"></div>
@@ -142,19 +147,24 @@
       event.preventDefault();
 
       var $btn = $(this),
-          roomURL = $btn.parent().attr('href'),
-          $input = $(`<input type="text" class="form-control"
+          roomPath = $btn.closest('a').attr('id').substr(2),
+          roomURL = $btn.closest('a').attr('href'),
+          $input = $(`<input type="password" class="form-control"
               name="secret" placeholder="${i18n.t('secret')}">`),
           $form = $(`<form method="post" action="${roomURL}"
               autocomplete="off" />`);
       if ($btn.data('error') === 'invalid_secret') {
         $input.addClass('is-invalid');
       }
-      $btn.replaceWith($form.append($input));
+      $btn.parent().replaceWith($form.append($input));
       $input.on('keypress', (event) => {
         if (event.keyCode === 13) { // prevent enter key from activating
           event.preventDefault();   // the outer anchor, instead submit
-          $form.submit();           // the form that the input is in
+          if ($btn.data('action') === 'admin') {
+            $form.submit();         // the form that the input is in, or...
+          } else { // trash action  // ...an event to ask to remove the room
+            socket.emit('remove-room', roomPath, $input.val());
+          }
         }
       }).focus();
     });
@@ -177,6 +187,12 @@
       socket.on('node-added', (room, node) => {
         var $span = $(`#r-${room} .num-nodes`);
         $span.text(parseInt($span.text(), 10) + 1);
+      });
+
+      socket.on('remove-room-error', (room, err) => {
+        if (err === 'invalid_secret') {
+          $(`#r-${room} input[name="secret"]`).addClass('is-invalid');
+        }
       });
 
       socket.on('restart', (room, graph) => {
@@ -205,6 +221,10 @@
       });
     });
 
+    socket.on('room-removed', (room) => {
+      $(`#r-${room}`).remove();
+    });
+
     // enable adding a room
     const $roomName = $('#room-name'),
           $addRoom = $('#btn-add-room');
@@ -224,6 +244,10 @@
             i18n.t('secret-is').replace(/%s/g, secret));
       }
     });
-    $roomName.on('keyup', () => $roomName.removeClass('is-invalid is-valid'));
+    $roomName.on('keyup', (event) => {
+      if (event.keyCode !== 13) { // ignore enter key in input for submitting
+        $roomName.removeClass('is-invalid is-valid');
+      }
+    });
   </script>
 </body>

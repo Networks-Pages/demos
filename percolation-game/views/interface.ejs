@@ -183,6 +183,13 @@ socket.on('connect', () => {
     nodes.classed("lost", false);
     $('#instructions-container, #add-node-container').show();
   });
+
+  socket.on('room-removed', (room) => {
+    // just to be sure, even though we will only get this message for our room
+    if (room === roomPath) {
+      document.location.href = URL_PREFIX; // go back to overview
+    }
+  });
 });
 
 var graph = null;
