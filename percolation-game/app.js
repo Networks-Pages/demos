@@ -335,7 +335,9 @@ function open(server) {
     connections[key] = {socket, userID};
     socket.once('disconnect', () => delete connections[key]);
 
-    socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
+    if (roomPath !== false) {
+        socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
+    }
 
     socket.on('add-node', (data) => {
       if (typeof data !== 'object') {
