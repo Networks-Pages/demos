@@ -108,8 +108,8 @@
     </div>
   </div><!-- /.container-fluid -->
 </body>
-<script src="/percolation-game/js/i18n.js"></script>
-<script src="/percolation-game/socket.io/socket.io.js"></script>
+<script src="<%= URL_PREFIX %>/js/i18n.js"></script>
+<script src="<%= URL_PREFIX %>/socket.io/socket.io.js"></script>
 <script src="https://d3js.org/d3.v6.min.js"></script>
 <!--<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>-->
 <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
@@ -164,12 +164,16 @@ socket.on('connect', () => {
 
   socket.on('restart', (graphData) => {
     graph = graphData;
+    selected = [false, false];
     for (const id in graph.nodes) {
       const n = graph.nodes[id];
       n.x = width/2;
       n.y = height/2;
       if (n.yours === true) {
         showUserAddedANode();
+        selected = graph.links
+            .filter((link) => link.source === id)
+            .map((link) => link.target);
       }
     }
     graph.links.forEach(addLink);
@@ -450,12 +454,16 @@ function d3SelectOrCreate(parentSelector, tagName, childSelector = null) {
 
 function loadGraph(g) {
   graph = g; // populate global variable
+  selected = [false, false];
   for (const id in graph.nodes) {
     const n = graph.nodes[id];
     n.x = width/2;
     n.y = height/2;
     if (n.yours === true) {
       showUserAddedANode();
+      selected = graph.links
+        .filter((link) => link.source === id)
+        .map((link) => link.target);
     }
   }
   graph.links.forEach(addLink);

@@ -34,8 +34,8 @@
              id="r-<%= room.path %>">
             <%= room.name %>
             <span class="badge badge-info badge-pill">
-              <%= room.numNodes %>
-              nodes
+              <span class="num-nodes"><%= room.numNodes %></span>
+              <span data-i18n-key="nodes"></span>
             </span>
             <button type="button" class="btn btn-dark">
               <i class="bi bi-toggles"></i>
@@ -60,6 +60,7 @@
   </div><!-- /.container -->
 
   <script src="<%= URL_PREFIX %>/js/i18n.js"></script>
+  <script src="<%= URL_PREFIX %>/socket.io/socket.io.js"></script>
   <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"
           integrity="sha384-DfXdz2htPH0lsSSs5nCTpuj/zy4C+OGpamoFVy38MVBnE+IbbVYUew+OrCXaRkfj"
           crossorigin="anonymous"></script>
@@ -121,5 +122,21 @@
       .data('error', '<%= search.get('error') %>')
       .click();
 <% } %>
+
+    // open a socket.io connection, update list on changes
+    const socket = io({
+      path: '/percolation-game/socket.io',
+      transports: ['polling']
+    });
+    socket.on('connect', () => {
+      socket.on('node-added', (room, node) => {
+        var $span = $(`#r-${room} .num-nodes`);
+        $span.text(parseInt($span.text(), 10) + 1);
+      });
+
+      socket.on('restart', (room, graph) => {
+        $(`#r-${room} .num-nodes`).text(graph.nodes.length);
+      });
+    });
   </script>
 </body>

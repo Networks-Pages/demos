@@ -39,6 +39,7 @@
         deleting the link when heads is thrown and deleting the link otherwise.
         The question then, is what the network looks like after this process.
         In this game, we will experience this process in practice!`,
+      'nodes': 'nodes',
       'page-title': 'Network Game',
       'percolation-do': 'Do percolation',
       'percolation-speed': 'Percolation speed',
@@ -97,6 +98,7 @@
         een (mogelijk oneerlijke) munt op te gooien en de verbinding bij kop te verwijderen.
         Men is vervolgens geïnteresseerd in hoe het resulterende netwerk eruit ziet.
         In dit spel gaan we dit samen live ontdekken!`,
+      'nodes': 'knopen',
       'page-title': 'Netwerkspel',
       'percolation-do': 'Voer percolatie uit',
       'percolation-speed': 'Percolatie snelheid',

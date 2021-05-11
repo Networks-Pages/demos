@@ -227,10 +227,23 @@ function close(server) {
   server.destroy();
 }
 
-function emitAll(connections) {
-  const emitArgs = Array.from(arguments).slice(1);
+function emitAll(connections, room) {
+  const emitArgs = Array.from(arguments).slice(2);
+  // emit to all connections in the same room, if this came from a room
+  if (room !== null) {
+    for (let key in room.connections) {
+      let conn = room.connections[key];
+      conn.socket.emit.apply(conn.socket, emitArgs.map((arg) =>
+          (_.isFunction(arg) ? arg.call(null, conn) : arg)));
+    }
+    // insert room into data for index page connections
+    emitArgs.splice(1, 0, room.path);
+  }
+  // emit to all non-room (index page) connections
   for (let key in connections) {
-    connections[key].socket.emit.apply(connections[key].socket, emitArgs);
+    let conn = connections[key];
+    conn.socket.emit.apply(conn.socket, emitArgs.map((arg) =>
+        (_.isFunction(arg) ? arg.call(null, conn) : arg)));
   }
 }
 
@@ -262,6 +275,8 @@ function initFromDB() {
         name: roomRow.name,
         path: roomRow.path,
         secret: roomRow.secret,
+        // internal data
+        connections: {},
         // network data
         nodes: new Map(),
         idx2id: [],
@@ -319,7 +334,7 @@ function open(server) {
   // initialize socket.io; closing logic from
   // https://github.com/socketio/socket.io/issues/1602#issuecomment-120561951
   const io = require('socket.io')(server, {path: '/percolation-game/socket.io'});
-  const connections = {};
+  const connections = {}; // connections not tied to a room (i.e. index page)
 
   io.on('connection', socket => {
     const ip = socket.handshake.headers['x-real-ip'] ||
@@ -331,9 +346,20 @@ function open(server) {
     const roomPath = (socket.handshake.query.hasOwnProperty('room') &&
         socket.handshake.query.room !== 'NaN' ?
         socket.handshake.query.room : false);
+    const room = (rooms.has(roomPath) ? rooms.get(roomPath) : null);
     const key = socket.conn.id;
-    connections[key] = {socket, userID};
-    socket.once('disconnect', () => delete connections[key]);
+    if (room === null) {
+      connections[key] = {socket, userID};
+    } else {
+      room.connections[key] = {socket, userID};
+    }
+    socket.once('disconnect', () => {
+      if (room === null) {
+        delete connections[key];
+      } else {
+        delete room.connections[key];
+      }
+    });
 
     if (roomPath !== false) {
         socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
@@ -360,7 +386,7 @@ function open(server) {
         socket.emit('oops', errorMessage);
         return;
       }
-      emitAll(connections, 'node-added', {
+      emitAll(connections, room, 'node-added', {
         id: node.idx,
         name: data.name,
         neighbor1: data.neighbors[0],
@@ -370,7 +396,7 @@ function open(server) {
 
     socket.on('percolate', (roomPath) => {
         if (rooms.has(roomPath)) {
-          emitAll(connections, 'percolate-start',
+          emitAll(connections, room, 'percolate-start',
                   _percolate(true, rooms.get(roomPath)));
         }
     });
@@ -379,7 +405,7 @@ function open(server) {
         if (rooms.has(roomPath)) {
           const room = rooms.get(roomPath);
           room.percolationDone = true;
-          emitAll(connections, 'percolate-done', room.percolationResult);
+          emitAll(connections, room, 'percolate-done', room.percolationResult);
         }
     });
 
@@ -388,10 +414,8 @@ function open(server) {
         const room = rooms.get(roomPath);
         _restart(room);
         setTimeout(() => {
-          for (let key in connections) {
-            connections[key].socket.emit('restart', _getdata_internal(ip,
-              connections[key].userID, roomPath));
-          }
+          emitAll(connections, room, 'restart',
+                  (conn) => _getdata_internal(ip, conn.userID, roomPath));
         }, 250);
       }
     });
@@ -402,6 +426,11 @@ function open(server) {
     for (let key in connections) {
       connections[key].socket.disconnect(true);
     }
+    rooms.forEach((room) => {
+      for (let key in room.connections) {
+        room.connections[key].socket.disconnect(true);
+      }
+    });
     server.close();
   }
 }
