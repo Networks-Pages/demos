@@ -147,49 +147,49 @@ socket.on('connect', () => {
   } else {
     socket.once('get-data', loadGraph);
   }
+});
 
-  socket.on('node-added', (node) => {
-    addLinksFromNeighbors(node);
-    updateVisualization();
-    recomputeDegrees();
-  });
+socket.on('node-added', (node) => {
+  addLinksFromNeighbors(node);
+  updateVisualization();
+  recomputeDegrees();
+});
 
-  socket.on('oops', (errorMessage) => {
-    createAlert(errorMessage);
-  });
+socket.on('oops', (errorMessage) => {
+  createAlert(errorMessage);
+});
 
-  socket.on('percolate-done', (percolation) => {
-    showPercolation(percolation);
-  });
+socket.on('percolate-done', (percolation) => {
+  showPercolation(percolation);
+});
 
-  socket.on('restart', (graphData) => {
-    graph = graphData;
-    selected = [false, false];
-    for (const id in graph.nodes) {
-      const n = graph.nodes[id];
-      n.x = width/2;
-      n.y = height/2;
-      if (n.yours === true) {
-        showUserAddedANode();
-        selected = graph.links
-            .filter((link) => link.source === id)
-            .map((link) => link.target);
-      }
+socket.on('restart', (graphData) => {
+  graph = graphData;
+  selected = [false, false];
+  for (const id in graph.nodes) {
+    const n = graph.nodes[id];
+    n.x = width/2;
+    n.y = height/2;
+    if (n.yours === true) {
+      showUserAddedANode();
+      selected = graph.links
+          .filter((link) => link.source === id)
+          .map((link) => link.target);
     }
-    graph.links.forEach(addLink);
-    showGraph();
-    recomputeDegrees();
-    nodes.classed("win", false);
-    nodes.classed("lost", false);
-    $('#instructions-container, #add-node-container').show();
-  });
+  }
+  graph.links.forEach(addLink);
+  showGraph();
+  recomputeDegrees();
+  nodes.classed("win", false);
+  nodes.classed("lost", false);
+  $('#instructions-container, #add-node-container').show();
+});
 
-  socket.on('room-removed', (room) => {
-    // just to be sure, even though we will only get this message for our room
-    if (room === roomPath) {
-      document.location.href = URL_PREFIX; // go back to overview
-    }
-  });
+socket.on('room-removed', (room) => {
+  // just to be sure, even though we will only get this message for our room
+  if (room === roomPath) {
+    document.location.href = URL_PREFIX; // go back to overview
+  }
 });
 
 var graph = null;

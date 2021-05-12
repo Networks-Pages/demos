@@ -195,53 +195,53 @@
     });
     socket.on('connect', () => {
       $('#btn-add-room').prop('disabled', false);
+    });
 
-      socket.on('add-room-error', (name, err) => {
-        indicateRoomLoading(false);
-        if (err === 'name_taken') {
-          showRoomNameInvalid('taken');
+    socket.on('add-room-error', (name, err) => {
+      indicateRoomLoading(false);
+      if (err === 'name_taken') {
+        showRoomNameInvalid('taken');
+      }
+    });
+
+    socket.on('node-added', (room, node) => {
+      var $span = $(`#r-${room} .num-nodes`);
+      $span.text(parseInt($span.text(), 10) + 1);
+    });
+
+    socket.on('remove-room-error', (room, err) => {
+      if (err === 'invalid_secret') {
+        $(`#r-${room} input[name="secret"]`).addClass('is-invalid');
+      }
+    });
+
+    socket.on('restart', (room, graph) => {
+      $(`#r-${room} .num-nodes`).text(graph.nodes.length);
+    });
+
+    socket.on('room-added', (room) => {
+      indicateRoomLoading(false);
+      $roomName.addClass('is-valid');
+      $roomName.siblings('.valid-feedback').text(
+          i18n.t('secret-is').replace(/%s/g, $roomName.data('secret')));
+
+      let $room = $roomTemplate.clone();
+      $room.data('name', room.name);
+      $room.attr('href', `${URL_PREFIX}/r/${room.path}`);
+      $room.attr('id', `r-${room.path}`);
+      $room.find('span:eq(0)').contents().get(0).nodeValue = room.name;
+      $room.find('.num-nodes').text(room.numNodes);
+
+      let inserted = false;
+      $list.children().each(function() {
+        let $otherRoom = $(this);
+        if (room.name.localeCompare($otherRoom.data('name')) < 0) {
+          $otherRoom.before($room);
+          inserted = true;
+          return false; // break
         }
       });
-
-      socket.on('node-added', (room, node) => {
-        var $span = $(`#r-${room} .num-nodes`);
-        $span.text(parseInt($span.text(), 10) + 1);
-      });
-
-      socket.on('remove-room-error', (room, err) => {
-        if (err === 'invalid_secret') {
-          $(`#r-${room} input[name="secret"]`).addClass('is-invalid');
-        }
-      });
-
-      socket.on('restart', (room, graph) => {
-        $(`#r-${room} .num-nodes`).text(graph.nodes.length);
-      });
-
-      socket.on('room-added', (room) => {
-        indicateRoomLoading(false);
-        $roomName.addClass('is-valid');
-        $roomName.siblings('.valid-feedback').text(
-            i18n.t('secret-is').replace(/%s/g, $roomName.data('secret')));
-
-        let $room = $roomTemplate.clone();
-        $room.data('name', room.name);
-        $room.attr('href', `${URL_PREFIX}/r/${room.path}`);
-        $room.attr('id', `r-${room.path}`);
-        $room.find('span:eq(0)').contents().get(0).nodeValue = room.name;
-        $room.find('.num-nodes').text(room.numNodes);
-
-        let inserted = false;
-        $list.children().each(function() {
-          let $otherRoom = $(this);
-          if (room.name.localeCompare($otherRoom.data('name')) < 0) {
-            $otherRoom.before($room);
-            inserted = true;
-            return false; // break
-          }
-        });
-        if (!inserted)  $list.append($room);
-      });
+      if (!inserted)  $list.append($room);
     });
 
     socket.on('room-removed', (room) => {

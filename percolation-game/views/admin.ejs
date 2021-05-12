@@ -89,44 +89,43 @@ const socket = io({
   },
   transports: ['polling']
 });
-socket.on('connect', () => {
-  socket.once('get-data', (g) => {
-    graph = g; // populate global variable
-    graph.nodes.forEach(function(v) {
-      v.x = width/2;
-      v.y = height/2;
-    });
-    graph.links.forEach(addLink);
-    showGraph();
-  });
 
-  socket.on('node-added', (node) => {
-    addLinksFromNeighbors(node);
-    updateVisualization();
+socket.once('get-data', (g) => {
+  graph = g; // populate global variable
+  graph.nodes.forEach(function(v) {
+    v.x = width/2;
+    v.y = height/2;
   });
-
-  socket.on('oops', (errorMessage) => {
-    console.error(errorMessage);
-  });
-
-  socket.on('restart', (graphData) => {
-    graph = graphData;
-    graph.nodes.forEach(function(v) {
-      v.x = width/2;
-      v.y = height/2;
-    });
-    graph.links.forEach(addLink);
-    showGraph();
-    nodes.classed("win", false);
-  });
-
-  socket.on('room-removed', (room) => {
-    // just to be sure, even though we will only get this message for our room
-    if (room === roomPath) {
-      document.location.href = URL_PREFIX; // go back to overview
-    }
-  })
+  graph.links.forEach(addLink);
+  showGraph();
 });
+
+socket.on('node-added', (node) => {
+  addLinksFromNeighbors(node);
+  updateVisualization();
+});
+
+socket.on('oops', (errorMessage) => {
+  console.error(errorMessage);
+});
+
+socket.on('restart', (graphData) => {
+  graph = graphData;
+  graph.nodes.forEach(function(v) {
+    v.x = width/2;
+    v.y = height/2;
+  });
+  graph.links.forEach(addLink);
+  showGraph();
+  nodes.classed("win", false);
+});
+
+socket.on('room-removed', (room) => {
+  // just to be sure, even though we will only get this message for our room
+  if (room === roomPath) {
+    document.location.href = URL_PREFIX; // go back to overview
+  }
+})
 
 var graph;
 var containerID = "canvas";
