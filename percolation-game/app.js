@@ -24,7 +24,7 @@ const rooms = new Map();
 
 
 // --- functions ---------------------------------------------------------------
-function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false,
+function _addnode_internal(ip, name, n1Idx, n2Idx, roomPath = false,
     then = null) {
   // check if room exists
   if (!rooms.has(roomPath)) {
@@ -42,25 +42,17 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false,
     throw 'Please specify a name for your node.'
 
   // check if ip is unique
-  let ipUnique = true;
-  room.nodes.forEach(function (n) {
-    if (n.ip == ip) ipUnique = false;
-  });
-  if (!ipUnique && id === false) {
-    throw 'You have already added a node to the network.';
-  }
-
-  // define ID for the new node
-  let newIDi;
-  if (id === false) {
-    newIDi = 498 + room.idx2id.length;
-  } else {
-    newIDi = id;
+  if (room.uniqueIP) {
+    let ipUnique = true;
+    room.nodes.forEach(function (n) {
+      if (n.ip == ip) ipUnique = false;
+    });
+    if (!ipUnique) {
+      throw 'You have already added a node to the network.';
+    }
   }
 
   // some checks on properties of the node
-  if (room.nodes.has(newIDi))
-    throw `The id ${newIDi} has already been taken.`;
   if (isNaN(n1Idx) || typeof n1Idx !== 'number')
     throw 'Please select neighbor 1.';
   if (n1Idx >= room.idx2id.length)
@@ -80,8 +72,8 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false,
   db.query('INSERT INTO nodes (room, name, ip_address) VALUES (?, ?, ?)', {
     vars: [room.id, name, ip],
     callback: (result) => {
-      newIDi = result.insertId;
-      let idx = room.nodes.size;
+      let newIDi = result.insertId,
+          idx = room.nodes.size;
       room.nodes.set(newIDi, {
         name: name,
         degree: 2,
@@ -105,7 +97,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false,
   });
 }
 
-function _getdata_internal(ip, id = false, roomPath = false) {
+function _getdata_internal(ip, roomPath = false) {
   if (!rooms.has(roomPath)) {
     throw 'Room not found.';
   }
@@ -117,7 +109,7 @@ function _getdata_internal(ip, id = false, roomPath = false) {
       id: n.idx,
       name: n.name
     };
-    if ((id === false && n.ip === ip) || (id !== false && id === nodeId)) {
+    if (room.uniqueIP && n.ip === ip) {
       newNode.yours = true;
     }
     returnNodes.push(newNode);
@@ -224,6 +216,7 @@ function createRoom(roomRow, then = null) {
     name: roomRow.name,
     path: roomRow.path,
     secret: roomRow.secret,
+    uniqueIP: !!roomRow.uniqueIP,
     // internal data
     connections: {},
     // network data
@@ -235,16 +228,17 @@ function createRoom(roomRow, then = null) {
     percolationResult: null
   });
   // insert into DB if needed, populate ID
-  logger.debug(`created room ${roomRow.path} (${roomRow.id})`);
   if (roomRow.id === false) {
-    db.query(`INSERT INTO rooms (path, secret, name) VALUES (?, ?, ?)`, {
-        vars: [roomRow.path, roomRow.secret, roomRow.name],
-        callback: (result) => {
-          rooms.get(roomRow.path).id = result.insertId;
-          if (typeof(then) === 'function') {
-            then();
-          }
-        },
+    db.query(`INSERT INTO rooms (path, secret, name, unique_ip) VALUES
+        (?, ?, ?, ?)`, {
+      vars: [roomRow.path, roomRow.secret, roomRow.name,
+          (roomRow.uniqueIP ? 1 : 0)],
+      callback: (result) => {
+        rooms.get(roomRow.path).id = result.insertId;
+        if (typeof(then) === 'function') {
+          then();
+        }
+      },
     });
   } else if (typeof(then) === 'function') {
     then();
@@ -419,18 +413,15 @@ function open(server) {
     const ip = socket.handshake.headers['x-real-ip'] ||
                 socket.handshake.headers['!~passenger-client-address'] ||
                 socket.conn.remoteAddress;
-    const userID = (socket.handshake.query.hasOwnProperty('userID') &&
-        socket.handshake.query.userID !== 'NaN' ?
-        parseInt(socket.handshake.query.userID, 10) : false);
     const roomPath = (socket.handshake.query.hasOwnProperty('room') &&
         socket.handshake.query.room !== 'NaN' ?
         socket.handshake.query.room : false);
     const room = (rooms.has(roomPath) ? rooms.get(roomPath) : null);
     const key = socket.conn.id;
     if (room === null) {
-      connections[key] = {socket, userID};
+      connections[key] = {socket};
     } else {
-      room.connections[key] = {socket, userID};
+      room.connections[key] = {socket};
     }
     socket.once('disconnect', () => {
       if (room === null) {
@@ -441,7 +432,7 @@ function open(server) {
     });
 
     if (roomPath !== false) {
-      socket.emit('get-data', _getdata_internal(ip, userID, roomPath));
+      socket.emit('get-data', _getdata_internal(ip, roomPath));
     }
 
     socket.on('add-node', (data) => {
@@ -455,12 +446,9 @@ function open(server) {
           return;
         }
       }
-      if (!data.hasOwnProperty('id') || typeof data.id !== 'number') {
-        data.id = false;
-      }
       try {
         _addnode_internal(ip, data.name, data.neighbors[0],
-            data.neighbors[1], data.id, data.room, (node) => {
+            data.neighbors[1], data.room, (node) => {
               emitAll(connections, room, 'node-added', {
                 id: node.idx,
                 name: data.name,
@@ -473,7 +461,7 @@ function open(server) {
       }
     });
 
-    socket.on('add-room', (name, secret) => {
+    socket.on('add-room', (name, secret, uniqueIP) => {
       // prevent whitespace shenanigans, replace all whitespace by a single ' '
       name = name.replace(/\s+/g, ' ');
 
@@ -491,7 +479,8 @@ function open(server) {
           id: false,
           name: name,
           path: roomPath,
-          secret: secret
+          secret: secret,
+          uniqueIP: uniqueIP
         }, () => {
           const room = rooms.get(roomPath);
           _restart(room, () => {
@@ -537,7 +526,7 @@ function open(server) {
         const room = rooms.get(roomPath);
         _restart(room, () => {
             emitAll(connections, room, 'restart',
-                    (conn) => _getdata_internal(ip, conn.userID, roomPath));
+                    (conn) => _getdata_internal(ip, roomPath));
         });
       }
     });

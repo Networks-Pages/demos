@@ -129,13 +129,11 @@ const MAX_DEGREE = 5;
 const URL_PREFIX = '/' + pathSplit[1];
 
 const roomPath = pathSplit[3];
-const userID = parseInt(searchParams.get('id'), 10);
 
 
 const socket = io({
   path: '/percolation-game/socket.io',
   query: {
-    userID: userID,
     room: roomPath
   },
   transports: ['polling']
@@ -231,7 +229,6 @@ function addNode() {
   socket.emit('add-node', {
     name: name,
     neighbors: selected,
-    id: (isNaN(userID) ? false : userID),
     room: roomPath
   });
   socket.once('node-added', showUserAddedANode);

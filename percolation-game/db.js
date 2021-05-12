@@ -44,7 +44,7 @@ const db = {
           logger.error('Error connecting: ' + err.stack);
         } else {
           db.active = true;
-          logger.debug(`connected to database ${process.env.DB_USE}`);
+          logger.info(`connected to database ${process.env.DB_USE}`);
           if (then !== null && typeof then === 'function') {
             then();
           }
@@ -81,13 +81,11 @@ const db = {
     if (opts.vars !== null) {
       query = mysql.format(query, opts.vars);
     }
-    logger.debug('executing query', {query: query});
     db.conn.query(query, function(error, results, fields) {
       if (error) {
         logger.error('error executing query', {error: error});
         throw error;
       }
-      logger.debug('query results', {results: results});
       if (typeof opts.callback === 'function') {
         opts.callback(results, fields);
       }

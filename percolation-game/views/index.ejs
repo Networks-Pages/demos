@@ -58,11 +58,19 @@
         </div>
       </div>
       <div class="col-12 mt-3 d-flex justify-content-end align-items-start">
-        <form class="mr-sm-3" autocomplete="off">
-          <input type="text" class="form-control" id="room-name"
-              data-i18n-key="room-name" data-i18n-attr="placeholder">
-          <div class="invalid-feedback"></div>
-          <div class="valid-feedback"></div>
+        <form class="form-inline align-items-start" autocomplete="off">
+          <div class="custom-control custom-checkbox mt-sm-2 mr-sm-3">
+            <input type="checkbox" class="custom-control-input" id="unique-ip"
+                checked>
+            <label class="custom-control-label" for="unique-ip"
+                data-i18n-key="restrict-multiple-nodes"></label>
+          </div>
+          <div>
+            <input type="text" class="form-control mr-sm-3" id="room-name"
+                data-i18n-key="room-name" data-i18n-attr="placeholder">
+            <div class="invalid-feedback"></div>
+            <div class="valid-feedback"></div>
+          </div>
         </form>
         <button class="btn btn-dark" id="btn-add-room" disabled>
           <i class="bi bi bi-plus-lg"></i>
@@ -250,6 +258,7 @@
 
     // enable adding a room
     const $roomName = $('#room-name'),
+          $uniqueIp = $('#unique-ip'),
           $addRoom = $('#btn-add-room');
     $addRoom.prev('form').on('submit', (event) => {
       event.preventDefault();
@@ -262,7 +271,8 @@
         indicateRoomLoading(true);
         let secret = makeId(8);
         $roomName.data('secret', secret);
-        socket.emit('add-room', $roomName.val().trim(), secret);
+        socket.emit('add-room', $roomName.val().trim(), secret,
+            $uniqueIp.is(':checked'));
       }
     });
     $roomName.on('keyup', (event) => {
