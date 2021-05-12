@@ -1,5 +1,7 @@
 const mysql = require('mysql');
 
+const logger = require('./logging');
+
 
 const dbParams = {
   /**
@@ -32,16 +34,17 @@ const db = {
     } else if (!db.active) {
       db.conn = mysql.createConnection({
         host: 'localhost',
-        database: 'tcasterm_networks',
-        user: 'networks',
-        password: 'G6ca#z70',
+        database: process.env.DB_USE,
+        user: process.env.DB_USER,
+        password: process.env.DB_PASS,
         multipleStatements: true
       });
       db.conn.connect(function(err) {
         if (err) {
-          console.error('Error connecting: ' + err.stack);
+          logger.error('Error connecting: ' + err.stack);
         } else {
           db.active = true;
+          logger.debug(`connected to database ${process.env.DB_USE}`);
           if (then !== null && typeof then === 'function') {
             then();
           }
@@ -57,10 +60,17 @@ const db = {
     dbParams.mock = (mock === true);
   },
 
-  query: function(query, callback = null, mockResult = []) {
+  query: function(query, options = {}) {
+    const opts = {
+      callback: null,
+      mockResult: [],
+      vars: null
+    };
+    Object.assign(opts, options);
+
     if (dbParams.mock) {
-      if (typeof callback === 'function') {
-        callback(mockResult, null);
+      if (typeof opts.callback === 'function') {
+        opts.callback(opts.mockResult, null);
       }
       return;
     }
@@ -68,12 +78,18 @@ const db = {
     if (!db.active) {
       throw 'DB not connected';
     }
+    if (opts.vars !== null) {
+      query = mysql.format(query, opts.vars);
+    }
+    logger.debug('executing query', {query: query});
     db.conn.query(query, function(error, results, fields) {
       if (error) {
-          throw error;
+        logger.error('error executing query', {error: error});
+        throw error;
       }
-      if (typeof callback === 'function') {
-        callback(results, fields);
+      logger.debug('query results', {results: results});
+      if (typeof opts.callback === 'function') {
+        opts.callback(results, fields);
       }
     });
   }

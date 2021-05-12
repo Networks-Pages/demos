@@ -20,8 +20,9 @@
     "body": "^5.1.0",
     "ejs": "^3.1.6",
     "mime-types": "^2.1.30",
-    "node-mysql": "^0.4.2",
+    "mysql": "^2.18.1",
     "socket.io": "^2.4.1",
+    "underscore": "^1.13.1",
     "winston": "^3.3.3"
   }
 }

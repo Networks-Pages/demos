@@ -24,34 +24,8 @@ const rooms = new Map();
 
 
 // --- functions ---------------------------------------------------------------
-function _addnode(req, url, res) {
-  const ip = getIP(req);
-  const data = url.searchParams;
-  const id = (data.has('id') ? parseInt(data.id, 10) : false);
-  const roomPath = data.get('room', false);
-
-  for (let param of ['name', 'neighbor1', 'neighbor2']) {
-    if (!data.has(param)) {
-      return res.writeHead(400, {
-        message: `Please provide ${param}.`,
-        errorfield: param
-      }).end();
-    }
-  }
-
-  try {
-    _addnode_internal(ip, data.get('name'), parseInt(data.get('neighbor1'), 10),
-                      parseInt(data.get('neighbor2'), 10), id, roomPath);
-  } catch (errorMessage) {
-      return res.writeHead(400, {
-        message: errorMessage,
-        errorfield: false
-      }).end();
-  }
-
-  return res.end('okay');
-}
-function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false) {
+function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false,
+    then = null) {
   // check if room exists
   if (!rooms.has(roomPath)) {
     throw 'Room not found.';
@@ -79,7 +53,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false)
   // define ID for the new node
   let newIDi;
   if (id === false) {
-    newIDi = 500 + room.idx2id.length;
+    newIDi = 498 + room.idx2id.length;
   } else {
     newIDi = id;
   }
@@ -103,24 +77,32 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, id = false, roomPath = false)
     throw `Neighbor2 ${n2ID} already has ${MAX_DEGREE} connections.`;
 
   // add node, update metadata
-  let idx = room.nodes.size;
-  room.nodes.set(newIDi, {
-    name: name,
-    degree: 2,
-    idx: idx,
-    ip: ip
-  });
-  room.idx2id.push(newIDi);
-  db.query(`INSERT INTO nodes VALUES (${newIDi}, ${room.id}, '${name}', ` +
-      `'${ip}')`);
-  room.links.push([newIDi,n1ID]);
-  db.query(`INSERT INTO links (id_source, id_target) VALUES (${newIDi}, ${n1ID})`);
-  room.links.push([newIDi,n2ID]);
-  db.query(`INSERT INTO links (id_source, id_target) VALUES (${newIDi}, ${n2ID})`);
-  room.nodes.get(n1ID).degree++;
-  room.nodes.get(n2ID).degree++;
+  db.query('INSERT INTO nodes (room, name, ip_address) VALUES (?, ?, ?)', {
+    vars: [room.id, name, ip],
+    callback: (result) => {
+      newIDi = result.insertId;
+      let idx = room.nodes.size;
+      room.nodes.set(newIDi, {
+        name: name,
+        degree: 2,
+        idx: idx,
+        ip: ip
+      });
+      room.idx2id.push(newIDi);
 
-  return {id: newIDi, idx: idx};
+      // add links
+      [n1ID, n2ID].forEach((nID) => {
+        db.query('INSERT INTO links (id_source, id_target) VALUES (?, ?)', {
+          vars: [newIDi, nID],
+          callback: () => {
+            room.links.push([newIDi, nID]);
+            room.nodes.get(nID).degree++;
+            if (nID === n2ID)  callIfFunction(then)({id: newIDi, idx: idx});
+          },
+        });
+      });
+    },
+  });
 }
 
 function _getdata_internal(ip, id = false, roomPath = false) {
@@ -205,23 +187,28 @@ function _percolate(res, room) {
   return res.end(JSON.stringify(room.percolationResult));
 }
 
-function _restart(room) {
-  db.query(`DELETE FROM links WHERE NOT EXISTS (SELECT 1 FROM nodes
-              WHERE nodes.room = ${room.id} AND (nodes.id = links.id_source OR
-              nodes.id = links.id_target));
-            DELETE FROM nodes WHERE room = ${room.id};`);
-  room.nodes.clear();
-  room.idx2id.length = 0;
-  room.links.length = 0;
-  room.percolationDone = false;
-  room.percolationResult = null;
-  db.query(`INSERT INTO nodes (room, name) VALUES (${room.id}, 'Dummy A'),
-              (${room.id}, 'Dummy B')`);
-  // TODO: find IDs of inserted nodes
-  //db.query('INSERT INTO links VALUES (1, 2)');
-  initRoomFromDB(room);
+function _restart(room, then = null) {
+  deleteRoomNetwork(room, (result) => {
+    db.query(`INSERT INTO nodes (room, name) VALUES (${room.id}, 'Dummy A'),
+                  (${room.id}, 'Dummy B')`, {
+      callback: (result) => {
+        db.query(`INSERT INTO links (id_source, id_target) VALUES (${
+            result.insertId}, ${result.insertId + 1})`, {
+          callback: () => initRoomFromDB(room, then),
+        });
+      },
+    });
+  });
 }
 
+
+function callIfFunction(callback) {
+  return (...args) => {
+    if (typeof(callback) === 'function') {
+      callback.apply(null, Array.from(args));
+    }
+  };
+}
 
 function close(server) {
   server.destroy();
@@ -230,7 +217,7 @@ function close(server) {
 /**
  * Creates a room in memory and inserts it into the DB if the `id` is `false`.
  */
-function createRoom(roomRow) {
+function createRoom(roomRow, then = null) {
   rooms.set(roomRow.path, {
     // metadata
     id: roomRow.id,
@@ -247,7 +234,46 @@ function createRoom(roomRow) {
     percolationDone: false,
     percolationResult: null
   });
-  // TODO: insert into DB if needed, populate ID
+  // insert into DB if needed, populate ID
+  logger.debug(`created room ${roomRow.path} (${roomRow.id})`);
+  if (roomRow.id === false) {
+    db.query(`INSERT INTO rooms (path, secret, name) VALUES (?, ?, ?)`, {
+        vars: [roomRow.path, roomRow.secret, roomRow.name],
+        callback: (result) => {
+          rooms.get(roomRow.path).id = result.insertId;
+          if (typeof(then) === 'function') {
+            then();
+          }
+        },
+    });
+  } else if (typeof(then) === 'function') {
+    then();
+  }
+}
+
+function deleteRoom(room, then = null) {
+  deleteRoomNetwork(room, () => {
+    db.query('DELETE FROM rooms WHERE id = ?', {
+      vars: [room.id],
+      callback: callIfFunction(then),
+    });
+  });
+}
+
+function deleteRoomNetwork(room, then = null) {
+  db.query(`DELETE FROM links WHERE EXISTS (SELECT 1 FROM nodes
+              WHERE nodes.room = ${room.id} AND (nodes.id = links.id_source OR
+              nodes.id = links.id_target));
+            DELETE FROM nodes WHERE room = ${room.id};`, {
+    callback: () => {
+      room.nodes.clear();
+      room.idx2id.length = 0;
+      room.links.length = 0;
+      room.percolationDone = false;
+      room.percolationResult = null;
+      callIfFunction(then)();
+    },
+  });
 }
 
 function emitAll(connections, room) {
@@ -312,46 +338,58 @@ function getRoomsForIndex() {
 
 function initFromDB() {
   rooms.clear();
-  db.query('SELECT * FROM rooms', function(roomResults) {
-    roomResults.forEach((roomRow) => {
-      // store room in memory
-      createRoom(roomRow);
-      initRoomFromDB(rooms.get(roomRow.path));
-    });
-  }, [
-    {id: 1, name: 'Dummy Room', path: 'abcdefgh', secret: 'secret'}
-  ]);
+  db.query('SELECT * FROM rooms', {
+    callback: function(roomResults) {
+      roomResults.forEach((roomRow) => {
+        // store room in memory
+        createRoom(roomRow, () =>
+            initRoomFromDB(rooms.get(roomRow.path)));
+      });
+    },
+    mockResult: [
+      {id: 1, name: 'Dummy Room', path: 'abcdefgh', secret: 'secret'}
+    ],
+  });
 }
 
-function initRoomFromDB(room) {
-  db.query(`SELECT * FROM nodes WHERE room = ${room.id}`, function(nodeResults) {
-    // find nodes in this room and store in memory
-    nodeResults.forEach((nodeRow, idx) => {
-      room.nodes.set(nodeRow.id, {
-        name: nodeRow.name,
-        degree: 0,
-        idx: idx,
-        ip: nodeRow.ip_address
+function initRoomFromDB(room, then = null) {
+  db.query(`SELECT * FROM nodes WHERE room = ${room.id}`, {
+    callback: function(nodeResults) {
+      // find nodes in this room and store in memory
+      nodeResults.forEach((nodeRow, idx) => {
+        room.nodes.set(nodeRow.id, {
+          name: nodeRow.name,
+          degree: 0,
+          idx: idx,
+          ip: nodeRow.ip_address
+        });
+        room.idx2id.push(nodeRow.id);
       });
-      room.idx2id.push(nodeRow.id);
-    });
 
-    // add links to the room
-    db.query('SELECT `id_source`, `id_target` FROM `links` ' +
-        'LEFT JOIN `nodes` ON `links`.`id_source` = `nodes`.`id` WHERE ' +
-        '`nodes`.`room` = ' + room.id, function(linkResults) {
-      linkResults.forEach((linkRow) => {
-        room.links.push([linkRow.id_source, linkRow.id_target]);
-        room.nodes.get(linkRow.id_source).degree++;
-        room.nodes.get(linkRow.id_target).degree++;
+      // add links to the room
+      db.query('SELECT `id_source`, `id_target` FROM `links` ' +
+          'LEFT JOIN `nodes` ON `links`.`id_source` = `nodes`.`id` WHERE ' +
+          '`nodes`.`room` = ' + room.id, {
+        callback: function(linkResults) {
+          linkResults.forEach((linkRow) => {
+            room.links.push([linkRow.id_source, linkRow.id_target]);
+            room.nodes.get(linkRow.id_source).degree++;
+            room.nodes.get(linkRow.id_target).degree++;
+          });
+          if (typeof(then) === 'function') {
+            then();
+          }
+        },
+        mockResult: [
+          {id_source: 1, id_target: 2}
+        ],
       });
-    }, [
-      {id_source: 1, id_target: 2}
-    ]);
-  }, [
-    {id: 1, name: 'Dummy A', ip_address: null},
-    {id: 2, name: 'Dummy B', ip_address: null}
-  ]);
+    },
+    mockResult: [
+      {id: 1, name: 'Dummy A', ip_address: null},
+      {id: 2, name: 'Dummy B', ip_address: null}
+    ],
+  });
 }
 
 function makeId(length) {
@@ -366,7 +404,7 @@ function makeId(length) {
 
 function open(server) {
   // open database
-  if (STANDALONE) {
+  if (STANDALONE && !IS_PASSENGER) {
     db.setMock(true);
   }
   db.open(initFromDB);
@@ -421,18 +459,18 @@ function open(server) {
         data.id = false;
       }
       try {
-        var node = _addnode_internal(ip, data.name, data.neighbors[0],
-                                    data.neighbors[1], data.id, data.room);
+        _addnode_internal(ip, data.name, data.neighbors[0],
+            data.neighbors[1], data.id, data.room, (node) => {
+              emitAll(connections, room, 'node-added', {
+                id: node.idx,
+                name: data.name,
+                neighbor1: data.neighbors[0],
+                neighbor2: data.neighbors[1]
+              });
+            });
       } catch (errorMessage) {
         socket.emit('oops', errorMessage);
-        return;
       }
-      emitAll(connections, room, 'node-added', {
-        id: node.idx,
-        name: data.name,
-        neighbor1: data.neighbors[0],
-        neighbor2: data.neighbors[1]
-      });
     });
 
     socket.on('add-room', (name, secret) => {
@@ -450,18 +488,21 @@ function open(server) {
       // create room
       const roomPath = makeId(8);
       createRoom({
-        id: false,
-        name: name,
-        path: roomPath,
-        secret: secret
-      });
-      const room = rooms.get(roomPath);
-      initRoomFromDB(room);
-      emitAll(connections, null, 'room-added', {
-        name: name,
-        path: roomPath,
-        numNodes: room.nodes.size
-      });
+          id: false,
+          name: name,
+          path: roomPath,
+          secret: secret
+        }, () => {
+          const room = rooms.get(roomPath);
+          _restart(room, () => {
+            emitAll(connections, null, 'room-added', {
+              name: name,
+              path: roomPath,
+              numNodes: room.nodes.size
+            });
+          });
+        }
+      );
     });
 
     socket.on('percolate', (roomPath) => {
@@ -485,19 +526,19 @@ function open(server) {
         socket.emit('remove-room-error', roomPath, 'invalid_secret');
         return;
       }
-      rooms.delete(roomPath);
-      // TODO: delete from DB, reuse _restart?
-      emitAll(connections, room, 'room-removed', roomPath);
+      deleteRoom(room, () => {
+        rooms.delete(roomPath);
+        emitAll(connections, room, 'room-removed', roomPath);
+      });
     });
 
     socket.on('restart', (roomPath) => {
       if (rooms.has(roomPath)) {
         const room = rooms.get(roomPath);
-        _restart(room);
-        setTimeout(() => {
-          emitAll(connections, room, 'restart',
-                  (conn) => _getdata_internal(ip, conn.userID, roomPath));
-        }, 250);
+        _restart(room, () => {
+            emitAll(connections, room, 'restart',
+                    (conn) => _getdata_internal(ip, conn.userID, roomPath));
+        });
       }
     });
   });
@@ -546,7 +587,7 @@ function route(req, res) {
         return res.end();
       }
 
-      routeAdmin(reqPath, res);
+      serveHtml(res, 'views/admin.ejs');
     });
     return;
   }
@@ -568,27 +609,6 @@ function route(req, res) {
         rooms: getRoomsForIndex(),
         search: url.searchParams
       });
-  }
-}
-
-function routeAdmin(reqPath, res) {
-  const room = rooms.get(reqPath[1]);
-  switch (reqPath[1]) {
-    case 'finishPercolation':
-      room.percolationDone = true;
-      return res.end('okay');
-    case 'percolate':
-      return _percolate(res, room);
-    case 'restart':
-      _restart(room);
-      setTimeout(() => res.end('okay'), 250);
-      return;
-    case 'undoPercolation':
-      room.percolationDone = false;
-      room.percolationResult = null;
-      return res.end('okay');
-    default:
-      serveHtml(res, 'views/admin.ejs');
   }
 }
 
