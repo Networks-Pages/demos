@@ -61,7 +61,7 @@
         <form class="mr-sm-3" autocomplete="off">
           <input type="text" class="form-control" id="room-name"
               data-i18n-key="room-name" data-i18n-attr="placeholder">
-          <div class="invalid-feedback" data-i18n-key="room-feedback"></div>
+          <div class="invalid-feedback"></div>
           <div class="valid-feedback"></div>
         </form>
         <button class="btn btn-dark" id="btn-add-room" disabled>
@@ -135,6 +135,12 @@
       return result.join('');
     }
 
+    function showRoomNameInvalid(msgId) {
+      $roomName.addClass('is-invalid').removeClass('is-valid');
+      $roomName.siblings('.invalid-feedback')
+          .text(i18n.t(`room-feedback-${msgId}`));
+    }
+
 
     // remove first item from rooms list, it is a template
     const $list = $('#rooms'),
@@ -190,6 +196,13 @@
     socket.on('connect', () => {
       $('#btn-add-room').prop('disabled', false);
 
+      socket.on('add-room-error', (name, err) => {
+        indicateRoomLoading(false);
+        if (err === 'name_taken') {
+          showRoomNameInvalid('taken');
+        }
+      });
+
       socket.on('node-added', (room, node) => {
         var $span = $(`#r-${room} .num-nodes`);
         $span.text(parseInt($span.text(), 10) + 1);
@@ -207,6 +220,10 @@
 
       socket.on('room-added', (room) => {
         indicateRoomLoading(false);
+        $roomName.addClass('is-valid');
+        $roomName.siblings('.valid-feedback').text(
+            i18n.t('secret-is').replace(/%s/g, $roomName.data('secret')));
+
         let $room = $roomTemplate.clone();
         $room.data('name', room.name);
         $room.attr('href', `${URL_PREFIX}/r/${room.path}`);
@@ -240,14 +257,12 @@
     });
     $addRoom.on('click', () => {
       if ($roomName.val().trim() === '') {
-        $roomName.addClass('is-invalid');
+        showRoomNameInvalid('empty');
       } else {
         indicateRoomLoading(true);
         let secret = makeId(8);
+        $roomName.data('secret', secret);
         socket.emit('add-room', $roomName.val().trim(), secret);
-        $roomName.addClass('is-valid');
-        $roomName.siblings('.valid-feedback').text(
-            i18n.t('secret-is').replace(/%s/g, secret));
       }
     });
     $roomName.on('keyup', (event) => {

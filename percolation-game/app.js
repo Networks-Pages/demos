@@ -436,6 +436,18 @@ function open(server) {
     });
 
     socket.on('add-room', (name, secret) => {
+      // prevent whitespace shenanigans, replace all whitespace by a single ' '
+      name = name.replace(/\s+/g, ' ');
+
+      // check if name already taken
+      for (let entry of rooms) { // iterate over [roomPath, room] pairs
+        if (entry[1].name === name) {
+          socket.emit('add-room-error', name, 'name_taken');
+          return false;
+        }
+      };
+
+      // create room
       const roomPath = makeId(8);
       createRoom({
         id: false,
