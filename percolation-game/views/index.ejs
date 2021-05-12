@@ -149,14 +149,20 @@
       var $btn = $(this),
           roomPath = $btn.closest('a').attr('id').substr(2),
           roomURL = $btn.closest('a').attr('href'),
-          $input = $(`<input type="password" class="form-control"
+          $input = $(`<input type="password" class="form-control mr-sm-3"
               name="secret" placeholder="${i18n.t('secret')}">`),
-          $form = $(`<form method="post" action="${roomURL}"
+          $cancel = $(`<button class="btn btn-dark" name="cancel">
+              <i class="bi bi-x-lg"></i></button>`),
+          $form = $(`<form class="form-inline" method="post" action="${roomURL}"
               autocomplete="off" />`);
       if ($btn.data('error') === 'invalid_secret') {
         $input.addClass('is-invalid');
       }
-      $btn.parent().replaceWith($form.append($input));
+      $btn.parent().replaceWith($form.append($input).append($cancel));
+      $cancel.on('click', (event) => {
+        event.preventDefault();
+        $form.replaceWith($roomTemplate.find('.btn-group').clone());
+      });
       $input.on('keypress', (event) => {
         if (event.keyCode === 13) { // prevent enter key from activating
           event.preventDefault();   // the outer anchor, instead submit
