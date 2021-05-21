@@ -53,7 +53,8 @@
       'show': 'Show instructions',
       'title': 'Instructions',
       'welcome-1': `This is the overview page of the network game. Select your
-        room to start.`,
+        room to start. Looking for instructions? Please read <a
+        href="/percolation-game-is-online/">this article</a>.`,
       'your-name': 'Your name',
 
       // alerts and other interactive elements
@@ -117,7 +118,8 @@
       'show': 'Toon instructies',
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je
-        klaslokaal om te beginnen.`,
+        klaslokaal om te beginnen. Lees <a href="/percolation-game-is-online/">
+        dit artikel</a> (EN) als je wat meer toelichting/hulp nodig hebt.`,
       'your-name': 'Jouw naam',
 
       // alerts and other interactive elements
