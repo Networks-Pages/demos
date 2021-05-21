@@ -1,0 +1,36 @@
+<div id="lang-controls">
+<% if (method == 'GET') { %>
+  <a href="<%= URL_PREFIX %>" class="text-dark">
+    <i class="bi bi-house-fill"></i>
+  </a>
+  <a href="<%= url %>?lang=nl" id="lang-nl">
+    <span class="flag-icon flag-icon-nl"></span>
+  </a>
+  <a href="<%= url %>?lang=en" id="lang-en">
+    <span class="flag-icon-combo">
+      <span class="flag-icon flag-icon-us"></span>
+      <span class="flag-icon flag-icon-gb"></span>
+    </span>
+  </a>
+<% } else { %>
+  <a href="<%= URL_PREFIX %>" class="text-dark">
+    <i class="bi bi-house-fill"></i>
+  </a>
+  <form method="post" action="<%= url %>?lang=nl" class="lang-switch">
+    <input type="hidden" name="secret" value="<%= post.secret %>">
+    <button type="submit" class="btn btn-link" id="lang-nl">
+      <span class="btn-label">Switch to NL</span>
+      <span class="flag-icon flag-icon-nl"></span>
+    </button>
+  </form>
+  <form method="post" action="<%= url %>?lang=en" class="lang-switch">
+    <input type="hidden" name="secret" value="<%= post.secret %>">
+    <button type="submit" class="btn btn-link" id="lang-en">
+      <span class="flag-icon-combo">
+        <span class="flag-icon flag-icon-us"></span>
+        <span class="flag-icon flag-icon-gb"></span>
+      </span>
+    </button>
+  </form>
+<% } %>
+</div>

@@ -576,7 +576,11 @@ function route(req, res) {
         return res.end();
       }
 
-      serveHtml(res, 'views/admin.ejs');
+      serveHtml(res, 'views/admin.ejs', {
+        method: req.method,
+        post: body,
+        url: url.pathname,
+      });
     });
     return;
   }
@@ -591,32 +595,40 @@ function route(req, res) {
   // route request
   switch (reqPath[0]) {
     case 'r':
-      serveHtml(res, 'views/interface.ejs');
+      serveHtml(res, 'views/interface.ejs', {
+        method: req.method,
+        url: url.pathname,
+      });
       break;
     default:
       serveHtml(res, 'views/index.ejs', {
+        method: req.method,
         rooms: getRoomsForIndex(),
-        search: url.searchParams
+        search: url.searchParams,
+        url: url.pathname,
       });
   }
 }
 
 function serveHtml(res, filename, vars = {}) {
   vars['URL_PREFIX'] = URL_PREFIX;
-  var enc = (filename.endsWith('ejs') ? 'utf-8' : null);
-  fs.readFile(path.resolve(__dirname, filename), enc, function(err, data) {
-    var contentType = mime.lookup(filename) || 'application/octet-stream',
-        dynamic = false;
-    if (filename.endsWith('ejs')) {
-      contentType = mime.lookup('html');
-      dynamic = true;
-    }
+  if (filename.endsWith('ejs')) {
     res.writeHead(200, {
-      'Content-Type': contentType
+      'Content-Type': mime.lookup('html')
     });
-    res.write(dynamic ? ejs.render(data, vars) : data);
-    res.end();
-  });
+    ejs.renderFile(filename, vars, {}, (err, str) => {
+      res.write(str);
+      res.end();
+    });
+  } else {
+    fs.readFile(path.resolve(__dirname, filename), function(err, data) {
+      res.writeHead(200, {
+        'Content-Type': mime.lookup(filename) || 'application/octet-stream'
+      });
+      res.write(data);
+      res.end();
+    });
+  }
 }
 
 

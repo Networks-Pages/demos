@@ -12,6 +12,8 @@
         crossorigin="anonymous">
   <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/public/css/flag-icon.min.css">
+  <link rel="stylesheet" href="/public/css/pg.css">
   <style>
     .mw-25 {
       max-width: 25% !important;
@@ -23,6 +25,7 @@
   </style>
 </head>
 <body>
+  <%- include('lang-controls', {url: url}); %>
   <div class="container">
     <div class="row flex-column align-items-center" id="alerts"></div>
 

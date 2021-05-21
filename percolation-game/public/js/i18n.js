@@ -15,7 +15,6 @@
         GitHub</a>; try to run it locally if you are interested, improvements
         and additions are welcome.`,
       'add-node': 'Add node',
-      'back': 'Back to overview',
       'hide': 'Hide instructions',
       'index-title': 'Network Game',
       'index-title-about': 'About the Game',
@@ -78,7 +77,6 @@
         GitHub</a>; probeer het eens lokaal uit te voeren als je geïnteresseerd
         bent, verbeteringen en aanvullingen zijn welkom.`,
       'add-node': 'Voeg knoop toe',
-      'back': 'Terug naar overzicht',
       'hide': 'Verberg instructies',
       'index-title': 'Netwerkspel',
       'index-title-about': 'Over het spel',
@@ -136,6 +134,13 @@
     lang = data.get('lang');
   } else if (!i18n.hasOwnProperty(lang)) {
     lang = DEFAULT_LANGUAGE;
+  }
+
+  var langSelect = document.getElementById(`lang-${lang}`);
+  if (langSelect !== null) {
+    langSelect.disabled = true;
+    langSelect.classList.add('lang-selected');
+    langSelect.addEventListener('click', (e) => e.preventDefault());
   }
 
   for (let node of document.querySelectorAll('[data-i18n-key]')) {

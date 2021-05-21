@@ -6,6 +6,10 @@
         href="https://cdn.jsdelivr.net/npm/bootstrap@4.5.3/dist/css/bootstrap.min.css"
         integrity="sha384-TX8t27EcRE3e/ihU7zmQxVncDAy5uIKz4rEkgIXeMed4M0jlfIDPvg6uqKI2xXr2"
         crossorigin="anonymous">
+  <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.5.0/font/bootstrap-icons.css">
+  <link rel="stylesheet" href="/public/css/flag-icon.min.css">
+  <link rel="stylesheet" href="/public/css/pg.css">
 
 <style>
 html, body {
@@ -51,11 +55,10 @@ form {
 }
 </style>
 <body>
+  <%- include('lang-controls', {url: url}); %>
   <div class="container">
     <div class="row justify-content-center" id="add-node-container">
       <form class="form-inline mt-3">
-        <a href="<%= URL_PREFIX %>" class="btn btn-secondary my-1 mr-2"
-            data-i18n-key="back"></a>
         <label class="my-1 mr-2" for="speed" data-i18n-key="percolation-speed"></label>
         <input type="range" class="my-1 mr-2" min="1" max="10" id="speed" value="1" onchange="updateSpeed(this.value)">
         <button class="btn btn-danger my-1 mr-2" onclick="percolate()"
@@ -80,7 +83,7 @@ const URL_PREFIX = '/' + pathSplit[1];
 const roomPath = pathSplit[3];
 
 // disable form submission; we handle everything using AJAX
-$('form').on('submit', (e) => e.preventDefault());
+$('form:not(.lang-switch)').on('submit', (e) => e.preventDefault());
 
 const socket = io({
   path: '<%= URL_PREFIX %>/socket.io',
