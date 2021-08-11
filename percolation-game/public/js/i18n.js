@@ -48,7 +48,8 @@
       'room-feedback-taken': 'That name is already taken.',
       'room-name': 'Room name',
       'secret': 'secret',
-      'secret-is': 'Your secret is %s.',
+      'room-created': 'Your classroom has been created!',
+      'secret-is': `The password for your room is <b>%s</b>. Do not forget this password! Without it, you won't be able to manage this room.`,
       'show': 'Show instructions',
       'title': 'Instructions',
       'welcome-1': `This is the overview page of the network game. Select your
@@ -112,7 +113,8 @@
       'room-feedback-taken': 'Die naam is al bezet.',
       'room-name': 'Naam klaslokaal',
       'secret': 'wachtwoord',
-      'secret-is': 'Je wachtwoord is %s.',
+      'room-created': 'Je klaslokaal is aangemaakt!',
+      'secret-is': `Het wachtwoord voor dit lokaal is <b>%s</b>. Noteer of kopieer dit wachtwoord zodat je het niet vergeet! Zonder dit wachtwoord kun je het lokaal niet beheren.`,
       'show': 'Toon instructies',
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je

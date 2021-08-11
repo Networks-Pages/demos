@@ -233,8 +233,7 @@
     socket.on('room-added', (room) => {
       indicateRoomLoading(false);
       $roomName.addClass('is-valid');
-      $roomName.siblings('.valid-feedback').text(
-          i18n.t('secret-is').replace(/%s/g, $roomName.data('secret')));
+      createAlert(i18n.t('secret-is').replace(/%s/g, $roomName.data('secret')), 'primary', i18n.t('room-created'));
 
       let $room = $roomTemplate.clone();
       $room.data('name', room.name);
