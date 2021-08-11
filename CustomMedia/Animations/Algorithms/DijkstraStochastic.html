@@ -1,0 +1,455 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<style>
+    .link {
+        stroke: #555;
+        stroke-opacity: 1.2;
+    }
+</style>
+<body onload="draw()">
+
+
+    <div id="buttonFieldRedo"> </div>
+    <div class="container">
+        <div class="row justify-content-center">
+            <h2 class="col-md-12" style="text-align: center">
+                Stochastic Dijkstra algorithm
+            </h2>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-5 form-group container">
+                <div class="row">
+                    <h5 class="col-sm-12">Display</h5>
+                </div>
+                <div class="row">
+                    <label for="autospeed" class="col-form-label col-sm-5">Steps per second:</label>
+                    <input type="range" value=0 min=0 max=2 step=0.5 class="form-control col-sm-5" id="autospeed" onchange="speedChanged()" />
+                    <label class="col-sm-2 col-form-label" id="speedDisplay">0</label>
+                </div>
+                <div class="row">
+                    <button type="button" class="btn btn-primary col-sm-12" onclick="nextStep()">Next step</button>
+                </div>
+            </div>
+            <div class="col-md-5 form-group container">
+                <div class="row">
+                    <h5 class="col-sm-12">Stochastics</h5>
+                </div>
+                <div class="row">
+                    <label for="quantile" class="col-form-label col-sm-5">Quantile:</label>
+                    <input type="range" value=0.5 min=0.5 max=0.95 step=0.05 class="form-control col-sm-5" id="quantile" onchange="quantileChanged()" />
+                    <label class="col-sm-2 col-form-label" id="quantileDisplay">mean</label>
+                </div>
+                <div class="row">
+                    <button type="button" class="btn btn-primary col-sm-12" onclick="restart()">Restart</button>
+                </div>
+            </div>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-12 col-md-12" id="field" style="text-align:center;"></div>
+        </div>
+    </div>
+
+    <script src="https://d3js.org/d3.v5.js"></script>
+    <script>
+        // The probability that a standard normal is smaller than ppf[p] is p.
+        var ppf = {
+            0.5: 0.0,
+            0.55: 0.12566134685507416,
+            0.6: 0.2533471031357997,
+            0.65: 0.38532046640756773,
+            0.7: 0.5244005127080407,
+            0.75: 0.6744897501960817,
+            0.8: 0.8416212335729143,
+            0.85: 1.0364333894937898,
+            0.9: 1.2815515655446004,
+            0.95: 1.6448536269514722
+        }
+        var quantile = 0.5;
+        var stepsPerSecond = 0;
+
+    var graph = {
+        nodes: [
+            {x: 100, y: 125},
+            {x: 225, y: 50},
+            {x: 250, y: 200},
+            {x: 375, y: 50},
+            {x: 400, y: 200},
+            {x: 500, y: 50},
+            {x: 550, y: 150}
+        ],
+        links: [
+            {source: 0, target: 1, mean: 12, variance: 1, tagx: -10, tagy: -10},
+            {source: 0, target: 2, mean: 10, variance: 9, tagx: -10, tagy: 20},
+            {source: 1, target: 2, mean: 2, variance: 1, tagx: -22, tagy: 5},
+            {source: 1, target: 3, mean: 7, variance: 9, tagx: 0, tagy: -10},
+            {source: 2, target: 3, mean: 4, variance: 4, tagx: -15, tagy: -10},
+            {source: 2, target: 4, mean: 4, variance: 1, tagx: 0, tagy: -10},
+            {source: 3, target: 4, mean: 3, variance: 1, tagx: 22, tagy: 0},
+            {source: 3, target: 5, mean: 10, variance: 16, tagx: -5, tagy: -10},
+            {source: 4, target: 6, mean: 19, variance: 1, tagx: 0, tagy: 20},
+            {source: 5, target: 6, mean: 5, variance: 4, tagx: 22, tagy: 0}
+        ], maxx: 460, maxy: 230
+    };
+    var restartCounter = 0; // To make sure 'next turn' time-outs before restarts are ignored.
+    
+    function linkLength(link) {
+        return link.mean+ppf[quantile]*Math.sqrt(link.variance);
+    }
+
+    function displayDist (d) {
+        if (d.dist === -1)
+            return "∞";
+        else
+            return d.dist.toFixed(1)
+    }
+
+    function restart() {
+        restartCounter++;
+        displaycontainer.svg.remove();
+        draw();
+    };
+
+    function quantileChanged() {
+        quantile = document.getElementById('quantile').value;
+        document.getElementById('quantileDisplay').innerHTML = quantile==0.5 ? 'mean' : quantile;
+    }
+    function speedChanged() {
+        var previousSpeed = stepsPerSecond;
+        stepsPerSecond = document.getElementById('autospeed').value;
+        document.getElementById('speedDisplay').innerHTML = stepsPerSecond;
+        // Start autoplaying
+        if (previousSpeed==0 && stepsPerSecond>0) {
+            showAlgorithm(restartCounter);
+        }
+    }
+    function nextStep() {
+        showAlgorithm(restartCounter);
+    }
+
+    var width = 650, height = 250, displaycontainer = {};
+    displaycontainer.animationTime = 1000;
+    displaycontainer.RedoSelectBottonintialised = false;
+    displaycontainer.redoButtom = {};
+    displaycontainer.animationcolors=[];
+    displaycontainer.markedcolors=[];
+    displaycontainer.notescolors=[];
+    
+    displaycontainer.animationcolors[0] = "#999999";// untouched
+    displaycontainer.animationcolors[1] = "#00CC00";// currently checked
+    displaycontainer.animationcolors[2] = "#AAAAAA";// check and not used on path
+    displaycontainer.animationcolors[3] = "#CC0000";// checked and used as path 
+
+
+    displaycontainer.markedcolors[0] = "#AAAAAA";// untouched
+    displaycontainer.markedcolors[1] = "#AAAAAA";// currently checked
+    displaycontainer.markedcolors[2] = "#BBBBBB";// check and not used on path
+    displaycontainer.markedcolors[3] = "#AA0000";// checked and used as path 
+    displaycontainer.markedcolors[4] = "#FF4444";// checked path of specific path
+
+    displaycontainer.notescolors[0] = "#FFFFFF";// untouched
+    displaycontainer.notescolors[1] = "#00CC00";// currently checked
+    displaycontainer.notescolors[2] = "#999999";// check and not used on path
+
+
+    function prefitGraph(){
+        for(var i=0; i<graph.nodes.length;i++){
+            graph.nodes[i].name=i;
+            graph.nodes[i].dist=-1;
+            graph.nodes[i].solved=false;
+            graph.nodes[i].path=[];
+        }
+        graph.nodes[0].dist=0;
+        console.log('Restarting with quantile '+quantile);
+        for(var i=0; i<graph.links.length;i++){
+            graph.links[i].name=i;
+            graph.links[i].status=-1;
+            graph.links[i].pointer=false;
+            graph.links[i].le = linkLength(graph.links[i]);
+        }
+    }
+    function draw() {
+        prefitGraph();
+        displaycontainer.svg = d3.select("#field").append("svg").attr("width", width).attr("height", height);
+        graph.activeNode = 0;
+        graph.checkedNodes = [];
+        displaycontainer.animationStep = 0;
+
+        displaycontainer.links = displaycontainer.svg.selectAll("link")
+                .data(graph.links)
+                .enter()
+                .append("line")
+                .attr("class", "link")
+                .attr("x1", function (l) {
+                    return graph.nodes[l.source].x;
+                })
+                .attr("y1", function (l) {
+                    return graph.nodes[l.source].y;
+                })
+                .attr("x2", function (l) {
+                    return graph.nodes[l.target].x;
+                })
+                .attr("y2", function (l) {
+                    return graph.nodes[l.target].y;
+                })
+                .attr("fill", "none")
+                .attr("stroke", "white");
+
+        displaycontainer.linkLabel = [];
+        for (i = 0; i < graph.links.length; i++) {
+            var d = graph.links[i];
+            displaycontainer.linkLabel.push(displaycontainer.svg.append('svg:text')
+                .attr('class', 'aEnd')
+                .attr('x', (graph.nodes[d.source].x + graph.nodes[d.target].x) / 2 + d.tagx)
+                .attr('y', (graph.nodes[d.source].y + graph.nodes[d.target].y) / 2 + d.tagy)
+                .text("N("+d.mean+","+d.variance+")")
+                .style("text-anchor", "middle")
+                .attr("font-size", "14px"));
+        }
+
+
+
+        displaycontainer.nodes = displaycontainer.svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("g")
+                .attr("class", "node");
+
+        displaycontainer.nodes.append("circle")
+                .attr("r", 21).attr("cx", function (d) {
+                    return d.x
+                }).attr("cy", function (d) {
+                    return d.y
+                }).attr("fill", "#000000");
+
+        displaycontainer.innerCycles = displaycontainer.nodes.append("circle")
+                .attr("r", 20).attr("cx", function (d) {
+            return d.x
+        }).attr("cy", function (d) {
+                    return d.y
+                }).attr("fill", function (d) {
+            if (d.name === graph.activeNode)
+                return "#FFFF00";
+            else
+                return "#FFFFFF";
+        });
+
+        displaycontainer.distanceLabels = displaycontainer.nodes.append("text").attr("x", d=>d.x)
+                .attr("y", d=>d.y+7)
+                .text(displayDist).attr("font-size", "18px").style("text-anchor", "middle");
+
+        var restartIndex = restartCounter;
+        if (stepsPerSecond>0) {
+            setTimeout(function () {
+                showAlgorithm(restartIndex);
+            }, 1000 / stepsPerSecond);
+        }
+
+    }
+
+    function showAlgorithm(restartIndex) {
+        if (restartIndex!=restartCounter) {
+            console.log('Ignoring showAlgorithm-call from previous restart.');
+            return;
+        }
+        //Step ONE color links
+        if (displaycontainer.animationStep === 0) {
+            graph.activeNeighbors = [];
+            displaycontainer.links.transition().duration(1000).attr("stroke-width", function (d) {
+                if ((graph.nodes[d.source].name === graph.activeNode) || (graph.nodes[d.target].name === graph.activeNode)) {
+                    return "3px";
+                }
+                else
+                    return "1px";
+            }).style("stroke", function (d) {
+                if ((graph.nodes[d.source].name === graph.activeNode) || (graph.nodes[d.target].name === graph.activeNode)) {
+                    if (graph.nodes[d.source].name === graph.activeNode) {
+                        if (!graph.nodes[d.target].solved){
+                            graph.activeNeighbors.push(graph.nodes[d.target].name);
+                            return displaycontainer.animationcolors[1];
+                        }
+                    } else {
+                        if (!graph.nodes[d.source].solved){
+                            graph.activeNeighbors.push(graph.nodes[d.source].name);
+                            return displaycontainer.animationcolors[1];
+                        }
+                    }
+                    if (d.status===2) return displaycontainer.animationcolors[2];
+                    if (d.status===3) return displaycontainer.animationcolors[3];
+                }
+                else {
+                    if (d.status===2) return displaycontainer.animationcolors[2];
+                    if (d.status===3) return displaycontainer.animationcolors[3];
+                }
+                return displaycontainer.animationcolors[0];
+            });
+            displaycontainer.animationStep = 1;
+        }
+        else if (displaycontainer.animationStep === 1) {
+            //Step two color neighbors
+            displaycontainer.innerCycles.transition().duration(1000).attr("fill", function (d) {
+                if (graph.activeNode === d.name)
+                    return "#FFFF00";
+                else if (graph.checkedNodes.indexOf(d.name) !== -1)
+                    return "#DDDDDD";
+                else if (graph.activeNeighbors.indexOf(d.name) !== -1)
+                    return "#00CC00";
+                else
+                    return "#FFFFFF";
+            });
+            displaycontainer.animationStep = 2;
+        }
+        else if (displaycontainer.animationStep === 2) {
+            //Step three update distances
+            computeNextDistances();
+            displaycontainer.distanceLabels.text(displayDist);
+            displaycontainer.animationStep = 3;
+        } else if (displaycontainer.animationStep === 3) {
+            computeRolesOfNodes();
+            displaycontainer.links.transition().duration(1000).attr("stroke-width", "1px").style("stroke", function(d) {
+                if (d.status===2) return displaycontainer.animationcolors[2];
+                if (d.status===3) {
+                        if (d.pointer === false){
+                            if (d.source === graph.activeNode) createArrow(d,true);
+                            else createArrow(d,false);
+                            d.pointer=true;
+                        } 
+                    return displaycontainer.animationcolors[3];
+                }
+                return displaycontainer.animationcolors[0];
+                
+            });
+            displaycontainer.innerCycles.transition().duration(1000).attr("fill", function (d) {
+                if (graph.checkedNodes.indexOf(d.name) === -1)
+                    return "#FFFFFF";
+                else
+                    return "#DDDDDD";
+            });
+            displaycontainer.animationStep = 0;
+        }
+
+
+        if (stepsPerSecond>0 && graph.checkedNodes.length !== graph.nodes.length) {
+            setTimeout(function () {
+                showAlgorithm(restartIndex);
+            }, 1000/stepsPerSecond);
+        }
+    }
+
+    function createArrow(edge, atSource) {
+        var st;
+        var end;
+        if (atSource) {
+            st = graph.nodes[edge.source];
+            end = graph.nodes[edge.target];
+        } else {
+            end = graph.nodes[edge.source];
+            st = graph.nodes[edge.target];
+
+        }   
+        
+        var off = 15;
+        var t = off / 100;
+        //The data for our line
+        var tipx = Math.floor(st.x * t + end.x * 1.0 * (1 - t));
+        var tipy = Math.floor(st.y * t + end.y * 1.0 * (1 - t));
+        var angle = Math.atan((st.x - end.x) / (st.y - end.y)) + Math.PI;
+        
+        var dummyy = tipy + off * Math.cos(angle);
+        var dummyx = tipx + off * Math.sin(angle);
+        var diff = (dummyy - end.y) * (dummyy - end.y) + (dummyx - end.x) * (dummyx - end.x);
+        if (diff > 1000) {
+            angle += Math.PI;
+        }
+
+        var dp = 10;
+        var lineData = [
+            {"x": tipx, "y": tipy},
+            {"x": tipx + dp * Math.sin(angle + Math.PI * 3 / 4), "y": tipy + dp * Math.cos(angle + Math.PI * 3 / 4)},
+            {"x": tipx + dp * Math.sin(angle + Math.PI) / 3, "y": tipy + dp * Math.cos(angle + Math.PI) / 3},
+            {"x": tipx + dp * Math.sin(angle + Math.PI * 5 / 4), "y": tipy + dp * Math.cos(angle + Math.PI * 5 / 4)},
+            {"x": tipx, "y": tipy}];
+        //This is the accessor function we talked about above
+        var lineFunction = d3.line().x(function (d) {
+            return d.x;
+        }).y(function (d) {
+            return d.y;
+        });
+
+        //The line SVG Path we draw
+        var lineGraph = displaycontainer.svg.append("path")
+                .attr("d", lineFunction(lineData))
+                .attr("stroke", "#CC0000")
+                .attr("stroke-width", 2)
+                .attr("fill", "#CC0000").attr("id", function () {
+            return "id" + edge.name;
+        });
+    }
+
+   
+
+    function computeNextDistances() {
+        for (var i = 0; i < graph.links.length; i++) {
+            if ((graph.activeNode === graph.links[i].source) || (graph.activeNode === graph.links[i].target)) {
+                var base = graph.nodes[graph.activeNode].dist;
+                var len = graph.links[i].le;
+                var other = graph.links[i].source;
+                if (other === graph.activeNode) {
+                    other = graph.links[i].target;
+                }
+                var oldvalue = graph.nodes[other].dist;
+
+                if ((oldvalue === -1) || ((oldvalue !== -1) && (oldvalue > base + len))) {
+                    // we found a new shorter connection
+                    // first tell the last bond of old path that it does carry a shortest connection anymore;
+                    if ((oldvalue !== -1)&&(graph.nodes[other].path.length>0)){
+                        var lastedEdge=graph.nodes[other].path[graph.nodes[other].path.length-1]
+                        lastedEdge.status=2;
+                        d3.select("path#id"+lastedEdge.name).transition().duration(1000).style("stroke", "#EEEEEE").style("fill","#FFFFFF");
+                        setTimeout(function () {
+                            d3.select("path#id"+lastedEdge.name).remove();
+                        },1000);
+                    }
+                    graph.nodes[other].dist = base + len;
+                    graph.nodes[other].path = [];
+                    for (var j = 0; j < graph.nodes[graph.activeNode].path.length; j++)
+                        graph.nodes[other].path.push(graph.nodes[graph.activeNode].path[j]);
+                    graph.nodes[other].path.push(graph.links[i]);
+                    graph.links[i].status = 3;
+                } else if (graph.links[i].status === 1)
+                    graph.links[i].status = 2;
+            }
+        }
+    }
+
+
+    function computeRolesOfNodes() {
+        // find the point with the smallest distance. 
+        graph.checkedNodes.push(graph.activeNode);
+        if((graph.activeNode<0)||(graph.activeNode>graph.nodes.length)) console.log("ill point "+graph.activeNode);
+        graph.nodes[graph.activeNode].solved = true;
+        var minindex = -1, minvalue = 40000;
+        if (graph.checkedNodes.length !== graph.nodes.length) {
+            for (i = 0; i < graph.nodes.length; i++) {
+                if (graph.checkedNodes.indexOf(i) === -1) {
+                    if (graph.nodes[i].dist !== -1) {
+                        if (minindex === -1) {
+                            minindex = i;
+                            minvalue = graph.nodes[i].dist;
+                        } else {
+                            if (minvalue > graph.nodes[i].dist)
+                            {
+                                minindex = i;
+                                minvalue = graph.nodes[i].dist;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        graph.activeNode = minindex;
+    }
+
+
+
+    </script>
