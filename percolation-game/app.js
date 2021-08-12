@@ -72,7 +72,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, roomPath = false,
   db.query('INSERT INTO nodes (room, name, ip_address) VALUES (?, ?, ?)', {
     vars: [room.id, name, ip],
     callback: (result) => {
-      let newIDi = result.insertId,
+      let newIDi = room.nodes.size+1,
           idx = room.nodes.size;
       room.nodes.set(newIDi, {
         name: name,
@@ -182,10 +182,12 @@ function _percolate(res, room) {
 function _restart(room, then = null) {
   deleteRoomNetwork(room, (result) => {
     db.query(`INSERT INTO nodes (room, name) VALUES (${room.id}, 'Dummy A'),
-                  (${room.id}, 'Dummy B')`, {
+                  (${room.id}, 'Dummy B'), (${room.id}, 'Dummy C')`, {
       callback: (result) => {
         db.query(`INSERT INTO links (id_source, id_target) VALUES (${
-            result.insertId}, ${result.insertId + 1})`, {
+            result.insertId}, ${result.insertId + 1}),(${
+            result.insertId}, ${result.insertId + 2}),(${
+            result.insertId + 1}, ${result.insertId + 2})`, {
           callback: () => initRoomFromDB(room, then),
         });
       },
@@ -375,13 +377,16 @@ function initRoomFromDB(room, then = null) {
           }
         },
         mockResult: [
-          {id_source: 1, id_target: 2}
+          {id_source: 1, id_target: 2},
+          {id_source: 1, id_target: 3},
+          {id_source: 2, id_target: 3}
         ],
       });
     },
     mockResult: [
       {id: 1, name: 'Dummy A', ip_address: null},
-      {id: 2, name: 'Dummy B', ip_address: null}
+      {id: 2, name: 'Dummy B', ip_address: null},
+      {id: 3, name: 'Dummy C', ip_address: null}
     ],
   });
 }
