@@ -15,6 +15,7 @@ const MAX_DEGREE = 5;
 const STANDALONE = (process.env.STANDALONE === 'true' || IS_PASSENGER);
 const SURVIVAL_P = 0.5;
 const URL_PREFIX = '/percolation-game';
+const deleteTimeout = 50 * 24 * 60 * 1000;
 
 
 // --- globals -----------------------------------------------------------------
@@ -244,6 +245,17 @@ function createRoom(roomRow, then = null) {
     });
   } else if (typeof(then) === 'function') {
     then();
+  }
+
+  // Delete the room after a while
+  if (roomRow.path != 'abcdefgh') {
+    let room = rooms.get(roomRow.path);
+    setTimeout(() => {
+      deleteRoom(room, () => {
+        rooms.delete(roomRow.path);
+        emitAll(room.connections, room, 'room-removed', roomRow.path);
+      });
+    }, deleteTimeout);
   }
 }
 
