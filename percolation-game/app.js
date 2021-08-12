@@ -15,7 +15,7 @@ const MAX_DEGREE = 5;
 const STANDALONE = (process.env.STANDALONE === 'true' || IS_PASSENGER);
 const SURVIVAL_P = 0.5;
 const URL_PREFIX = '/percolation-game';
-const deleteTimeout = 50 * 24 * 60 * 1000;
+const deleteTimeout = 7 * 24 * 60 * 1000;
 
 
 // --- globals -----------------------------------------------------------------
