@@ -56,6 +56,8 @@
         room to start. Looking for instructions? Please read <a
         href="/percolation-game-is-online/">this article</a>.`,
       'your-name': 'Your name',
+      'delete': 'Delete classroom',
+      'manage-percolate': 'Manage en percolate',
 
       // alerts and other interactive elements
       'error': 'Error',
@@ -119,8 +121,12 @@
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je
         klaslokaal om te beginnen. Lees <a href="/percolation-game-is-online/">
-        dit artikel</a> (EN) als je wat meer toelichting/hulp nodig hebt.`,
+        dit artikel</a> (EN) als je wat meer toelichting/hulp nodig hebt. 
+        Vergeet niet om het wachtwoord te noteren na het aanmaken van een klaslokaal. 
+        Zonder dit wachtwoord kun je niet percoleren.`,
       'your-name': 'Jouw naam',
+      'delete': 'Verwijder lokaal',
+      'manage-percolate': 'Beheer en percoleer',
 
       // alerts and other interactive elements
       'error': 'Fout',
