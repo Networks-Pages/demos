@@ -73,7 +73,7 @@ function _addnode_internal(ip, name, n1Idx, n2Idx, roomPath = false,
   db.query('INSERT INTO nodes (room, name, ip_address) VALUES (?, ?, ?)', {
     vars: [room.id, name, ip],
     callback: (result) => {
-      let newIDi = room.nodes.size+1,
+      let newIDi = result.insertId || room.nodes.size+1,
           idx = room.nodes.size;
       room.nodes.set(newIDi, {
         name: name,
