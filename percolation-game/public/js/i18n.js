@@ -20,10 +20,12 @@
       'index-title-about': 'About the Game',
       'instructions-1': `In this game, each participant adds a single node to
         the network and chooses two neighbors that this node connects to. You
-        can only connect to nodes that have <b>less than 5 neighbors</b>. `,
+        can only connect to nodes that have <b>less than 5 neighbors</b>. If 
+        you are playing this game on your phone, than the network only becomes
+        visible after clicking 'Hide instructions'`,
       'instructions-2': `At the
         end of the game, we will percolate the graph: half of the links will be
-        removed at random.
+        removed at random. This will disconnect parts of the graph from the rest.
         The game is won by the players whose nodes end up in
         the <i>largest</i> connected component after percolation. When multiple
         components have equal size, all win.`,
@@ -53,8 +55,10 @@
       'show': 'Show instructions',
       'title': 'Instructions',
       'welcome-1': `This is the overview page of the network game. Select your
-        room to start. Looking for instructions? Please read <a
-        href="/percolation-game-is-online/">this article</a>.`,
+        room to start. If you need more instructions, you can read <a
+        href="/percolation-game-is-online/">this article</a>. Do not forget to
+        write down your password after creating a room. Without this password, 
+        you won't be able to percolate.`,
       'your-name': 'Your name',
       'delete': 'Delete classroom',
       'manage-percolate': 'Manage en percolate',
@@ -86,7 +90,9 @@
       'instructions-1': `In dit netwerkspel mag elke deelnemer een knoop met
         hun naam aan het netwerk toevoegen, die verbonden moet zijn met precies
         twee andere knopen. Je kunt alleen verbinding maken met knopen die
-        <b>minder dan vijf buren</b> hebben.`,
+        <b>minder dan vijf buren</b> hebben. Als je dit spel op je telefoon 
+        speelt, is het netwerk pas zichtbaar nadat je op 'Verberg instructies' 
+        klikt.`,
       'instructions-2': `Aan het eind van het spel wordt
         een willekeurige helft van de verbindingen verwijderd. Hierdoor zullen
         gedeelten van het netwerk losgekoppeld worden van de rest.
@@ -95,7 +101,7 @@
         deelnetwerken met evenveel knopen overblijven, winnen spelers in al deze
         deelnetwerken.`,
       'instructions-3': `Je kunt <b>jouw knoop toevoegen</b> aan het netwerk
-        door op de twee knopen te klikken waarmee je verbinding wilt leggen, je
+        door op de twee knopen te klikken waarmee je wil verbinden, je
         naam in te vullen en op "Voeg knoop toe" te klikken.`,
       'instructions-perc': `<b>Percolatietheorie</b> is een vertakking van de wiskunde op het snijvlak
         tussen kansrekening en grafentheorie. De term 'percolatie' komt
@@ -121,7 +127,7 @@
       'title': 'Instructies',
       'welcome-1': `Dit is de overzichtspagina van het netwerkspel. Selecteer je
         klaslokaal om te beginnen. Lees <a href="/percolation-game-is-online/">
-        dit artikel</a> (EN) als je wat meer toelichting/hulp nodig hebt. 
+        dit artikel</a> (EN) als je meer toelichting/hulp nodig hebt. 
         Vergeet niet om het wachtwoord te noteren na het aanmaken van een klaslokaal. 
         Zonder dit wachtwoord kun je niet percoleren.`,
       'your-name': 'Jouw naam',
