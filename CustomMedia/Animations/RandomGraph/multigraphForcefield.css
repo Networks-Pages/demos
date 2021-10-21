@@ -4,15 +4,19 @@
     }
     .count1 {
         stroke: #000;
+        stroke-width: 2px;
     }
     .count2 {
         stroke: #F00;
+        stroke-width: 3px;
     }
     .count3 {
         stroke: #0F0;
+        stroke-width: 4px;
     }
     .count4 {
         stroke: #0FF;
+        stroke-width: 5px;
     }
 
     .node circle {

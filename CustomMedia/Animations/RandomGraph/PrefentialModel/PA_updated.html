@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<!--<link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Raleway" />-->
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<link rel="stylesheet" type="text/css" href="../multigraphForcefield.css">
+
+<body onload="draw()">
+    <script src="../../SharedResources/d3.min.js"></script>
+    <script src="../SharedResources/GraphAlgorithmLibaryFitzner.js"></script>
+    <script src="../SharedResources/VisualFunctionFitzner.js"></script>
+    <div class="container" id="page">
+        <div class="row justify-content-center">
+            <h2 class="col-md-12" style="text-align: center">
+                Preferential Attachment generation
+            </h2>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-md-6 form-group container">
+                <div class="row">
+                    <h5 class="col-sm-12">Parameters</h5>
+                </div>
+                <div class="row">
+                    <label for="numvertices" class="col-form-label col-sm-6">Nr. of vertices:</label>
+                    <input type="number" value=50 min=1 max=1000 step=1 class="form-control col-sm-6" id="numvertices"/>
+                </div>
+                <div class="row">
+                    <label for="numedges" class="col-form-label col-sm-6">Edges per vertex:</label>
+                    <input type="number" value=2 min=1 max=5 step=1 class="form-control col-sm-6" id="numedges" />
+                </div>
+                <div class="row">
+                    <label for="delta" class="col-form-label col-sm-3">&delta;:</label>
+                    <input type="range" value=-1.5 min=-2 max=0 step=0.5 class="form-control col-sm-6" id="delta" />
+                    <label class="col-sm-3 col-form-label" id="deltaDisplay">-0.5</label>
+                </div>
+                <div class="row">
+                    <button type="button" class="btn btn-primary col-sm-12" onclick="restartAnimation()">Restart animation</button>
+                </div>
+            </div>
+            <div class="col-md-1"></div>
+            <div class="col-md-5 form-group container">
+                <div class="row">
+                    <h5 class="col-sm-12">Display</h5>
+                </div>
+                <div class="row">
+                    <label for="timestep" class="col-form-label col-sm-3">Timestep:</label>
+                    <input type="range" value=0 min=0 max=3000 step=100 class="form-control col-sm-6" id="timestep" />
+                    <label class="col-sm-3 col-form-label" id="timestepDisplay">manual</label>
+                </div>
+                <div class="row">
+                    <button type="button" class="btn btn-primary col-sm-12" onclick="nextStep()">Next step</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    var width = document.getElementById('page').clientWidth,
+            height = (window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight)-document.getElementById("page").offsetHeight,
+            color = d3.scale.category20(),
+            nrOfNodes = 50,
+            offspring = 2,
+            delta = -0.5,
+            timestep=0;
+    var force, svg, link, node,graph;
+    var chartNotShown = true, chartelement = [], nameTag = {}, modelTag = "PrefAttachment", chartType = "";
+
+    function draw() {
+        document.getElementById("delta").value = delta;
+        document.getElementById("numedges").value = offspring;
+        document.getElementById("numvertices").value = nrOfNodes;
+        //graph=initializeGraph(delta,offspring);
+        //initializeGraphic();
+        //addLogo();
+        //setTimer();
+        restartAnimation();
+    };
+    
+    
+    
+    function initializeGraphic() {
+        // first of the standard configurations:
+        svg = d3.select("#page").append("svg")
+                .attr("width", width).attr("height", height).attr('class','row');
+
+        force = d3.layout.force()
+                .size([width - 100, height - 100]).charge(-60)
+                .gravity(0.1)
+                .linkDistance(100)
+                .nodes(graph.nodes)
+                .links(graph.links).charge(-60).linkDistance(Math.min(300,Math.max(10000/nrOfNodes, 60)));
+        force.on("tick", tick).start();
+
+
+        link = svg.selectAll(".link")
+                .data(graph.links)
+                .enter().append("path")
+                .attr("class", d=> "link count" + d.count)
+                .attr("id", function (d) {
+            if (d.source.name < d.target.name)
+                return "idlink" + d.source.name + "t" + d.target.name;
+            else
+                return "idlink" + d.target.name + "t" + d.source.name;
+        });
+
+        node = svg.selectAll(".node")
+                .data(graph.nodes)
+                .enter().append("circle")
+                .attr("class", "node")
+                .attr("id", function (n) {
+                    return "id"+n.name;})
+                .attr("r", 10)
+                .style("fill", function (d) {
+                    return color(d.degree);
+                })
+                .call(force.drag);
+    };
+
+
+
+    function initializeGraph(deltagiven, offspring) {
+        var g={};
+        g.delta = Number(deltagiven);
+        g.offspring= Number(offspring);
+        g.totaledges =  offspring;
+        g.nodes = [];
+        g.links = [];
+        var firstnode = {};
+        firstnode.name = 0;
+        firstnode.degree = 2*offspring;
+        g.nodes.push(firstnode);
+        var edge = {};
+        edge.source = 0;
+        edge.target = 0;
+        edge.angle = 0;
+        edge.count = 2*offspring;
+        g.links.push(edge);
+        g.edgesCurrent = offspring; // Number of 'completed' edges of the current vertex
+        g.nrCompleted=0; // number of 'completed' vertices and equal to
+        return g;
+    }
+
+    function updateVisualization() {
+        link = link.data(graph.links);
+
+        link.enter().append("path")
+            .attr("id", function (d) {
+                console.log(d);
+                if (d.source.name < d.target.name)
+                    return "idlink" + d.source + "t" + d.target;
+                else
+                    return "idlink" + d.target + "t" + d.source;
+            });
+        force.start();
+        link.attr('class', d=>"link count"+d.count)
+        link.exit().remove();
+
+        node = node.data(graph.nodes);
+
+        node.enter().append("circle")
+            .attr("class", "node")
+            .attr("id", function (n) {
+                return "id"+n.name;})
+            .attr("r", 10).call(force.drag);
+        node.style("fill", function (d) {
+            return color(d.degree);
+        });
+        node.exit().remove();
+    }
+
+    function numerator(target) {
+        if (target==graph.nrCompleted) {
+            return graph.nodes[target].degree + 1 + graph.delta * (graph.edgesCurrent+1) / graph.offspring;
+        } else {
+            return graph.nodes[target].degree + graph.delta;
+        }
+    }
+
+    function denominator() {
+        return 2*(graph.nrCompleted*graph.offspring+graph.edgesCurrent) + 1 + graph.delta*(graph.nrCompleted + (graph.edgesCurrent+1)/graph.offspring);
+    }
+
+    function addOneEdge() {
+        if (graph.nrCompleted == nrOfNodes) {
+            return;
+        }
+        if (graph.edgesCurrent == graph.offspring) {
+            graph.nrCompleted++;
+            if (graph.nrCompleted == nrOfNodes) {
+                return;
+            }
+            var newnode = {};
+            newnode.degree = 0;
+            newnode.name = graph.nr;
+            newnode.edgeDict = {};
+            graph.nodes.push(newnode);
+            graph.edgesCurrent = 0;
+        }
+        var currentNode = graph.nodes[graph.nrCompleted];
+        var toBeat = Math.random() * denominator();
+        var edgeTarget = 0;
+        var cummulativeNumerator = numerator(edgeTarget);
+        while (toBeat > cummulativeNumerator) {
+            edgeTarget++;
+            cummulativeNumerator += numerator(edgeTarget);
+        }
+        graph.nodes[edgeTarget].degree++;
+        graph.nodes[graph.nrCompleted].degree++;
+        if (typeof(currentNode.edgeDict[edgeTarget]) == "undefined") {
+            var edge = {};
+            edge.source = edgeTarget;
+            edge.target = graph.nrCompleted;
+            edge.angle = 0; // Do something with this
+            edge.count = edge.source==edge.target ? 2 : 1;
+            currentNode.edgeDict[edgeTarget] = edge;
+            graph.links.push(edge);
+        } else {
+            var edge = currentNode.edgeDict[edgeTarget];
+            edge.count += edge.source==edge.target ? 2 : 1;
+        }
+
+        graph.edgesCurrent++;
+
+        updateVisualization();
+        setTimer();
+    }
+
+    /*
+     * Create a preferential attachment graph as describted in CITE.
+     */
+    function addOneNode() {
+            var newnode = {};
+            newnode.degree = graph.offspring;
+            newnode.name = graph.nrCompleted;
+            graph.nodes.push(newnode);
+            if (graph.offspring===1){
+                var denominator = graph.nrCompleted * (2 + graph.delta) + (1 + graph.delta);
+                var toBeat = Math.random() * denominator;
+                var edgeTarget = 0;
+                var cummulativeNominator = graph.nodes[edgeTarget].degree + graph.delta;
+                //console.log(newnode.name+" denome:"+denominator+" seed "+toBeat +" origin "+cummulativeNominator+" degree "+ graph.nodes[0].degree);
+                while (toBeat > cummulativeNominator) {
+                    edgeTarget++;
+                    cummulativeNominator += graph.nodes[edgeTarget].degree + graph.delta;
+                }
+                graph.nodes[edgeTarget].degree++;
+                var edge = {};
+                edge.source = edgeTarget;
+                edge.target = graph.nrCompleted;
+                edge.angle = 0;
+                if (edge.source!==edge.target)  edge.count = 1;
+                else edge.count = 2;
+                
+                graph.links.push(edge);
+                graph.nrCompleted++;
+            } else {
+                var countList=Array.apply(null, Array(graph.nrCompleted+1)).map(Number.prototype.valueOf,0);
+                for (i = 0; i < graph.offspring; i++) {
+                    var denominator = (graph.nrCompleted *graph.offspring+i)*(2 + graph.delta) + (1 + graph.delta);
+                    var toBeat = Math.random() * denominator;
+                    var edgeTarget = 0;
+                    var cummulativeNominator = graph.nodes[edgeTarget].degree + graph.delta;
+                    //console.log(newnode.name+" denome:"+denominator+" seed "+toBeat +" origin "+cummulativeNominator+" degree "+ graph.nodes[0].degree);
+                    while (toBeat > cummulativeNominator) {
+                        edgeTarget++;
+                        cummulativeNominator += graph.nodes[edgeTarget].degree + graph.delta;
+                    }
+                    countList[edgeTarget]++;
+                    graph.nodes[edgeTarget].degree++;
+                    console.log(countList);
+                }
+                
+                var edge;
+                for (i = 0; i < countList.length; i++) {
+                    if (countList[i]>0){
+                        if (countList[i] === 1) {
+                            edge = {};
+                                edge.source = i;
+                                edge.target = graph.nrCompleted;
+                                edge.angle = 0;
+                                edge.count = 1;
+                                graph.links.push(edge);
+                        }
+                        if (countList[i] === 2) {
+                            edge = {};
+                            edge.source = i;
+                            edge.target = graph.nrCompleted;
+                            edge.angle = 1;
+                            edge.count = 2;
+                            graph.links.push(edge);
+                            edge2 = {};
+                            edge2.source = graph.nrCompleted;
+                            edge2.target = i;
+                            edge2.angle = 2;
+                            edge2.count = 2;
+                            graph.links.push(edge2);
+                        }
+                        if (countList[i] === 3) {
+                            edge = {};
+                            edge.source = i;
+                            edge.target = graph.nrCompleted;
+                            edge.angle = 1;
+                            edge.count = 3;
+                            graph.links.push(edge);
+                            edge2 = {};
+                            edge2.source = graph.nrCompleted;
+                            edge2.target = i;
+                            edge2.angle = 1;
+                            edge2.count = 3;
+                            graph.links.push(edge2);
+                            edge3 = {};
+                            edge3.source = i;
+                            edge3.target = graph.nrCompleted;
+                            edge3.angle = 0;
+                            edge3.count = 3;
+                            graph.links.push(edge3);
+                        }
+                        if (countList[i] > 3) {
+                            for (k = 0; k < countList[i]; k++) {
+                                edge = {};
+                                edge.source = i;
+                                edge.target = graph.nrCompleted;
+                                edge.angle = 1;
+                                edge.count = k + 1;
+                                graph.links.push(edge);
+                            }
+                        }
+                    }
+                }
+                edge.group=edge.count;
+                graph.nrCompleted++;
+            }
+            
+
+
+            link = link.data(graph.links);
+
+            link.enter().append("path")
+                .attr("class", function (d) {
+                    return "link count" + d.degree;})
+                .attr("id", function (d) {
+                if (d.source.name < d.target.name)
+                    return "idlink" + d.source.name + "t" + d.target.name;
+                else
+                    return "idlink" + d.target.name + "t" + d.source.name;
+            });
+            force.start();
+            link.exit().remove();
+
+            node = node.data(graph.nodes);
+
+            node.enter().append("circle")
+                .attr("class", "node")
+                .attr("id", function (n) {
+                    return "id"+n.name;})
+                .attr("r", 5).call(force.drag);
+            node.style("fill", function (d) {
+                return color(d.degree);
+            });
+            node.exit().remove();
+            setTimer();
+    }
+
+    function setTimer() {
+        if (typeof(displayID)!="undefined") {
+            clearInterval(displayID);
+        }
+        if (timestep > 0) {
+            displayID = setTimeout(function () {
+                if (graph.nrCompleted < nrOfNodes) {
+                    addOneEdge();
+                }
+            }, timestep);
+        }
+    }
+
+    function nextStep() {
+        addOneEdge();
+    }
+
+    function restartAnimation() {
+        if (typeof(displayID)!="undefined") {
+            clearInterval(displayID);
+        }
+        d3.select("svg").remove();
+        graph = initializeGraph(delta,offspring);
+        initializeGraphic();
+        addLogo();
+        setTimer();
+    }
+    
+    d3.select("input[id=nrNodes]").on("change", function () {
+        nrOfNodes = this.value;
+    });
+    d3.select("input[id=numedges]").on("change", function () {
+        offspring = Number(this.value);
+        document.getElementById("delta").min = -offspring+0.5;
+    });
+    d3.select("input[id=delta]").on("change", function () {
+        delta = this.value;
+        document.getElementById("deltaDisplay").innerHTML = delta;
+    });
+    d3.select("input[id=timestep]").on("change", function () {
+        timestep=this.value;
+        document.getElementById("timestepDisplay").innerHTML = timestep > 0 ? timestep + "ms" : "manual";
+        setTimer();
+    });
+
+
+    </script>

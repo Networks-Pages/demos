@@ -55,12 +55,12 @@ function addLogo() {
     nameTag = svg.append("text")
             .attr("class", "xlabel")
             .attr("text-anchor", "end")
-            .attr("x", window.innerWidth * 6 / 7)
+            .attr("x", width * 6 / 7)
             .attr("y", height - 100)
             .style("font-family", "Raleway")
             .style("fill", "rgba(0,0,0, 0.5)")
             .style("font-size", "20px")
-            .text("Fitzner, networkpages.nl")[0][0];
+            .text("Fitzner, Gösgens, networkpages.nl")[0][0];
 };
 
 
