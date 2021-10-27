@@ -5,7 +5,7 @@
 <link rel="stylesheet" type="text/css" href="../multigraphForcefield.css">
 
 <body onload="draw()">
-    <script src="../../SharedResources/d3.min.js"></script>
+    <script src="https://d3js.org/d3.v3.js"></script>
     <script src="../SharedResources/GraphAlgorithmLibaryFitzner.js"></script>
     <script src="../SharedResources/VisualFunctionFitzner.js"></script>
     <div class="container" id="page">
@@ -43,7 +43,7 @@
                 </div>
                 <div class="row">
                     <label for="timestep" class="col-form-label col-sm-3">Timestep:</label>
-                    <input type="range" value=0 min=0 max=3000 step=100 class="form-control col-sm-6" id="timestep" />
+                    <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-sm-6" id="timestep" />
                     <label class="col-sm-3 col-form-label" id="timestepDisplay">manual</label>
                 </div>
                 <div class="row">
@@ -60,7 +60,7 @@
             nrOfNodes = 50,
             offspring = 2,
             delta = -0.5,
-            timestep=0;
+            timestep=3100;
     var force, svg, link, node,graph;
     var chartNotShown = true, chartelement = [], nameTag = {}, modelTag = "PrefAttachment", chartType = "";
 
@@ -210,7 +210,7 @@
         if (typeof(displayID)!="undefined") {
             clearInterval(displayID);
         }
-        if (timestep > 0) {
+        if (timestep <=3000) {
             displayID = setTimeout(function () {
                 if (graph.nrCompleted < nrOfNodes) {
                     addOneEdge();
@@ -247,7 +247,7 @@
     });
     d3.select("input[id=timestep]").on("change", function () {
         timestep=this.value;
-        document.getElementById("timestepDisplay").innerHTML = timestep > 0 ? timestep + "ms" : "manual";
+        document.getElementById("timestepDisplay").innerHTML = timestep > 3100 ?  "manual" : timestep + "ms";
         setTimer();
     });
 
