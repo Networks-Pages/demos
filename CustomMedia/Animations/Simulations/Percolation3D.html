@@ -1,0 +1,337 @@
+<!DOCTYPE html >
+<html >
+<head>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1" />
+    <meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+    <title>Percolation on 3D Grid</title>
+
+    <script type="text/javascript" src="https://d3js.org/d3.v3.min.js"></script>
+    <script type="text/javascript" src="http://x3dom.org/x3dom/dist/x3dom-full.js"></script>
+    <script>
+
+        var gridSize = 5;
+        var vertices = [];
+        var edges = [];
+        var scales = [];
+        var percolationProb = 0.7;
+        var graph = {};
+        var ancestors = {};
+        var routeIds = [];
+
+        function vertex2id(v) {
+            return "x"+v.x+"y"+v.y+"z"+v.z;
+        }
+        function id2vertex(id) {
+            var split1 = id.substr(1).split('y');
+            var x = Number(split1[0]);
+            var split2 = split1[1].split('z');
+            var y = Number(split2[0]);
+            var z = Number(split2[1]);
+            return {
+                x: x,
+                y: y,
+                z: z
+            }
+        }
+        function endpointIds2edgeId(aId,bId) {
+            if (aId<bId)
+                return aId+"_"+bId;
+            else
+                return bId+"_"+aId;
+        }
+        function endpoints2edgeId(A,B) {
+            return endpointIds2edgeId(vertex2id(A),vertex2id(B));
+        }
+        function edge2id(l) {
+            var A = {x: l.xStart,y: l.yStart, z: l.zStart},
+                B = {x: l.xEnd, y: l.yEnd, z: l.zEnd};
+            return endpoints2edgeId(A,B);
+        }
+
+        function gridPercolation( parent )
+        {
+            var x3d = parent
+                .append("x3d")
+                .style( "width", "100%" )
+                .style( "height", "100%" )
+                .style( "border", "none" );
+
+            var scene = x3d.append("scene");
+
+            scene.append("orthoviewpoint")
+                .attr( "centerOfRotation", [gridSize/2,gridSize/2,gridSize/2])
+                .attr( "fieldOfView", [-5, -5, 5, 5])
+                .attr( "orientation", [-0.5, 1, 0.2, 1.12*Math.PI/4])
+                .attr( "position", [10, 7, 10]);
+
+            vertices = initializeDataGrid();
+            edges = initializeEdges(vertices);
+            var axisRange = [0, gridSize];
+            scales = [];
+            var ease = 'linear';
+            var axisKeys = ["x", "y", "z"];
+
+            // Initialize the axes lines and labels.
+            function initializePlot() {
+                for (var axisIndex=0;axisIndex<3;axisIndex++) {
+                    var scale = d3.scale.linear()
+                        .domain( [1,gridSize] ) // demo data range
+                        .range( axisRange )
+
+                    scales[axisIndex] = scale;
+                }
+            }
+
+
+            // Update visualization of points
+            function plotVertices( duration ) {
+
+                if (!vertices) {
+                    console.log("no vertices to plot.")
+                    return;
+                }
+
+                var x = scales[0], y = scales[1], z = scales[2];
+                var sphereRadius = 0.1;
+
+                // Draw a sphere at each x,y,z coordinate.
+                var datapoints = scene.selectAll(".datapoint").data(vertices, vertex2id);
+                datapoints.exit().remove()
+
+                var newDatapoints = datapoints.enter()
+                    .append("transform")
+                    .attr("class", "datapoint")
+                    .attr("id", vertex2id)
+                    .attr("scale", [sphereRadius, sphereRadius, sphereRadius])
+                    .append("shape");
+                newDatapoints
+                    .append("appearance")
+                    .append("material")
+                    .attr("id", v=>vertex2id(v)+"_material")
+                    .attr("diffuseColor", "steelblue");
+                newDatapoints
+                    .append("sphere")
+
+                datapoints.transition().ease(ease).duration(duration)
+                    .attr("translation", function(row) {
+                        return x(row[axisKeys[0]]) + " " + y(row[axisKeys[1]]) + " " + z(row[axisKeys[2]])})
+            }
+
+
+            function plotEdges() {
+                var x=scales[0],y=scales[1],z=scales[2];
+                var links = scene.selectAll(".link").data(edges,edge2id);
+                links.exit().remove();
+                var newLinks = links.enter()
+                    .append("transform")
+                    .attr("translation",l => [x(l.xStart),y(l.yStart),z(l.zStart)])
+                    .attr("rotation", l=>([[0,0,0,0],[0,0,1,Math.PI/2],[0,1,0,-Math.PI/2]][l.axisIndex]))
+                    .attr("class", "link")
+                    .append("shape");
+                newLinks.append("appearance")
+                    .append("material")
+                    .attr("id", e => edge2id(e) + "_appearance")
+                    .attr("emissiveColor", "black");
+                newLinks.append("LineProperties")
+                    .attr("linewidthScaleFactor",10)
+                    .attr("id", e => edge2id(e) + "_lineproperties");
+
+                newLinks.append("polyline2d")
+                    .attr("lineSegments", l => (scales[l.axisIndex](1)-scales[l.axisIndex](0))+" 0, 0 0")
+                    .attr("id",edge2id);
+                routeIds.forEach(eId => {
+                    document.getElementById(eId+"_appearance").emissiveColor = "red";
+                });
+            }
+
+            function initializeDataGrid() {
+                var vertices = [];
+                // Follow the convention where y(x,z) is elevation.
+                for (var x=1; x<=gridSize; x+=1) {
+                    for (var z=1; z<=gridSize; z+=1) {
+                        for (var y=1; y<=gridSize; y++) {
+                            vertices.push({x: x, y: y, z: z});
+                        }
+                    }
+                }
+
+                return vertices;
+            }
+
+            function initializeEdges(vertices) {
+                var edges = [];
+                vertices.forEach(v => {
+                    if (v.x < gridSize) {
+                        edges.push({
+                            xStart: v.x,
+                            yStart: v.y,
+                            zStart: v.z,
+                            xEnd: v.x+1,
+                            yEnd: v.y,
+                            zEnd: v.z,
+                            axisIndex: 0
+                        });
+                    }
+                    if (v.y < gridSize) {
+                        edges.push({
+                            xStart: v.x,
+                            yStart: v.y,
+                            zStart: v.z,
+                            xEnd: v.x,
+                            yEnd: v.y+1,
+                            zEnd: v.z,
+                            axisIndex: 1
+                        });
+                    }
+                    if (v.z < gridSize) {
+                        edges.push({
+                            xStart: v.x,
+                            yStart: v.y,
+                            zStart: v.z,
+                            xEnd: v.x,
+                            yEnd: v.y,
+                            zEnd: v.z+1,
+                            axisIndex: 2
+                        });
+                    }
+                });
+                return edges;
+            }
+
+            function percolate() {
+                vertices.forEach(v=> {
+                    document.getElementById(vertex2id(v)+"_material").diffuseColor = "steelblue";
+                });
+                routeIds.forEach(eId => {
+                    document.getElementById(eId+"_appearance").emissiveColor = "black";
+                });
+                var edgesNew = [];
+                edges.forEach(e => {
+                    if (Math.random()>percolationProb) {
+                        console.log("add "+edge2id(e));
+                        edgesNew.push(e);
+                    }
+                });
+                console.log(edgesNew.length+"remaining");
+                edges = edgesNew;
+                graph = {};
+                ancestors = {};
+                var endPoint;
+                vertices.forEach(v => {
+                    graph[vertex2id(v)] = [];
+                })
+                edgesNew.forEach(e => {
+                    var start = vertex2id({
+                        x: e.xStart,
+                        y: e.yStart,
+                        z: e.zStart
+                    }), end = vertex2id({
+                        x: e.xEnd,
+                        y: e.yEnd,
+                        z: e.zEnd
+                    });
+                    graph[start].push(end);
+                    graph[end].push(start);
+                });
+                var newVertices = [];
+                for (var x=1; x<= gridSize; x++) {
+                    for (var z=1; z<=gridSize; z++) {
+                        var vId = vertex2id({
+                            x: x,
+                            y: 1,
+                            z: z
+                        });
+                        newVertices.push(vId);
+                        ancestors[vId] = "start";
+                        document.getElementById(vId+"_material").diffuseColor = "green";
+                    }
+                }
+                var endVertex;
+                while (newVertices.length>0) {
+                    var v = newVertices.splice(0,1)[0];
+                    graph[v].forEach(neighbor => {
+                        if (!(neighbor in ancestors)) {
+                            ancestors[neighbor] = v;
+                            newVertices.push(neighbor);
+                            document.getElementById(neighbor+"_material").diffuseColor = "green";
+                            if (!endVertex && id2vertex(neighbor).y==gridSize) {
+                                endVertex = neighbor;
+                            }
+                        }
+                    });
+                }
+
+                if (!endVertex) {
+                    console.log("No endpoint");
+                    routeIds = [];
+                    plotEdges();
+                    return;
+                }
+                var route = [endVertex];
+                var currentV = endVertex;
+                var foundStart = false;
+                while (!foundStart) {
+                    currentV = ancestors[currentV];
+                    if (currentV == "start") {
+                        foundStart = true;
+                    } else {
+                        route.push(currentV);
+                    }
+                }
+                console.log(route);
+                routeIds = [];
+                for (var routeId=0; routeId<route.length-1; routeId++) {
+                    var eId = endpointIds2edgeId(route[routeId],route[routeId+1]);
+                    routeIds.push(eId);
+                }
+                plotEdges();
+            }
+
+            document.getElementById("percolateButton").onclick = percolate;
+
+            initializePlot();
+            plotVertices();
+            plotEdges();
+            //setInterval( ()=>{plotData( defaultDuration );}, defaultDuration );
+
+            window.onload = function() {
+                document.getElementsByTagName('x3d')[0].style.height='100%';
+            }
+
+        }
+    </script>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="http://www.x3dom.org/download/dev/x3dom.css"/>
+</head>
+<body>
+<div class="container" id="page">
+    <div class="row justify-content-center">
+        <h2 class="col-md-12" style="text-align: center">
+            Percolation on 3D Grid
+        </h2>
+    </div>
+    <div class="row justify-content-center">
+        <label for="percolationProb" class="col-form-label col-sm-3">Percolation probability:</label>
+        <input type="range" value=0.7 min=0.1 max=0.9 step=0.1 class="form-control col-sm-4" id="percolationProb" />
+        <label class="col-sm-2 col-form-label" id="percolationProbDisplay">0.7</label>
+        <button type="button" id="percolateButton" class="btn btn-primary col-sm-3">Percolate</button>
+    </div>
+    <div class="row justify-content-center">
+        <div id="divPlot" class="col-sm-12"></div>
+    </div>
+</div>
+
+<script>
+    d3.select('html').style('height','100%').style('width','100%');
+    d3.select('body').style('height','100%').style('width','100%');
+    var height = (window.innerHeight || document.documentElement.clientHeight || document.getElementsByTagName('body')[0].clientHeight)-document.getElementById("page").offsetHeight;
+    d3.select('#divPlot').style('height', height+"px");
+    d3.select("input[id=percolationProb]").on("change", function () {
+        percolationProb=this.value;
+        document.getElementById("percolationProbDisplay").innerHTML = percolationProb;
+    });
+    gridPercolation( d3.select('#divPlot'));
+
+</script>
+</body>
+</html>
