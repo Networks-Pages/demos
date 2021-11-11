@@ -13,7 +13,7 @@
         var vertices = [];
         var edges = [];
         var scales = [];
-        var percolationProb = 0.7;
+        var percolationProb = 0.3;
         var graph = {};
         var ancestors = {};
         var routeIds = [];
@@ -207,7 +207,7 @@
                 });
                 var edgesNew = [];
                 edges.forEach(e => {
-                    if (Math.random()>percolationProb) {
+                    if (Math.random()<percolationProb) {
                         console.log("add "+edge2id(e));
                         edgesNew.push(e);
                     }
@@ -312,8 +312,8 @@
     </div>
     <div class="row justify-content-center">
         <label for="percolationProb" class="col-form-label col-sm-3">Percolation probability:</label>
-        <input type="range" value=0.7 min=0.1 max=0.9 step=0.1 class="form-control col-sm-4" id="percolationProb" />
-        <label class="col-sm-2 col-form-label" id="percolationProbDisplay">0.7</label>
+        <input type="range" value=0.3 min=0.1 max=0.9 step=0.1 class="form-control col-sm-4" id="percolationProb" />
+        <label class="col-sm-2 col-form-label" id="percolationProbDisplay">0.3</label>
         <button type="button" id="percolateButton" class="btn btn-primary col-sm-3">Percolate</button>
     </div>
     <div class="row justify-content-center">
