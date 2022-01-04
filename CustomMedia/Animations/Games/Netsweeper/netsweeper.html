@@ -181,6 +181,7 @@ function loadGraph(graphType) {
       }
     ];
     graph.links = [{"source": 0, "target": 1},{"source": 1, "target": 2}];
+    var sumDegrees = 2*graph.links.length;
     for (var i=3; i<30; i++) {
       var neighbors = [];
       graph.nodes.push({
@@ -189,12 +190,11 @@ function loadGraph(graphType) {
         "x": 0,
         "y": 0
       });
-      var sumDegrees = 2*graph.links.length;
       for (var e=0; e<3; e++) {
         var x = sumDegrees*Math.random();
         for (var j=0; j<i; j++) {
           x -= graph.nodes[j].degree;
-          if (x<0 && !(j in neighbors)) {
+          if (x<0 && !neighbors.includes(j)) {
             graph.links.push({
               "source": j,
               "target": i
@@ -230,7 +230,7 @@ function loadGraph(graphType) {
 }
 
 function restart() {
-  console.log('RESTART');
+  console.log('Restart');
   // clear field
   d3.selectAll('.revealed').classed('revealed',false);
   d3.selectAll('.neighbor-counter').remove();
@@ -425,7 +425,6 @@ function updateVisualization() {
       return;
     let nodeID = event.target.parentElement.id;
     let node = id2node[nodeID];
-    console.log("mouseover "+node.name)
     tooltip.transition()
             .duration(200)
             .style("opacity", .9);
