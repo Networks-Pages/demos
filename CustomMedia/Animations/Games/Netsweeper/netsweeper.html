@@ -1,0 +1,542 @@
+
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<script src="https://unpkg.com/d3-force-boundary@0.0.1/dist/d3-force-boundary.min.js"></script>
+<script src="petersen.js"></script>
+<script src="tutte.js"></script>
+<script src="dodecahedral.js"></script>
+<script src="eurocup2020.js"></script>
+<style>
+  #links {
+    stroke: #999;
+    stroke-opacity: 0.6;
+    stroke-width: 1.5px;
+  }
+
+  div.tooltip {
+    position: absolute;
+    text-align: center;
+    /*width: 60px;*/
+    height: 25px;
+    padding: 5px;
+    font: 12px sans-serif;
+    color: black;
+    background: #999;
+    border: 0px;
+    border-radius: 5px;
+    pointer-events: none;
+  }
+
+  #nodes {
+    stroke: #fff;
+    stroke-width: 1.5px
+  }
+  #nodes circle {
+    stroke: black;
+    fill: #999;
+  }
+  #nodes .revealed circle {
+    fill: green;
+  }
+  #nodes .mine {
+  }
+  #nodes text {
+    stroke: black;
+    stroke-width: 0.5px;
+    text-anchor: middle;
+  }
+</style>
+<head>
+  <title>Netsweeper - Minesweeper on Networks</title>
+</head>
+<body>
+  <div class="row">
+    <div style="width:100%">
+      <h1 style="text-align: center;">
+        Netsweeper
+        <img onclick="restart()" id="smiley" height="100%" src="smiley-alive.png"></img>
+      </h1>
+      <p style="text-align: center">
+        The network contains <b id="minecount">?</b> hidden mines. Click the smiley to restart.
+      <p>
+    </div>
+    <div style="float:right;position:absolute;right:0;top:10px;">
+      <div class="custom-control custom-switch" style="float:right;margin-top:10px;margin-right:10px;">
+        <input type="checkbox" class="custom-control-input" id="flagmode">
+        <label class="custom-control-label" for="flagmode">
+          Flag mode
+          <img height="18px" src="flag.ico"></img></label>
+      </div>
+      <div><select id="graphtype" style="margin-top:10px;">
+        <option value="ER">Random ER-network</option>
+        <option value="PA">Random PA-network</option>
+        <option value="petersen">The Petersen graph</option>
+        <option value="dodecahedral">Dodecahedral graph</option>
+        <option value="tutte">Tutte graph</option>
+        <option value="eurocup2020">UEFA EURO 2020</option>
+      </select></div>
+    </div>
+  </div>
+  <div class="row">
+    <div id="playingfield" height="100%" class="col-md-12"></div>
+  </div>
+</body>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<script>
+
+let staticGraphs = {
+  "petersen": petersen,
+  "tutte": tutte,
+  "dodecahedral": dodecahedral,
+  "eurocup2020": eurocup2020,
+};
+
+function isMobileBrowser() {
+    const toMatch = [
+        /Android/i,
+        /webOS/i,
+        /iPhone/i,
+        /iPad/i,
+        /iPod/i,
+        /BlackBerry/i,
+        /Windows Phone/i
+    ];
+    return toMatch.some((toMatchItem) => {
+        return navigator.userAgent.match(toMatchItem);
+    });
+}
+var scale = isMobileBrowser() ? 2 : 1;
+
+let smileyAlive = document.getElementById("smiley").src;
+var srcSmiley = {
+  alive: smileyAlive,
+  win: smileyAlive.replace("alive","won"),
+  lost: smileyAlive.replace("alive","lost"),
+}
+var graph;
+var id = "playingfield";
+var container = document.getElementById(id);
+// Make height at least as big as width
+var width = container.offsetWidth;//container.offsetWidth,
+	height = 800;//container.offsetHeight;
+if (height<width) height=width;
+if (height>window.innerHeight) height=window.innerHeight;
+
+var revealed = [];
+var removable = [];
+var dead = false;
+
+var currentMines;
+
+// A mapping from node/link to its id name
+var node2id = v => "node"+v.name;
+var link2id = e => "link"+e.source.name+"-"+e.target.name;
+
+var id2node = {};
+
+function loadGraph(graphType) {
+  graph = {};
+  var deepcopy = false;
+  if (graphType == "ER") {
+    // ER with n=40, p=0.15 and nMines=5
+    graph.nMines = 5;
+    graph.nodes = [];
+    graph.links = [];
+    for (var i=0; i<30; i++) {
+      graph.nodes.push({
+        "name": i,
+        "x": 0,
+        "y": 0
+      });
+      for (var j=0; j<i; j++) {
+        if (Math.random()<0.15) {
+          graph.links.push({
+            "source": j,
+            "target": i
+          });
+        }
+      }
+    }
+  } else if (graphType == "PA") {
+    graph.nMines = 5;
+    graph.nodes = [
+      {
+        "name": 0,
+        "degree": 1,
+        "x": 0,
+        "y": 0,
+      },
+      {
+        "name": 1,
+        "degree": 2,
+        "x": 0,
+        "y": 0,
+      },
+      {
+        "name": 2,
+        "degree": 1,
+        "x": 0,
+        "y": 0,
+      }
+    ];
+    graph.links = [{"source": 0, "target": 1},{"source": 1, "target": 2}];
+    for (var i=3; i<30; i++) {
+      var neighbors = [];
+      graph.nodes.push({
+        "name": i,
+        "degree": 0,
+        "x": 0,
+        "y": 0
+      });
+      var sumDegrees = 2*graph.links.length;
+      for (var e=0; e<3; e++) {
+        var x = sumDegrees*Math.random();
+        for (var j=0; j<i; j++) {
+          x -= graph.nodes[j].degree;
+          if (x<0 && !(j in neighbors)) {
+            graph.links.push({
+              "source": j,
+              "target": i
+            });
+            neighbors.push(j);
+            graph.nodes[j].degree++;
+            graph.nodes[i].degree++;
+            sumDegrees+=2;
+            break;
+          }
+        }
+      }
+    }
+  } else {
+    graph = JSON.parse(JSON.stringify(staticGraphs[graphType]));
+  }
+  nNodes = graph.nodes.length;
+  id2node = {};
+  var size = Math.min(width,height);
+  graph.nodes.forEach(function(v) {
+    v.neighbors = [];
+    id2node[node2id(v)] = v;
+    v.x = width/2+v.x*size;
+    v.y = height/2+v.y*size;
+  });
+  graph.links.forEach(function(e) {
+    let sID = "node"+e.source, tID = "node"+e.target;
+    e.source = id2node[sID];
+    e.target = id2node[tID];
+    e.source.neighbors.push(tID);
+    e.target.neighbors.push(sID);
+  });
+}
+
+function restart() {
+  console.log('RESTART');
+  // clear field
+  d3.selectAll('.revealed').classed('revealed',false);
+  d3.selectAll('.neighbor-counter').remove();
+  d3.selectAll('.flag').remove();
+  d3.selectAll('.mine').remove();
+  document.getElementById("smiley").src = srcSmiley.alive;
+  revealed = [];
+  removable = [];
+  dead = false;
+  // Obtain graph
+  loadGraph(document.getElementById('graphtype').value);
+  // Update UI
+  document.getElementById('minecount').innerHTML = ""+graph.nMines;
+  updateVisualization();
+}
+
+function gameWon() {
+  console.log("Game won!");
+  document.getElementById("smiley").src = srcSmiley.win;
+}
+
+function revealNode(node) {
+  let id = node2id(node);
+  // TODO: make an API call
+  // Count neighbors
+  let nNeighbors = 0;
+  node.neighbors.forEach(function (neighborID) {
+    if (currentMines.includes(neighborID)) {
+      nNeighbors++;
+    }
+  })
+
+  let element = document.getElementById(node2id(node));
+  let reveal = {
+    mine: currentMines.includes(id),
+    neighborMines: nNeighbors
+  }
+
+  revealed.push(id);
+  if (reveal.mine) {
+    // End the game and show the mine
+    element.classList.add("mine");
+    dead = true;
+    let newElement = document.createElementNS('http://www.w3.org/2000/svg','image');
+    newElement.setAttribute("href","mine.ico");
+    newElement.setAttribute("width",scale*20);
+    newElement.setAttribute("class","mine");
+    newElement.setAttribute("height",scale*20);
+    newElement.setAttribute("x",-scale*10);
+    newElement.setAttribute("y",-scale*10);
+    element.appendChild(newElement);
+    document.getElementById("smiley").src = srcSmiley.lost;
+    return;
+  }
+
+  // Reveal the node
+  element.classList.add("revealed");
+  if (reveal.neighborMines == 0) {
+    removable.push(id);
+    // Reveal neighbors
+    node.neighbors.forEach(function (nID) {
+      let neighbor = id2node[nID];
+      if (!revealed.includes(nID) && node.neighbors.includes(nID)) {
+        revealNode(neighbor);
+      }
+    });
+  } else {
+    // Add text to the node
+    let newElement = document.createElementNS('http://www.w3.org/2000/svg','text');
+    newElement.innerHTML = ""+reveal.neighborMines;
+    newElement.setAttribute('y',scale*4);
+    newElement.setAttribute('font-size',scale+'rem');
+    newElement.setAttribute('class','neighbor-counter');
+    element.appendChild(newElement);
+  }
+  if (revealed.length + graph.nMines == nNodes) {
+    gameWon();
+  }
+}
+
+function nodeClicked(event) {
+  let nodeID = event.target.parentElement.id;
+  let node = id2node[nodeID];
+  if (document.getElementById('flagmode').checked) {
+    toggleFlag(event.target,node2id(node));
+    return;
+  }
+  // Don't do anything if the game is over
+  if (dead) {
+    return;
+  }
+
+  if (revealed.length==0) {
+    placeMines(nodeID);
+  }
+  // If the node was already revealed, we remove it from the visualization.
+  // Else, we reveal the node.
+  if (!revealed.includes(nodeID)) {
+    revealNode(node);
+  } else if (removable.includes(nodeID)) {
+    // Delete node from visualization
+    let filteredNodes = [];
+    graph.nodes.forEach(function (v) {
+      if (node2id(v)!=nodeID) {
+        filteredNodes.push(v);
+      }
+    })
+    graph.nodes = filteredNodes;
+    let filteredLinks = [];
+    graph.links.forEach(function(e) {
+      if (![node2id(e.source),node2id(e.target)].includes(nodeID)) {
+        filteredLinks.push(e);
+      }
+    });
+    graph.links = filteredLinks;
+    tooltip .transition()
+            .duration(500)
+            .style("opacity", 0);
+    updateVisualization();
+  }
+}
+
+function toggleFlag(element,id) {
+  let flag = document.getElementById("flag"+id);
+  if (flag) {
+    // Remove flag
+    flag.remove();
+  } else {
+    // Raise a flag if it is not revealed
+    if (revealed.includes(id)) {
+      return;
+    }
+    flag = document.createElementNS('http://www.w3.org/2000/svg','image');
+    flag.setAttribute("id","flag"+id);
+    flag.setAttribute("class","flag");
+    flag.setAttribute("href","flag.ico");
+    flag.setAttribute("width",scale*20);
+    flag.setAttribute("height",scale*20);
+    flag.setAttribute("x",-scale*10);
+    flag.setAttribute("y",-scale*10);
+    flag.oncontextmenu = function() {
+      event.preventDefault();
+      flag.remove();
+    };
+    flag.onclick = function() {
+      if (document.getElementById('flagmode').checked) {
+        toggleFlag(flag,id);
+      }
+    }
+    element.parentElement.appendChild(flag);
+  }
+}
+
+function nodeRightClicked(e,node) {
+  event.preventDefault();
+  toggleFlag(e.target,node2id(node));
+}
+
+// Update the visualization after graph is changed.
+var nodes,circles,labels,links,drag,simulation,svg,tooltip;
+function updateVisualization() {
+  links = d3.select("#links").selectAll("line").data(graph.links,link2id);
+  let linkEnter = links.enter()
+                       .append("line")
+                       .attr("id",link2id)
+                       .attr("x1",e=>e.x1)
+                       .attr("y1",e=>e.y1)
+                       .attr("x2",e=>e.x2)
+                       .attr("y2",e=>e.y2);
+
+  links.exit().remove();
+  links = linkEnter.merge(links);
+
+
+  nodes = d3.select("#nodes").selectAll("g").data(graph.nodes,node2id);
+  let nodeEnter = nodes.enter()
+                       .append("g")
+                       .attr("id",node2id)
+                       .attr("transform", d => "translate("+d.x+","+d.y+")")
+                       .call(drag(simulation));
+  circles = nodeEnter.append("circle")
+                 .attr("r", scale*12)
+                 .on("click",nodeClicked)
+                 .on("contextmenu", nodeRightClicked);
+  /*labels = nodeEnter.append("text")
+                .text(d => d.name)
+                .attr('x', 0)
+                .attr('y', 4);*/
+
+  circles.on("mouseover", event=> {
+    if (graph.name != "eurocup2020")
+      return;
+    let nodeID = event.target.parentElement.id;
+    let node = id2node[nodeID];
+    console.log("mouseover "+node.name)
+    tooltip.transition()
+            .duration(200)
+            .style("opacity", .9);
+    tooltip	.html(node.name)
+            .style("left", node.x + "px")
+            .style("top", node.y-25-scale*12+ "px");
+  }).on("mouseout", d => {
+            tooltip .transition()
+                    .duration(500)
+                    .style("opacity", 0);
+  });
+  nodes.exit().remove();
+  nodes = nodeEnter.merge(nodes);
+  // Update the simulation elements and restart
+  simulation = simulation.nodes(graph.nodes).force("link", d3.forceLink(graph.links).id(d => d.name));
+  simulation.alpha(0.1).restart();
+
+
+}
+
+function showGraph() {
+  // Tooltip for hovering
+  tooltip = d3.select("#playingfield").append("div")
+          .attr("class", "tooltip")
+          .style("opacity", 0);
+  drag = simulation => {
+    function dragstarted(event) {
+      if (!event.active) simulation.alphaTarget(0.3).restart();
+      event.subject.fx = event.subject.x;
+      event.subject.fy = event.subject.y;
+    }
+
+    function dragged(event) {
+      event.subject.fx = event.x;
+      event.subject.fy = event.y;
+    }
+
+    function dragended(event) {
+      if (!event.active) simulation.alphaTarget(0);
+      event.subject.fx = null;
+      event.subject.fy = null;
+    }
+
+    return d3.drag()
+        .on("start", dragstarted)
+        .on("drag", dragged)
+        .on("end", dragended);
+  }
+
+  simulation = d3.forceSimulation(graph.nodes)
+                 .force("link", d3.forceLink(graph.links).id(d => d.name))
+                 .force("boundary", forceBoundary(15,15,width-15, height-15))
+                 .force("charge", d3.forceManyBody().strength(-400*scale))
+                 .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
+
+	svg = d3.select("#"+id).append("svg")
+							   .attr("width", width)
+							   .attr("height", height);
+
+  links = svg.append("g").attr("id","links");
+
+  nodes = svg.append("g").attr("id","nodes");
+  //updateVisualization();
+  simulation.on("tick", () => {
+    links
+        .attr("x1", d => d.source.x)
+        .attr("y1", d => d.source.y)
+        .attr("x2", d => d.target.x)
+        .attr("y2", d => d.target.y);
+    nodes.attr("transform", d => "translate("+d.x+","+d.y+")");
+  });
+
+}
+
+function addNodesFromName(n) {
+  graph.nodes.push({name: n, x: width/2, y: height/2})
+}
+
+function addLinksFromNeighbors(v) {
+  graph.links.push({
+    source: graph.nodes[v.id],
+    target: graph.nodes[v.neighbor1],
+    x1: graph.nodes[v.id].x,
+    y1: graph.nodes[v.id].x,
+    x2: graph.nodes[v.neighbor1].x,
+    y2: graph.nodes[v.neighbor1].y,
+  });
+  graph.links.push({
+    "source": graph.nodes[v.id],
+    "target": graph.nodes[v.neighbor2]
+  });
+}
+
+function placeMines(firstNodeID) {
+  let mines = [];
+  while (mines.length < graph.nMines) {
+    let id;
+    do {
+      id = node2id(graph.nodes[parseInt(Math.random()*graph.nodes.length)]);
+    } while (id==firstNodeID || mines.includes(id))
+    mines.push(id);
+  }
+  currentMines = mines;
+}
+
+var graph = {
+  nodes: [],
+  links: []
+};
+showGraph();
+restart();
+
+
+</script>
