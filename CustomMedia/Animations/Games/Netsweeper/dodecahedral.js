@@ -223,6 +223,6 @@ dodecahedral = {
             "target": 19
         }
     ],
-    "nMines": 8,
+    "nMines": 4,
     "name": "dodecahedral"
 };
