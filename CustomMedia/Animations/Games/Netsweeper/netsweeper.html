@@ -106,7 +106,7 @@ function isMobileBrowser() {
         return navigator.userAgent.match(toMatchItem);
     });
 }
-var scale = isMobileBrowser() ? 2 : 1;
+var scale = 1;//isMobileBrowser() ? 2 : 1;
 
 let smileyAlive = document.getElementById("smiley").src;
 var srcSmiley = {
