@@ -51,7 +51,7 @@
   <title>Netsweeper - Minesweeper on Networks</title>
 </head>
 <body>
-  <div class="row">
+  <div class="row" id="menurow">
     <div style="width:100%">
       <h1 style="text-align: center;">
         Netsweeper
@@ -117,11 +117,12 @@ var srcSmiley = {
 var graph;
 var id = "playingfield";
 var container = document.getElementById(id);
+var menuHeight = document.getElementById("menurow").offsetHeight;
 // Make height at least as big as width
 var width = container.offsetWidth;//container.offsetWidth,
 	height = 800;//container.offsetHeight;
 if (height<width) height=width;
-if (height>window.innerHeight) height=window.innerHeight;
+if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
 
 var revealed = [];
 var removable = [];
