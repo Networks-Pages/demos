@@ -52,8 +52,9 @@
 </head>
 <body>
   <div class="row" id="menurow">
-    <div style="width:100%">
-      <h1 style="text-align: center;">
+    <div class="col-md-2 col-sm-0"></div>
+    <div class="col-md-8 col-sm-12">
+      <h1 style="width: 100%; text-align: center;">
         Netsweeper
         <img onclick="restart()" id="smiley" height="100%" src="smiley-alive.png"></img>
       </h1>
@@ -61,21 +62,23 @@
         The network contains <b id="minecount">?</b> hidden mines. Click the smiley to restart.
       <p>
     </div>
-    <div style="float:right;position:absolute;right:0;top:10px;">
-      <div class="custom-control custom-switch" style="float:right;margin-top:10px;margin-right:10px;">
-        <input type="checkbox" class="custom-control-input" id="flagmode">
-        <label class="custom-control-label" for="flagmode">
-          Flag mode
-          <img height="18px" src="flag.ico"></img></label>
+    <div class="col-md-2 col-sm-12">
+      <div style="float:right;position:absolute;right:0;top:10px;">
+        <div class="custom-control custom-switch" style="float:right;margin-top:10px;margin-right:10px;">
+          <input type="checkbox" class="custom-control-input" id="flagmode">
+          <label class="custom-control-label" for="flagmode">
+            Flag mode
+            <img height="18px" src="flag.ico"></img></label>
+        </div>
+        <div><select id="graphtype" style="margin-top:10px;">
+          <option value="ER">Random ER-network</option>
+          <option value="PA">Random PA-network</option>
+          <option value="petersen">The Petersen graph</option>
+          <option value="dodecahedral">Dodecahedral graph</option>
+          <option value="tutte">Tutte graph</option>
+          <option value="eurocup2020">UEFA EURO 2020</option>
+        </select></div>
       </div>
-      <div><select id="graphtype" style="margin-top:10px;">
-        <option value="ER">Random ER-network</option>
-        <option value="PA">Random PA-network</option>
-        <option value="petersen">The Petersen graph</option>
-        <option value="dodecahedral">Dodecahedral graph</option>
-        <option value="tutte">Tutte graph</option>
-        <option value="eurocup2020">UEFA EURO 2020</option>
-      </select></div>
     </div>
   </div>
   <div class="row">
