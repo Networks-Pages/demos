@@ -22,7 +22,7 @@
     "flag-icon-css": "^3.5.0",
     "mime-types": "^2.1.30",
     "mysql": "^2.18.1",
-    "socket.io": "^2.4.1",
+    "socket.io": "^4.5.0",
     "underscore": "^1.13.1",
     "winston": "^3.3.3"
   }

@@ -430,7 +430,7 @@ function open(server) {
     const ip = socket.handshake.headers['x-real-ip'] ||
                 socket.handshake.headers['!~passenger-client-address'] ||
                 socket.conn.remoteAddress;
-    const roomPath = (socket.handshake.query.hasOwnProperty('room') &&
+    const roomPath = (Object.hasOwn(socket.handshake.query, 'room') &&
         socket.handshake.query.room !== 'NaN' ?
         socket.handshake.query.room : false);
     const room = (rooms.has(roomPath) ? rooms.get(roomPath) : null);
