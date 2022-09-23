@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css"
+      integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+<style>
+    .links line {
+        stroke: #999;
+        stroke-opacity: 0.6;
+        stroke-width: 5px;
+    }
+
+    .stubs line {
+        stroke: #999;
+        stroke-opacity: 0.6;
+        stroke-width: 5px;
+    }
+    .stubs line.infected {
+        orient: auto;
+        stroke-width: 3px;
+        stroke: #212529;
+        stroke-opacity: 0.8;
+    }
+    .stubs line.infected.arrow {
+        marker-start: url(#arrow);
+    }
+    .stubs path {
+        stroke: #999;
+        stroke-opacity: 0.6;
+        stroke-width: 5px;
+    }
+    .stubs path.infected {
+        stroke-width: 3px;
+        stroke: #212529;
+        stroke-opacity: 0.8;
+    }
+
+    .links line.selected {
+        stroke: #28a745;
+    }
+
+    .links line.disabled {
+        visibility: hidden;
+    }
+
+    .links line.infected-forward {
+        marker-end: url(#arrow);
+        stroke: #212529;
+        stroke-width: 3px;
+        orient: auto;
+    }
+    .links line.infected-backwards {
+        marker-start: url(#arrow);
+        stroke: #212529;
+        stroke-width: 3px;
+        orient: auto;
+    }
+
+    .nodes circle {
+        stroke-width: 3px;
+    }
+
+    #graph {
+        width: 100%;
+        height: 600px;
+        margin: auto;
+    }
+</style>
+
+<body onload="initialize()">
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div id="graph"></div>
+        </div>
+    </div>
+    <div class="row" id="transitions">
+        <button type="button" class="col-md-6 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next
+            step
+        </button>
+        <label for="timestep" class="col-form-label col-md-2">Timestep:</label>
+        <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-md-3" id="timestep" />
+        <label class="col-md-1 col-form-label" id="timestepDisplay">manual</label>
+    </div>
+    <div class="row" id="initialization">
+        <button type="button" class="col-md-6 btn btn-primary" onclick="restart()">Initialize weights</button>
+        <label for="greens" class="col-form-label col-sm-2">Initial #greens:</label>
+        <input type="range" value=1 min=0 max=5 step=1 class="form-control col-sm-3" id="greens" />
+        <label class="col-sm-1 col-form-label" id="greensDisplay">1</label>
+    </div>
+</div>
+</div>
+<script src="https://d3js.org/d3.v5.js"></script>
+<script>
+    // OPTIONS:
+    var directed = false; // Doesn't do anything yet
+    var showGeneration = false;
+    var nNodes = 20;
+    var nPos = 1;
+    var toyExample = [
+        [0, 1],
+        [0, 2],
+        [0, 4],
+        [1, 2],
+        [2, 3],
+    ];
+    var model = "toy";
+    var configurationModelDegrees = Array(nNodes-2).fill(3).concat([9,9]).sort((a,b) => 0.5-Math.random()); // constant degrees
+
+    // Set nNodes to the length of the degree sequence for CM and to 5 for the toy example.
+    if (model=="CM") {
+        nNodes = configurationModelDegrees.length;
+    } else { // toy example
+        nNodes = 5;
+    }
+
+    // Time between states, 3100 denotes 'manual'
+    var timestep = 3100;
+
+    var id = "graph";
+    var container = document.getElementById(id);
+    var width = container.offsetWidth;
+    var height = container.offsetHeight;
+    var size = width < height ? width : height;
+    var stubLen = 30;
+    var stubAngle = Math.PI*0.7; // The angle between the first and last stub of a vertex
+    var generationPhase = showGeneration;
+    var graphGenerationIndex = 0;
+
+    var nodes = [];
+    var xs = [];
+    var ys = [];
+
+
+    var infectingEdge = null;
+
+    var graph = {
+        "nodes": [],
+        "links": []
+    };
+
+    // A function that gives the id of the link/edge.
+    var linkId = e => e.source + "-" + e.target;
+
+    // Transforms a node pair to a link with source and target.
+    function pair2link(p) {
+        return {
+            "source": Math.min(p[0], p[1]),
+            "target": Math.max(p[0], p[1])
+        };
+    }
+
+    function pair2stub(p) {
+        var angle = graph.nodes[p[0]].angle;
+        if (graph.nodes[p[0]].neighbors.length>1) {
+            angle +=(graph.nodes[p[0]].stubs.length/(graph.nodes[p[0]].neighbors.length-1.0)-0.5)*stubAngle;
+        }
+        var stub = {
+            "source": p[0],
+            "for": p[1],
+            "angle": angle,
+        };
+        stub['endX'] = graph.nodes[p[0]].x+Math.cos(stub['angle'])*stubLen;
+        stub['endY'] = graph.nodes[p[0]].y+Math.sin(stub['angle'])*stubLen;
+        stub['cpX'] = graph.nodes[p[0]].x+3*Math.cos(stub['angle'])*stubLen;
+        stub['cpY'] = graph.nodes[p[0]].y+3*Math.sin(stub['angle'])*stubLen;
+        return stub;
+    }
+
+    // Helper functions
+    function randomIndex(max,min=0) {
+        return min+Math.floor(Math.random()*(max-min));
+    }
+
+    function randomElement(a,splice=false) {
+        var i = randomIndex(a.length);
+        if (splice) {
+            return a.splice(i,1)[0];
+        }
+        return a[i];
+    }
+
+    function initializeStates() {
+        var negNodes = [];
+        nodes.forEach(v => {negNodes.push(v);});
+        var posNodes = [];
+        for (var i = 0; i < nPos; i++) {
+            posNodes.push(negNodes.splice(Math.floor(Math.random()*negNodes.length),1)[0]);
+        }
+        negNodes.forEach(i => {
+            graph.nodes[i].state = false;
+        });
+        posNodes.forEach(i => {
+            graph.nodes[i].state = true;
+        });
+    }
+
+    function endGenerationPhase() {
+        generationPhase = false;
+
+        // set timestep to manual
+        timestep = 3100;
+        document.getElementById('timestep').value=timestep;
+        document.getElementById("timestepDisplay").innerHTML = timestep > 3000 ?  "manual" : timestep + "ms";
+
+        if (typeof(displayID)!="undefined") {
+            clearInterval(displayID);
+        }
+
+
+    }
+
+    // Perform one step of the voting dynamics
+    function updateState() {
+        if (generationPhase) {
+            // Draw the new edge
+            updateGraph();
+            graphGenerationIndex++;
+            if (graphGenerationIndex==graph.links.length) {
+                endGenerationPhase();
+            }
+            return
+        }
+        // Choose a node uniformly at random
+        var source = randomElement(graph.nodes);
+        // Choose a neighbor uniformly at random
+        var target = graph.nodes[randomElement(source.neighbors)];
+        infectingEdge = [source.name,target.name];
+        if (source.state != target.state) {
+            console.log(target.name+" got infected by "+source.name);
+        }
+        target.state = source.state;
+        updateGraph();
+    }
+
+    // Given a d3 selector, this initializes a line for each (enter-) element.
+    function initLinks(selector) {
+        var links = selector.append("line")
+            .attr("id", linkId)
+            .attr("x1", e => graph.nodes[e.source].x)
+            .attr("y1", e => graph.nodes[e.source].y)
+            .attr("x2", e => graph.nodes[e.target].x)
+            .attr("y2", e => graph.nodes[e.target].y);
+        if (showGeneration) {
+            links.classed("disabled",true)
+        }
+        return links;
+    }
+
+    function initStubs(selector) {
+        var stubs = selector.append("line")
+            .attr("id", linkId)
+            .attr("x1", s => graph.nodes[s.source].x)
+            .attr("y1", s => graph.nodes[s.source].y)
+            .attr("x2", s => s.endX)
+            .attr("y2", s => s.endY);
+        return stubs;
+    }
+
+
+
+    var svg;
+    var defs;
+    var colorScale;
+    var colorbar;
+    var line1;
+    var line2;
+    var axisTicks;
+
+    function initContainer() {
+        d3.select("input[id=timestep]").on("change", function () {
+            timestep=this.value;
+            document.getElementById("timestepDisplay").innerHTML = timestep > 3000 ?  "manual" : timestep + "ms";
+            setTimer();
+        });
+        d3.select("input[id=greens]").on("change", function () {
+            nPos=this.value;
+            document.getElementById("greensDisplay").innerHTML = nPos;
+        });
+        document.getElementById("greens").max = nNodes;
+
+        if (showGeneration)
+            document.getElementById("updateButton").disabled = false;
+
+
+        if (!d3.select("#" + id + " svg").empty()) {
+            return;
+        }
+        svg = d3.select("#" + id).append("svg")
+            .attr("width", width)
+            .attr("height", height);
+        defs = svg.append("defs");
+        defs.append("marker")
+            .attr("id","arrow")
+            .attr("viewBox","-19 -5 10 10")
+            .attr("refX",0)
+            .attr("refY",0)
+            .attr("markerWidth",4)
+            .attr("markerHeight",4)
+            .attr("orient","auto-start-reverse")
+            .append("path")
+            .attr("d", "M-19,-5L-9,0L-19,5")
+            .attr("class","arrowHead");
+    }
+
+    var d3Nodes;
+    var d3Stubs;
+    var d3Links;
+    var selectedLink;
+
+    function createGraph() {
+        for (var i = 0; i < nNodes; i++) {
+            nodes.push(i);
+        }
+
+        // Initialize positions on an oval.
+        for (var i = 0; i < nNodes; i++) {
+            var angle = (2 * Math.PI * i) / nNodes;
+            var x = width/2 + size * Math.cos(angle) / 2.5;
+            var y = height/2 + size * Math.sin(angle) / 2.5;
+            xs.push(x);
+            ys.push(y);
+        }
+
+        nodes.forEach(i => graph["nodes"].push({
+            "name": i,
+            "x": xs[i],
+            "y": ys[i],
+            "neighbors": [],
+            "state": false
+        }))
+
+        var edges = [];
+        if (model=="CM") {
+            var stubs = [];
+            configurationModelDegrees.forEach((d,i) => {stubs = stubs.concat(Array(d).fill(i)); });
+            while (stubs.length>1) {
+                edges.push([randomElement(stubs,true),randomElement(stubs,true)]);
+            }
+        } else { // model=="toy example"
+            edges = toyExample;
+        }
+
+        edges.forEach(function (e) {
+            graph.links.push(pair2link(e))
+            graph.nodes[e[0]].neighbors.push(e[1]);
+            graph.nodes[e[1]].neighbors.push(e[0]);
+        });
+
+        if (showGeneration) {
+            graph.stubs = [];
+            graph.nodes.forEach(v => {
+                v['stubs'] = [];
+                v['angle'] = Math.PI*(1.0+(2.0*v.name) / nNodes);
+            });
+            graph.links.forEach(e => {
+                var source = e['source'];
+                var target = e['target'];
+                var iSource = Number.isInteger(source) ? source : source.name;
+                var iTarget = Number.isInteger(target) ? target : target.name;
+                var sourceStub = pair2stub([iSource,iTarget]);
+                graph.nodes[iSource].stubs.push(sourceStub);
+                graph.stubs.push(sourceStub);
+                var targetStub = pair2stub([iTarget,iSource]);
+                graph.nodes[iTarget].stubs.push(targetStub);
+                e['stubs'] = [sourceStub,targetStub];
+                graph.stubs.push(targetStub);
+            });
+        }
+
+        //draw lines for the links
+        d3Links = initLinks(svg.append("g")
+            .attr("class", "links")
+            .selectAll("line")
+            .data(graph.links)
+            .enter());
+
+        if (showGeneration) {
+            d3Stubs = initStubs(svg.append("g").attr("class","stubs")
+                        .selectAll("line")
+                        .data(graph.stubs)
+                        .enter());
+        }
+
+        //draw circles for the nodes
+        d3Nodes = svg.append("g")
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5)
+            .selectAll("circle")
+            .data(graph.nodes)
+            .join("circle")
+            .attr("r", 10);
+        d3Nodes = d3Nodes.on("click",v => {v.state = !v.state; updateGraph();});
+        d3Nodes
+            .attr("cx", function (d) {
+                return d.x;
+            })
+            .attr("cy", function (d) {
+                return d.y;
+            });
+
+    }
+
+    function setTimer() {
+        if (typeof(displayID)!="undefined") {
+            clearInterval(displayID);
+        }
+        if (timestep <=3000) {
+            displayID = setTimeout(updateState, timestep);
+        }
+    }
+
+    function restart() {
+        initializeStates();
+        infectingEdge = null;
+        updateGraph();
+        document.getElementById("updateButton").disabled = false;
+    }
+
+    function updateGraph() {
+        if (generationPhase) {
+            var currentLink = graph.links[graphGenerationIndex];
+            var sourceStub = currentLink.stubs[0];
+            var targetStub = currentLink.stubs[1];
+            var connector = d3.select(".stubs").append("path").attr(
+                'd',
+                "M "+sourceStub.endX+" "+sourceStub.endY+" C "+sourceStub.cpX+" "+sourceStub.cpY+", "+targetStub.cpX+" "+targetStub.cpY+", "+targetStub.endX+", "+targetStub.endY
+            ).attr("fill","transparent");
+            currentLink['connector'] = connector;
+            sourceStub['connector'] = connector;
+            targetStub['connector'] = connector;
+            setTimer();
+            return
+        }
+
+        // To allow to update color and position separately
+        d3Nodes.style("fill", v => v.state ? "green" : "red");
+        if (showGeneration) {
+            // desinfect all lines and stubs
+            d3.selectAll('.infected').classed('infected',false);
+            if (infectingEdge) {
+                var iSource = infectingEdge[0];
+                var iTarget = infectingEdge[1];
+                var connector = graph.links.find(l => l.source==iSource&&l.target==iTarget||l.source==iTarget&&l.target==iSource).connector;
+                connector.classed('infected',true);
+                d3Stubs.classed('infected', s => s.connector === connector);
+                d3Stubs.classed('arrow', s => s.source == iTarget);
+            }
+        } else {
+            if (infectingEdge) {
+                var iSource = infectingEdge[0];
+                var iTarget = infectingEdge[1];
+                d3Links.classed("infected-forward", e => (e.source == iSource && e.target == iTarget));
+                d3Links.classed("infected-backwards", e => (e.source == iTarget && e.target == iSource));
+            } else {
+                d3Links.classed("infected-forward", false);
+                d3Links.classed("infected-backwards", false);
+            }
+        }
+        setTimer();
+    }
+
+    function initialize() {
+        initContainer();
+
+        // Generate graph and draw
+        createGraph();
+    }
+
+</script>
