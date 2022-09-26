@@ -94,8 +94,8 @@
 <script>
     // OPTIONS:
     var directed = false; // Doesn't do anything yet
-    var showGeneration = true;
-    var nNodes = 20;
+    var showGeneration = false;
+    var nNodes = 10;
     var nPos = 1;
     var toyExample = [
         [0, 1],
@@ -104,7 +104,7 @@
         [1, 2],
         [2, 3],
     ];
-    var model = "CM";
+    var model = "toy";
     var configurationModelDegrees = Array(nNodes-2).fill(3).concat([9,9]).sort((a,b) => 0.5-Math.random()); // constant degrees
 
     // Set nNodes to the length of the degree sequence for CM and to 5 for the toy example.

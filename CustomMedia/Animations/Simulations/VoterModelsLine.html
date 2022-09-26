@@ -61,7 +61,8 @@
 
     #graph {
         width: 100%;
-        height: 600px;
+        aspect-ratio: 1;
+        max-height: 600px !important;
         margin: auto;
     }
 </style>
@@ -74,18 +75,18 @@
         </div>
     </div>
     <div class="row" id="transitions">
-        <button type="button" class="col-md-6 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next
+        <button type="button" class="col-6 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next
             step
         </button>
-        <label for="timestep" class="col-form-label col-md-2">Timestep:</label>
-        <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-md-3" id="timestep" />
-        <label class="col-md-1 col-form-label" id="timestepDisplay">manual</label>
+        <label for="timestep" class="col-form-label col-2">Timestep:</label>
+        <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-3" id="timestep" />
+        <label class="col-1 col-form-label" id="timestepDisplay">manual</label>
     </div>
     <div class="row" id="initialization">
-        <button type="button" class="col-md-6 btn btn-primary" onclick="restart()">Initialize weights</button>
-        <label for="greens" class="col-form-label col-sm-2">Initial #greens:</label>
-        <input type="range" value=1 min=0 max=5 step=1 class="form-control col-sm-3" id="greens" />
-        <label class="col-sm-1 col-form-label" id="greensDisplay">1</label>
+        <button type="button" class="col-6 btn btn-primary" onclick="restart()" id="restartButton">Initialize states</button>
+        <label for="reds" class="col-form-label col-2">Initial #reds:</label>
+        <input type="range" value=1 min=0 max=5 step=1 class="form-control col-3" id="reds" />
+        <label class="col-1 col-form-label" id="redsDisplay">1</label>
     </div>
 </div>
 </div>
@@ -94,7 +95,7 @@
     // OPTIONS:
     var directed = false; // Doesn't do anything yet
     var showGeneration = false;
-    var nNodes = 20;
+    var nNodes = 10;
     var nPos = 1;
     var toyExample = [
         [0, 1],
@@ -103,13 +104,13 @@
         [1, 2],
         [2, 3],
     ];
-    var model = "toy";
+    var model = "line";
     var configurationModelDegrees = Array(nNodes-2).fill(3).concat([9,9]).sort((a,b) => 0.5-Math.random()); // constant degrees
 
     // Set nNodes to the length of the degree sequence for CM and to 5 for the toy example.
     if (model=="CM") {
         nNodes = configurationModelDegrees.length;
-    } else { // toy example
+    } else if (model!="line" && model!="complete") { // toy example
         nNodes = 5;
     }
 
@@ -202,6 +203,9 @@
         document.getElementById('timestep').value=timestep;
         document.getElementById("timestepDisplay").innerHTML = timestep > 3000 ?  "manual" : timestep + "ms";
 
+        // Enable restartButton
+        document.getElementById("restartButton").disabled = false;
+
         if (typeof(displayID)!="undefined") {
             clearInterval(displayID);
         }
@@ -272,14 +276,16 @@
             document.getElementById("timestepDisplay").innerHTML = timestep > 3000 ?  "manual" : timestep + "ms";
             setTimer();
         });
-        d3.select("input[id=greens]").on("change", function () {
+        d3.select("input[id=reds]").on("change", function () {
             nPos=this.value;
-            document.getElementById("greensDisplay").innerHTML = nPos;
+            document.getElementById("redsDisplay").innerHTML = nPos;
         });
-        document.getElementById("greens").max = nNodes;
+        document.getElementById("reds").max = nNodes;
 
-        if (showGeneration)
+        if (showGeneration) {
+            document.getElementById("restartButton").disabled = true;
             document.getElementById("updateButton").disabled = false;
+        }
 
 
         if (!d3.select("#" + id + " svg").empty()) {
@@ -315,7 +321,7 @@
         // Initialize positions on an oval.
         for (var i = 0; i < nNodes; i++) {
             var angle = (2 * Math.PI * i) / nNodes;
-            var x = width/2 + size * Math.cos(angle) / 2.5;
+            var x = width/2 + size * Math.cos(angle) / 2.2;
             var y = height/2 + size * Math.sin(angle) / 2.5;
             xs.push(x);
             ys.push(y);
@@ -332,9 +338,21 @@
         var edges = [];
         if (model=="CM") {
             var stubs = [];
-            configurationModelDegrees.forEach((d,i) => {stubs = stubs.concat(Array(d).fill(i)); });
-            while (stubs.length>1) {
-                edges.push([randomElement(stubs,true),randomElement(stubs,true)]);
+            configurationModelDegrees.forEach((d, i) => {
+                stubs = stubs.concat(Array(d).fill(i));
+            });
+            while (stubs.length > 1) {
+                edges.push([randomElement(stubs, true), randomElement(stubs, true)]);
+            }
+        } else if (model=="line") {
+            for (var i = 0; i < nNodes-1; i++) {
+                edges.push([i, i + 1]);
+            }
+        } else if (model=="complete") {
+            for (var i = 0; i < nNodes-1; i++) {
+                for (var j=i+1; j<nNodes; j++) {
+                    edges.push([i,j]);
+                }
             }
         } else { // model=="toy example"
             edges = toyExample;
@@ -389,7 +407,12 @@
             .data(graph.nodes)
             .join("circle")
             .attr("r", 10);
-        d3Nodes = d3Nodes.on("click",v => {v.state = !v.state; updateGraph();});
+        d3Nodes = d3Nodes.on("click",v => {
+            if (!generationPhase) {
+                v.state = !v.state;
+                updateGraph();
+            }
+        });
         d3Nodes
             .attr("cx", function (d) {
                 return d.x;
@@ -410,6 +433,9 @@
     }
 
     function restart() {
+        if (generationPhase) {
+            return;
+        }
         initializeStates();
         infectingEdge = null;
         updateGraph();
@@ -433,7 +459,7 @@
         }
 
         // To allow to update color and position separately
-        d3Nodes.style("fill", v => v.state ? "green" : "red");
+        d3Nodes.style("fill", v => v.state ? "red" : "#0069d9");
         if (showGeneration) {
             // desinfect all lines and stubs
             d3.selectAll('.infected').classed('infected',false);
@@ -467,3 +493,4 @@
     }
 
 </script>
+</body>
