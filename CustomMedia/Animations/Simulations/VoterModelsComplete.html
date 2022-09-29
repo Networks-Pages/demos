@@ -136,7 +136,7 @@
     var width = container.offsetWidth;
     var height = container.offsetHeight;
     var size = width < height ? width : height;
-    var stubLen = 30;
+    var stubLen = size/nNodes;
     var stubAngle = Math.PI*0.7; // The angle between the first and last stub of a vertex
     var generationPhase = showGeneration;
     var graphGenerationIndex = 0;

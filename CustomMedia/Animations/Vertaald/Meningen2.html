@@ -6,17 +6,17 @@
     .links line {
         stroke: #999;
         stroke-opacity: 0.6;
-        stroke-width: 5px;
+        stroke-width: 3.5px;
     }
 
     .stubs line {
         stroke: #999;
         stroke-opacity: 0.6;
-        stroke-width: 5px;
+        stroke-width: 3.5px;
     }
     .stubs line.infected {
         orient: auto;
-        stroke-width: 3px;
+        stroke-width: 2.5px;
         stroke: #212529;
         stroke-opacity: 0.8;
     }
@@ -26,10 +26,10 @@
     .stubs path {
         stroke: #999;
         stroke-opacity: 0.6;
-        stroke-width: 5px;
+        stroke-width: 3.5px;
     }
     .stubs path.infected {
-        stroke-width: 3px;
+        stroke-width: 2.5px;
         stroke: #212529;
         stroke-opacity: 0.8;
     }
@@ -45,24 +45,24 @@
     .links line.infected-forward {
         marker-end: url(#arrow);
         stroke: #212529;
-        stroke-width: 3px;
+        stroke-width: 2.5px;
         orient: auto;
     }
     .links line.infected-backwards {
         marker-start: url(#arrow);
         stroke: #212529;
-        stroke-width: 3px;
+        stroke-width: 2.5px;
         orient: auto;
     }
 
     .nodes circle {
-        stroke-width: 3px;
+        stroke-width: 2.5px;
     }
 
     #graph {
         width: 100%;
         aspect-ratio: 1;
-        max-height: 600px !important;
+        max-height: 500px !important;
         margin: auto;
     }
 </style>
@@ -75,17 +75,32 @@
         </div>
     </div>
     <div class="row" id="transitions">
-        <button type="button" class="col-6 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Volgende stap
-        </button>
-        <label for="timestep" class="col-form-label col-2">Tijdsstap:</label>
-        <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-3" id="timestep" />
-        <label class="col-1 col-form-label" id="timestepDisplay">handmatig</label>
+        <div class="container col-sm-4">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Volgende stap</button>
+            </div>
+        </div>
+        <div class="container col-sm-8">
+            <div class="row">
+                <label for="timestep" class="col-form-label col-3">Tijdsstap:</label>
+                <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-6" id="timestep" />
+                <label class="col-3 col-form-label" id="timestepDisplay">handmatig</label>
+            </div>
+        </div>
     </div>
     <div class="row" id="initialization">
-        <button type="button" class="col-6 btn btn-primary" onclick="restart()" id="restartButton">Kies kleuren</button>
-        <label for="reds" class="col-form-label col-2">Aantal groen:</label>
-        <input type="range" value=1 min=0 max=5 step=1 class="form-control col-3" id="reds" />
-        <label class="col-1 col-form-label" id="redsDisplay">1</label>
+        <div class="container col-sm-4">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="restart()" id="restartButton">Kies kleuren</button>
+            </div>
+        </div>
+        <div class="container col-sm-8">
+            <div class="row">
+                <label for="reds" class="col-form-label col-3">#groen:</label>
+                <input type="range" value=1 min=0 max=5 step=1 class="form-control col-6" id="reds" />
+                <label class="col-3 col-form-label" id="redsDisplay">1</label>
+            </div>
+        </div>
     </div>
 </div>
 </div>
@@ -121,7 +136,7 @@
     var width = container.offsetWidth;
     var height = container.offsetHeight;
     var size = width < height ? width : height;
-    var stubLen = 30;
+    var stubLen = size/nNodes;
     var stubAngle = Math.PI*0.7; // The angle between the first and last stub of a vertex
     var generationPhase = showGeneration;
     var graphGenerationIndex = 0;
@@ -311,6 +326,7 @@
     var d3Stubs;
     var d3Links;
     var selectedLink;
+    var consensusLabel;
 
     function createGraph() {
         for (var i = 0; i < nNodes; i++) {
@@ -320,8 +336,8 @@
         // Initialize positions on an oval.
         for (var i = 0; i < nNodes; i++) {
             var angle = (2 * Math.PI * i) / nNodes;
-            var x = width/2 + size * Math.cos(angle) / 2.2;
-            var y = height/2 + size * Math.sin(angle) / 2.5;
+            var x = width/2 + size * Math.cos(angle) / 2.4;
+            var y = height/2 + size * Math.sin(angle) / 2.4;
             xs.push(x);
             ys.push(y);
         }
@@ -405,7 +421,7 @@
             .selectAll("circle")
             .data(graph.nodes)
             .join("circle")
-            .attr("r", 10);
+            .attr("r", 7);
         d3Nodes = d3Nodes.on("click",v => {
             if (!generationPhase) {
                 v.state = !v.state;
@@ -420,6 +436,11 @@
                 return d.y;
             });
 
+        consensusLabel = svg.append("g").append('text')
+                                        .attr('x',width/2)
+                                        .attr('y',height/2+size/2.4+30)
+                                        .style('text-anchor','middle')
+                                        .text('');
     }
 
     function setTimer() {
@@ -457,8 +478,15 @@
             return
         }
 
+        var nRed=0;
+
         // To allow to update color and position separately
-        d3Nodes.style("fill", v => v.state ? "green" : "red");
+        d3Nodes.style("fill", v => {
+            if (v.state) {
+                nRed++;
+            }
+            return v.state ? "green" : "red";
+        });
         if (showGeneration) {
             // desinfect all lines and stubs
             d3.selectAll('.infected').classed('infected',false);
@@ -481,7 +509,12 @@
                 d3Links.classed("infected-backwards", false);
             }
         }
-        setTimer();
+        if (nRed != 0 && nRed!=nNodes) {
+            consensusLabel.text('');
+            setTimer();
+        } else {
+            consensusLabel.text('Consensus voor ' + (nRed==0 ? 'rood' : 'groen')+'.');
+        }
     }
 
     function initialize() {
