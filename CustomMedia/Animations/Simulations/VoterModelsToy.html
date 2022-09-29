@@ -74,31 +74,32 @@
             <div id="graph"></div>
         </div>
     </div>
+    <div class="row" id="spacing-div"></div>
     <div class="row" id="transitions">
-        <div class="container col-sm-6">
+        <div class="container col-sm-5">
             <div class="row">
                 <button type="button" class="col-12 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next step</button>
             </div>
         </div>
-        <div class="container col-sm-6">
+        <div class="container col-sm-7">
             <div class="row">
-                <label for="timestep" class="col-form-label col-4">Timestep:</label>
+                <label for="timestep" class="col-form-label col-3">Timestep:</label>
                 <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-6" id="timestep" />
-                <label class="col-2 col-form-label" id="timestepDisplay">manual</label>
+                <label class="col-3 col-form-label" id="timestepDisplay">manual</label>
             </div>
         </div>
     </div>
     <div class="row" id="initialization">
-        <div class="container col-sm-6">
+        <div class="container col-sm-5">
             <div class="row">
                 <button type="button" class="col-12 btn btn-primary" onclick="restart()" id="restartButton">Initialize states</button>
             </div>
         </div>
-        <div class="container col-sm-6">
+        <div class="container col-sm-7">
             <div class="row">
-                <label for="reds" class="col-form-label col-4">Initial #reds:</label>
+                <label for="reds" class="col-form-label col-3">Initial #reds:</label>
                 <input type="range" value=1 min=0 max=5 step=1 class="form-control col-6" id="reds" />
-                <label class="col-2 col-form-label" id="redsDisplay">1</label>
+                <label class="col-3 col-form-label" id="redsDisplay">1</label>
             </div>
         </div>
     </div>
@@ -135,6 +136,11 @@
     var container = document.getElementById(id);
     var width = container.offsetWidth;
     var height = container.offsetHeight;
+    var maxHeight = window.innerHeight - document.getElementById("transitions").offsetHeight - document.getElementById("initialization").offsetHeight;
+    if (height < maxHeight) {
+        console.log(height+"<"+maxHeight);
+        d3.select('#spacing-div').style('height',(maxHeight-height)/2+'px');
+    }
     var size = width < height ? width : height;
     var stubLen = size/nNodes;
     var stubAngle = Math.PI*0.7; // The angle between the first and last stub of a vertex
@@ -438,7 +444,7 @@
 
         consensusLabel = svg.append("g").append('text')
                                         .attr('x',width/2)
-                                        .attr('y',height/2+size/2.4+30)
+                                        .attr('y',height-15)
                                         .style('text-anchor','middle')
                                         .text('');
     }
