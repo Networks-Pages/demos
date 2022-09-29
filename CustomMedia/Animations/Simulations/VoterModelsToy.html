@@ -62,7 +62,7 @@
     #graph {
         width: 100%;
         aspect-ratio: 1;
-        max-height: 600px !important;
+        max-height: 580px !important;
         margin: auto;
     }
 </style>
@@ -75,18 +75,32 @@
         </div>
     </div>
     <div class="row" id="transitions">
-        <button type="button" class="col-6 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next
-            step
-        </button>
-        <label for="timestep" class="col-form-label col-2">Timestep:</label>
-        <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-3" id="timestep" />
-        <label class="col-1 col-form-label" id="timestepDisplay">manual</label>
+        <div class="container col-sm-6">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="updateState()" id="updateButton" disabled>Next step</button>
+            </div>
+        </div>
+        <div class="container col-sm-6">
+            <div class="row">
+                <label for="timestep" class="col-form-label col-4">Timestep:</label>
+                <input type="range" value=3100 min=100 max=3100 step=100 class="form-control col-6" id="timestep" />
+                <label class="col-2 col-form-label" id="timestepDisplay">manual</label>
+            </div>
+        </div>
     </div>
     <div class="row" id="initialization">
-        <button type="button" class="col-6 btn btn-primary" onclick="restart()" id="restartButton">Initialize states</button>
-        <label for="reds" class="col-form-label col-2">Initial #reds:</label>
-        <input type="range" value=1 min=0 max=5 step=1 class="form-control col-3" id="reds" />
-        <label class="col-1 col-form-label" id="redsDisplay">1</label>
+        <div class="container col-sm-6">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="restart()" id="restartButton">Initialize states</button>
+            </div>
+        </div>
+        <div class="container col-sm-6">
+            <div class="row">
+                <label for="reds" class="col-form-label col-4">Initial #reds:</label>
+                <input type="range" value=1 min=0 max=5 step=1 class="form-control col-6" id="reds" />
+                <label class="col-2 col-form-label" id="redsDisplay">1</label>
+            </div>
+        </div>
     </div>
 </div>
 </div>
@@ -95,7 +109,7 @@
     // OPTIONS:
     var directed = false; // Doesn't do anything yet
     var showGeneration = false;
-    var nNodes = 10;
+    var nNodes = 20;
     var nPos = 1;
     var toyExample = [
         [0, 1],
@@ -312,6 +326,7 @@
     var d3Stubs;
     var d3Links;
     var selectedLink;
+    var consensusLabel;
 
     function createGraph() {
         for (var i = 0; i < nNodes; i++) {
@@ -321,8 +336,8 @@
         // Initialize positions on an oval.
         for (var i = 0; i < nNodes; i++) {
             var angle = (2 * Math.PI * i) / nNodes;
-            var x = width/2 + size * Math.cos(angle) / 2.2;
-            var y = height/2 + size * Math.sin(angle) / 2.5;
+            var x = width/2 + size * Math.cos(angle) / 2.4;
+            var y = height/2 + size * Math.sin(angle) / 2.4;
             xs.push(x);
             ys.push(y);
         }
@@ -421,6 +436,11 @@
                 return d.y;
             });
 
+        consensusLabel = svg.append("g").append('text')
+                                        .attr('x',width/2)
+                                        .attr('y',height/2+size/2.4+30)
+                                        .style('text-anchor','middle')
+                                        .text('');
     }
 
     function setTimer() {
@@ -458,8 +478,15 @@
             return
         }
 
+        var nRed=0;
+
         // To allow to update color and position separately
-        d3Nodes.style("fill", v => v.state ? "red" : "#0069d9");
+        d3Nodes.style("fill", v => {
+            if (v.state) {
+                nRed++;
+            }
+            return v.state ? "red" : "#0069d9";
+        });
         if (showGeneration) {
             // desinfect all lines and stubs
             d3.selectAll('.infected').classed('infected',false);
@@ -482,7 +509,12 @@
                 d3Links.classed("infected-backwards", false);
             }
         }
-        setTimer();
+        if (nRed != 0 && nRed!=nNodes) {
+            consensusLabel.text('');
+            setTimer();
+        } else {
+            consensusLabel.text('Consensus reached by ' + (nRed==0 ? 'blue' : 'red')+'.');
+        }
     }
 
     function initialize() {
