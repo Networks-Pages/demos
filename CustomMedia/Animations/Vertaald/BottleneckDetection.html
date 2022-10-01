@@ -123,8 +123,8 @@
           // Initialize positions on an oval.
           for (var i=0; i<nNodes; i++) {
             var angle = Math.PI * (3*i % 14) / 7.0;
-            var x = width * (1/2 + Math.cos(angle)/4);
-            var y = height * (1/2 + Math.sin(angle)/4);
+            var x = width/2 + size * Math.cos(angle)/2.3;
+            var y = height/2 + size * Math.sin(angle)/2.3;
             xs.push(x);
             ys.push(y);
           }
