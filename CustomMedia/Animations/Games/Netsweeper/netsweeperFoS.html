@@ -6,8 +6,8 @@
 <script src="petersen.js"></script>
 <script src="tutte.js"></script>
 <script src="dodecahedral.js"></script>
-<script src="eurocup2020.js"></script>
 <script src="worldcup2022.js"></script>
+<script src="vierletterwoorden.js"></script>
 <style>
   #links {
     stroke: #999;
@@ -67,7 +67,7 @@
         <img onclick="restart()" id="smiley" height="100%" src="smiley-alive.png"></img>
       </h1>
       <p style="text-align: center">
-        The network contains <b id="minecount">?</b> hidden mines. Click the smiley to restart.
+        Het netwerk bevat <b id="minecount">?</b> verborgen mijnen. Klik de smiley om te herstarten.
       <p>
     </div>
     <div class="col-md-2 col-sm-12">
@@ -79,13 +79,12 @@
             <img height="18px" src="flag.ico"></img></label>
         </div>
         <div><select id="graphtype" style="margin-top:10px;">
-          <option value="ER">Random ER-network</option>
-          <option value="PA">Random PA-network</option>
-          <option value="petersen">The Petersen graph</option>
-          <option value="dodecahedral">Dodecahedral graph</option>
-          <option value="tutte">Tutte graph</option>
-          <option value="eurocup2020">UEFA Euro 2020</option>
+          <option value="ER">Willekeurig ER-netwerk</option>
+          <option value="PA">Willekeurig PA-netwerk</option>
+          <option value="petersen">Het Petersen netwerk</option>
+          <option value="dodecahedral">Dodecaëder netwerk</option>
           <option value="worldcup2022">FIFA World Cup 2022</option>
+          <option value="vierletterwoorden">Vierletterwoorden</option>
         </select></div>
       </div>
     </div>
@@ -101,8 +100,8 @@ let staticGraphs = {
   "petersen": petersen,
   "tutte": tutte,
   "dodecahedral": dodecahedral,
-  "eurocup2020": eurocup2020,
   "worldcup2022": worldcup2022,
+  "vierletterwoorden": vierletterwoorden,
 };
 
 function isMobileBrowser() {
@@ -153,18 +152,17 @@ function loadGraph(graphType) {
   graph = {};
   var deepcopy = false;
   if (graphType == "ER") {
-    // ER with n=40, p=0.15 and nMines=5
-    graph.nMines = 5;
+    graph.nMines = 4;
     graph.nodes = [];
     graph.links = [];
-    for (var i=0; i<30; i++) {
+    for (var i=0; i<20; i++) {
       graph.nodes.push({
         "name": i,
         "x": 0,
         "y": 0
       });
       for (var j=0; j<i; j++) {
-        if (Math.random()<0.15) {
+        if (Math.random()<1/6) {
           graph.links.push({
             "source": j,
             "target": i
@@ -173,7 +171,7 @@ function loadGraph(graphType) {
       }
     }
   } else if (graphType == "PA") {
-    graph.nMines = 5;
+    graph.nMines = 4;
     graph.nodes = [
       {
         "name": 0,
@@ -204,7 +202,7 @@ function loadGraph(graphType) {
         "x": 0,
         "y": 0
       });
-      for (var e=0; e<3; e++) {
+      for (var e=0; e<2; e++) {
         var x = sumDegrees*Math.random();
         for (var j=0; j<i; j++) {
           x -= graph.nodes[j].degree;
