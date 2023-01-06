@@ -62,7 +62,7 @@
 <head>
   <title>Netsweeper - Mijnenveger op een Netwerk</title>
 </head>
-<body onresize="bodyResized()">
+<body onresize="bodyResized()" onload="bodyLoaded()">
   <div class="row" id="menurow">
     <div class="col-md-2 col-sm-0"></div>
     <div class="col-md-8 col-sm-12">
@@ -132,13 +132,18 @@ var srcSmiley = {
 }
 var graph;
 var id = "playingfield";
-var container = document.getElementById(id);
-var menuHeight = document.getElementById("menurow").offsetHeight;
+var container,menuHeight,width,height;
+function bodyLoaded() {
+  container = document.getElementById(id);
+  menuHeight = document.getElementById("menurow").offsetHeight;
 // Make height at least as big as width
-var width = container.offsetWidth-15;//container.offsetWidth,
-var height = 600;//container.offsetHeight;
+  width = container.offsetWidth-15;//container.offsetWidth,
+  height = 600;//container.offsetHeight;
 //if (height<width) height=width;
-if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
+  if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
+  showGraph();
+  restart();
+}
 
 function bodyResized() {
   console.log('Width is now '+container.offsetWidth);
@@ -562,8 +567,6 @@ var graph = {
   nodes: [],
   links: []
 };
-showGraph();
-restart();
 
 
 </script>
