@@ -141,7 +141,7 @@ function bodyLoaded() {
   height = 600;//container.offsetHeight;
 //if (height<width) height=width;
   if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
-  if (height<=30) height=31;
+  if (height<=30) height=600;
   showGraph();
   restart();
 }
@@ -151,7 +151,7 @@ function bodyResized() {
   width = container.offsetWidth-15;//container.offsetWidth,
   //if (height<width) height=width;
   if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
-  if (height<31) height=31;
+  if (height<31) height=600; // In cases where window.innerHeight==0, we get weird situations, but seems an issue with load ordering
 
   simulation.force("center", d3.forceCenter(width / 2, height / 2).strength(1))
             .force("boundary", forceBoundary(15,15,width-15, height-15));
