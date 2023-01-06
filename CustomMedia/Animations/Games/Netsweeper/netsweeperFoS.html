@@ -141,6 +141,7 @@ function bodyLoaded() {
   height = 600;//container.offsetHeight;
 //if (height<width) height=width;
   if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
+  if (height<=30) height=31;
   showGraph();
   restart();
 }
@@ -150,9 +151,10 @@ function bodyResized() {
   width = container.offsetWidth-15;//container.offsetWidth,
   //if (height<width) height=width;
   if (height>window.innerHeight-menuHeight) height=window.innerHeight-menuHeight;
+  if (height<31) height=31;
 
   simulation.force("center", d3.forceCenter(width / 2, height / 2).strength(1))
-            .force("boundary", forceBoundary(15,15,width-15, height>30 ? height-15 : 31));
+            .force("boundary", forceBoundary(15,15,width-15, height-15));
   simulation.restart();
   svg.attr("width", width).attr("height", height);
 }
@@ -509,7 +511,7 @@ function showGraph() {
 
   simulation = d3.forceSimulation(graph.nodes)
                  .force("link", d3.forceLink(graph.links).id(d => d.name))
-                 .force("boundary", forceBoundary(15,15,width-15, height>30? height-15:16))
+                 .force("boundary", forceBoundary(15,15,width-15, height-15))
                  .force("charge", d3.forceManyBody().strength(-400*scale))
                  .force("center", d3.forceCenter(width / 2, height / 2).strength(1));
 
