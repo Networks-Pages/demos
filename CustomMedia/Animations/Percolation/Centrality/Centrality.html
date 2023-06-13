@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" integrity="sha384-rbsA2VBKQhggwzxH7pPCaAqO46MgnOM80zW1RWuH61DGLwZJEdK2Kadq2F9CUG65" crossorigin="anonymous">
+<script>
+    // We store the precomputed graphs as JSON strings, so that we don't have to deep-copy it.
+    const generated_graphs = {
+        'ER': '{"nodes": [{"name": 0, "x": 0.45450415874021316, "y": -0.2948369517714435, "betweenness": 0.048264999895434674, "degree": 6, "closeness": 0.5, "eigenvector": 0.24969630404374862, "Game of Thieves": 20.21212121212121, "harmonic": 14.000000000000002, "pagerank": 0.046163001085403686}, {"name": 1, "x": 0.10225741362699159, "y": -0.6633597291424178, "betweenness": 0.04360334713595583, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.1912637360529674, "Game of Thieves": 20.87878787878788, "harmonic": 13.5, "pagerank": 0.04016919587097178}, {"name": 2, "x": -0.7617465585475489, "y": 0.8957041251194875, "betweenness": 0.006858178053830228, "degree": 2, "closeness": 0.39344262295081966, "eigenvector": 0.05681893712169099, "Game of Thieves": 30.03030303030303, "harmonic": 10.583333333333334, "pagerank": 0.020354895394145818}, {"name": 3, "x": 0.1276414197686963, "y": 0.9999999999999999, "betweenness": 0.002536231884057971, "degree": 3, "closeness": 0.42857142857142855, "eigenvector": 0.11333079824584245, "Game of Thieves": 29.90909090909091, "harmonic": 11.66666666666667, "pagerank": 0.026530380349739507}, {"name": 4, "x": 0.6717798764887049, "y": -0.36895645047171316, "betweenness": 0.014492753623188406, "degree": 4, "closeness": 0.47058823529411764, "eigenvector": 0.19288652246572738, "Game of Thieves": 29.060606060606062, "harmonic": 12.833333333333334, "pagerank": 0.032134263259656286}, {"name": 5, "x": -0.18614618171436562, "y": -0.11483518188385192, "betweenness": 0.0676400391074304, "degree": 6, "closeness": 0.4897959183673469, "eigenvector": 0.2144990826216639, "Game of Thieves": 24.09090909090909, "harmonic": 13.833333333333334, "pagerank": 0.04752200492345383}, {"name": 6, "x": 0.4308538572094035, "y": 0.39002831059774534, "betweenness": 0.1045004914570132, "degree": 8, "closeness": 0.5333333333333333, "eigenvector": 0.30234098638205087, "Game of Thieves": 19.181818181818183, "harmonic": 15.166666666666668, "pagerank": 0.06051424555875059}, {"name": 7, "x": -0.2081100687174158, "y": 0.42320617713831316, "betweenness": 0.06922158960202439, "degree": 5, "closeness": 0.5106382978723404, "eigenvector": 0.16381178968937218, "Game of Thieves": 22.939393939393938, "harmonic": 13.833333333333334, "pagerank": 0.04092569693245417}, {"name": 8, "x": -0.8751601673933275, "y": -0.33577390284507513, "betweenness": 0.010899758454106281, "degree": 3, "closeness": 0.43636363636363634, "eigenvector": 0.09257317581824848, "Game of Thieves": 25.060606060606062, "harmonic": 11.833333333333334, "pagerank": 0.026978543976709853}, {"name": 9, "x": 0.5251241035628895, "y": 0.20302856399183744, "betweenness": 0.033014147688060734, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.20866472980729664, "Game of Thieves": 24.21212121212121, "harmonic": 13.5, "pagerank": 0.039346359944804676}, {"name": 10, "x": 0.03611727099326066, "y": 0.329411326963138, "betweenness": 0.08845363573624444, "degree": 7, "closeness": 0.5581395348837209, "eigenvector": 0.28113229811672774, "Game of Thieves": 20.818181818181817, "harmonic": 15.166666666666668, "pagerank": 0.053244581954104066}, {"name": 11, "x": -0.2807349015911144, "y": 0.0951180013767745, "betweenness": 0.06349088713219148, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.15394610799060288, "Game of Thieves": 24.09090909090909, "harmonic": 13.5, "pagerank": 0.0411143523210834}, {"name": 12, "x": -0.1591471537387019, "y": 0.8571326175854687, "betweenness": 0.050940303657694974, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.16479096942049729, "Game of Thieves": 24.333333333333332, "harmonic": 13.500000000000002, "pagerank": 0.0420197647097362}, {"name": 13, "x": -0.26641376404419265, "y": -0.4370243229050831, "betweenness": 0.13123274672187718, "degree": 7, "closeness": 0.5454545454545454, "eigenvector": 0.20218436686605465, "Game of Thieves": 21.666666666666668, "harmonic": 15.0, "pagerank": 0.05600713888897112}, {"name": 14, "x": 0.2982794862687263, "y": -0.8684852103277042, "betweenness": 0.00516304347826087, "degree": 3, "closeness": 0.4444444444444444, "eigenvector": 0.13550655376659232, "Game of Thieves": 29.424242424242426, "harmonic": 12.000000000000002, "pagerank": 0.025741771295734833}, {"name": 15, "x": 0.19670983552144322, "y": -0.13476343625906215, "betweenness": 0.06940876152832674, "degree": 7, "closeness": 0.5217391304347826, "eigenvector": 0.2777295023231583, "Game of Thieves": 20.939393939393938, "harmonic": 14.666666666666668, "pagerank": 0.05331999773948045}, {"name": 16, "x": -0.4651686162295096, "y": 0.25483627121446095, "betweenness": 0.0802924430641822, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.15153335549967864, "Game of Thieves": 22.09090909090909, "harmonic": 13.5, "pagerank": 0.04241864783883364}, {"name": 17, "x": -0.5021292934318099, "y": -0.9447147300126832, "betweenness": 0.014281400966183577, "degree": 3, "closeness": 0.42857142857142855, "eigenvector": 0.08839937027936713, "Game of Thieves": 25.848484848484848, "harmonic": 11.666666666666668, "pagerank": 0.02707487742782741}, {"name": 18, "x": 0.32386950782459806, "y": -0.3879419417357789, "betweenness": 0.0567287784679089, "degree": 7, "closeness": 0.5333333333333333, "eigenvector": 0.30251891249938845, "Game of Thieves": 25.848484848484848, "harmonic": 14.833333333333334, "pagerank": 0.05271391802204011}, {"name": 19, "x": 0.1898663159458, "y": 0.35264082088169213, "betweenness": 0.019967924587489805, "degree": 4, "closeness": 0.46153846153846156, "eigenvector": 0.14821468286920605, "Game of Thieves": 26.939393939393938, "harmonic": 12.666666666666668, "pagerank": 0.033321517303647075}, {"name": 20, "x": 0.18086991802744287, "y": 0.015812942712430014, "betweenness": 0.10162651358303533, "degree": 8, "closeness": 0.5853658536585366, "eigenvector": 0.3316454168736943, "Game of Thieves": 20.454545454545453, "harmonic": 15.833333333333334, "pagerank": 0.05956601499516374}, {"name": 21, "x": 0.5551500667899142, "y": -0.06961228660794194, "betweenness": 0.026850806198632282, "degree": 5, "closeness": 0.5106382978723404, "eigenvector": 0.24191115175310138, "Game of Thieves": 26.818181818181817, "harmonic": 13.833333333333334, "pagerank": 0.03857784067055361}, {"name": 22, "x": 0.7204550096747939, "y": 0.4975105592275124, "betweenness": 0.017946546207415776, "degree": 4, "closeness": 0.46153846153846156, "eigenvector": 0.17798068283077795, "Game of Thieves": 25.303030303030305, "harmonic": 12.666666666666666, "pagerank": 0.032527720780221}, {"name": 23, "x": -0.4206067569134781, "y": -0.21221575146471192, "betweenness": 0.015451748332183116, "degree": 3, "closeness": 0.43636363636363634, "eigenvector": 0.10475717473245638, "Game of Thieves": 27.12121212121212, "harmonic": 11.833333333333334, "pagerank": 0.02667588125651195}, {"name": 24, "x": -0.6881147781214165, "y": -0.48190982138139377, "betweenness": 0.03104596691553213, "degree": 4, "closeness": 0.42857142857142855, "eigenvector": 0.09868864181558719, "Game of Thieves": 25.606060606060606, "harmonic": 12.083333333333336, "pagerank": 0.03503738750000097}], "links": [{"source": 0, "target": 1}, {"source": 0, "target": 9}, {"source": 0, "target": 10}, {"source": 0, "target": 14}, {"source": 0, "target": 20}, {"source": 0, "target": 21}, {"source": 1, "target": 4}, {"source": 1, "target": 13}, {"source": 1, "target": 17}, {"source": 1, "target": 20}, {"source": 2, "target": 12}, {"source": 2, "target": 16}, {"source": 3, "target": 6}, {"source": 3, "target": 7}, {"source": 3, "target": 12}, {"source": 4, "target": 6}, {"source": 4, "target": 15}, {"source": 4, "target": 18}, {"source": 5, "target": 8}, {"source": 5, "target": 10}, {"source": 5, "target": 19}, {"source": 5, "target": 20}, {"source": 5, "target": 21}, {"source": 5, "target": 24}, {"source": 6, "target": 9}, {"source": 6, "target": 10}, {"source": 6, "target": 12}, {"source": 6, "target": 18}, {"source": 6, "target": 21}, {"source": 6, "target": 22}, {"source": 7, "target": 11}, {"source": 7, "target": 12}, {"source": 7, "target": 13}, {"source": 7, "target": 15}, {"source": 8, "target": 13}, {"source": 8, "target": 24}, {"source": 9, "target": 11}, {"source": 9, "target": 15}, {"source": 9, "target": 22}, {"source": 10, "target": 11}, {"source": 10, "target": 12}, {"source": 10, "target": 19}, {"source": 10, "target": 20}, {"source": 11, "target": 23}, {"source": 11, "target": 24}, {"source": 13, "target": 14}, {"source": 13, "target": 16}, {"source": 13, "target": 17}, {"source": 13, "target": 18}, {"source": 14, "target": 18}, {"source": 15, "target": 18}, {"source": 15, "target": 20}, {"source": 15, "target": 21}, {"source": 15, "target": 23}, {"source": 16, "target": 19}, {"source": 16, "target": 20}, {"source": 16, "target": 23}, {"source": 17, "target": 24}, {"source": 18, "target": 20}, {"source": 18, "target": 21}, {"source": 19, "target": 22}, {"source": 20, "target": 22}]}',
+        'CM': '{"nodes": [{"name": 0, "x": 0.5934155293579976, "y": 0.5339694634904609, "betweenness": 0.0, "degree": 1, "closeness": 0.3157894736842105, "eigenvector": 0.02390450534100419, "Game of Thieves": 31.303030303030305, "harmonic": 8.483333333333333, "pagerank": 0.014988452314184563}, {"name": 1, "x": 0.7284904176104696, "y": -0.10514793247958676, "betweenness": 0.0, "degree": 1, "closeness": 0.3870967741935484, "eigenvector": 0.0631695267967219, "Game of Thieves": 32.24242424242424, "harmonic": 10.166666666666664, "pagerank": 0.01409639677552773}, {"name": 2, "x": -0.5331252907200201, "y": -0.5807028114078236, "betweenness": 0.0, "degree": 1, "closeness": 0.375, "eigenvector": 0.07071534192028178, "Game of Thieves": 30.393939393939394, "harmonic": 10.0, "pagerank": 0.013574415246794475}, {"name": 3, "x": 0.002241775198904638, "y": 1.0, "betweenness": 0.0, "degree": 1, "closeness": 0.3157894736842105, "eigenvector": 0.017260589120626953, "Game of Thieves": 30.333333333333332, "harmonic": 8.45, "pagerank": 0.016839421387053872}, {"name": 4, "x": -0.4186850770975288, "y": -0.9095585869880958, "betweenness": 0.0, "degree": 1, "closeness": 0.32, "eigenvector": 0.028617240732068526, "Game of Thieves": 30.272727272727273, "harmonic": 8.583333333333334, "pagerank": 0.014604141222265169}, {"name": 5, "x": 0.2646906542104458, "y": 0.9716973797469597, "betweenness": 0.0, "degree": 1, "closeness": 0.3157894736842105, "eigenvector": 0.017260589120626953, "Game of Thieves": 29.666666666666668, "harmonic": 8.45, "pagerank": 0.016839421387053872}, {"name": 6, "x": 0.7002412696714229, "y": 0.1471187524388578, "betweenness": 0.0, "degree": 1, "closeness": 0.3870967741935484, "eigenvector": 0.0631695267967219, "Game of Thieves": 31.575757575757574, "harmonic": 10.166666666666664, "pagerank": 0.01409639677552773}, {"name": 7, "x": 0.16148170917590715, "y": -0.3844842880272429, "betweenness": 0.0, "degree": 3, "closeness": 0.47058823529411764, "eigenvector": 0.2066599454542975, "Game of Thieves": 29.0, "harmonic": 12.5, "pagerank": 0.029071225750410754}, {"name": 8, "x": -0.59477375300105, "y": 0.17297716515457703, "betweenness": 0.009057971014492754, "degree": 3, "closeness": 0.4, "eigenvector": 0.0720237428333902, "Game of Thieves": 27.060606060606062, "harmonic": 11.166666666666668, "pagerank": 0.030699720923561685}, {"name": 9, "x": 0.4332627565248144, "y": -0.2742998433177064, "betweenness": 0.0009057971014492754, "degree": 3, "closeness": 0.42105263157894735, "eigenvector": 0.15020632338689152, "Game of Thieves": 27.060606060606062, "harmonic": 11.583333333333332, "pagerank": 0.029706749514629222}, {"name": 10, "x": -0.15943563342822126, "y": -0.5485548343191593, "betweenness": 0.005072463768115942, "degree": 3, "closeness": 0.42105263157894735, "eigenvector": 0.17210765938964412, "Game of Thieves": 30.151515151515152, "harmonic": 11.666666666666666, "pagerank": 0.029578970197148193}, {"name": 11, "x": 0.004460399748553941, "y": 0.10085449724968314, "betweenness": 0.004528985507246377, "degree": 3, "closeness": 0.47058823529411764, "eigenvector": 0.15772520192572653, "Game of Thieves": 31.272727272727273, "harmonic": 12.583333333333334, "pagerank": 0.02992797925558968}, {"name": 12, "x": -0.4373844290943079, "y": 0.24149160752478566, "betweenness": 0.025664251207729465, "degree": 4, "closeness": 0.43636363636363634, "eigenvector": 0.10463277949722556, "Game of Thieves": 24.151515151515152, "harmonic": 12.166666666666666, "pagerank": 0.039099481852157086}, {"name": 13, "x": -0.2824435977439873, "y": -0.08943717872899114, "betweenness": 0.01588164251207729, "degree": 4, "closeness": 0.4528301886792453, "eigenvector": 0.20533270159477096, "Game of Thieves": 30.454545454545453, "harmonic": 12.666666666666666, "pagerank": 0.03699298833785664}, {"name": 14, "x": 0.24134386962679935, "y": 0.22869271093144605, "betweenness": 0.09118357487922704, "degree": 4, "closeness": 0.4528301886792453, "eigenvector": 0.1432585271322609, "Game of Thieves": 22.151515151515152, "harmonic": 12.666666666666668, "pagerank": 0.04229880517434291}, {"name": 15, "x": -0.4685581776159124, "y": -0.1852891479418483, "betweenness": 0.03466183574879227, "degree": 4, "closeness": 0.4528301886792453, "eigenvector": 0.18412623055126326, "Game of Thieves": 24.545454545454547, "harmonic": 12.666666666666666, "pagerank": 0.03827720875301351}, {"name": 16, "x": 0.07820568330832973, "y": 0.5588399904043487, "betweenness": 0.16718426501035197, "degree": 4, "closeness": 0.4528301886792453, "eigenvector": 0.10344171624681757, "Game of Thieves": 14.545454545454545, "harmonic": 12.583333333333332, "pagerank": 0.05100419911822296}, {"name": 17, "x": -0.21915338397963444, "y": 0.06956921190032506, "betweenness": 0.10265700483091787, "degree": 5, "closeness": 0.5106382978723404, "eigenvector": 0.20682803390510415, "Game of Thieves": 27.393939393939394, "harmonic": 13.833333333333332, "pagerank": 0.04872720568919694}, {"name": 18, "x": -0.14400364741160845, "y": 0.26791448500767434, "betweenness": 0.0801328502415459, "degree": 5, "closeness": 0.48, "eigenvector": 0.14287086228985524, "Game of Thieves": 19.454545454545453, "harmonic": 13.416666666666666, "pagerank": 0.04857151424288265}, {"name": 19, "x": -0.34420745244676304, "y": -0.43028353501050515, "betweenness": 0.0932367149758454, "degree": 5, "closeness": 0.46153846153846156, "eigenvector": 0.1715035072331134, "Game of Thieves": 18.454545454545453, "harmonic": 13.0, "pagerank": 0.05061100698151668}, {"name": 20, "x": 0.09675161140140234, "y": -0.23711734010587793, "betweenness": 0.020358868184955144, "degree": 5, "closeness": 0.5, "eigenvector": 0.2659855367206926, "Game of Thieves": 22.696969696969695, "harmonic": 13.666666666666666, "pagerank": 0.04534911098651777}, {"name": 21, "x": 0.23626938096454658, "y": -0.13417540829617478, "betweenness": 0.03666321601104209, "degree": 5, "closeness": 0.5, "eigenvector": 0.2556279413873757, "Game of Thieves": 23.454545454545453, "harmonic": 13.666666666666668, "pagerank": 0.046476690396825185}, {"name": 22, "x": 0.24235591647949203, "y": 0.009385457495967883, "betweenness": 0.3412267080745342, "degree": 11, "closeness": 0.6153846153846154, "eigenvector": 0.3785746502633675, "Game of Thieves": 6.212121212121212, "harmonic": 17.166666666666664, "pagerank": 0.10477964272466006}, {"name": 23, "x": -0.052572719594013786, "y": -0.1712006044966941, "betweenness": 0.22890786749482406, "degree": 11, "closeness": 0.6153846153846154, "eigenvector": 0.43614226022348607, "Game of Thieves": 11.515151515151516, "harmonic": 17.166666666666664, "pagerank": 0.09576888951933138}, {"name": 24, "x": -0.12886781114603776, "y": -0.25225921022538045, "betweenness": 0.18832815734989647, "degree": 11, "closeness": 0.5853658536585366, "eigenvector": 0.4237982982505249, "Game of Thieves": 7.606060606060606, "harmonic": 16.833333333333336, "pagerank": 0.0980199654737293}], "links": [{"source": 0, "target": 14}, {"source": 1, "target": 22}, {"source": 2, "target": 24}, {"source": 3, "target": 16}, {"source": 4, "target": 19}, {"source": 5, "target": 16}, {"source": 6, "target": 22}, {"source": 7, "target": 24}, {"source": 7, "target": 23}, {"source": 7, "target": 22}, {"source": 8, "target": 18}, {"source": 8, "target": 12}, {"source": 8, "target": 15}, {"source": 9, "target": 22}, {"source": 9, "target": 20}, {"source": 9, "target": 21}, {"source": 10, "target": 24}, {"source": 10, "target": 23}, {"source": 10, "target": 19}, {"source": 11, "target": 24}, {"source": 11, "target": 22}, {"source": 11, "target": 18}, {"source": 12, "target": 17}, {"source": 12, "target": 13}, {"source": 12, "target": 18}, {"source": 13, "target": 20}, {"source": 13, "target": 23}, {"source": 13, "target": 24}, {"source": 14, "target": 18}, {"source": 14, "target": 21}, {"source": 14, "target": 23}, {"source": 15, "target": 24}, {"source": 15, "target": 23}, {"source": 15, "target": 19}, {"source": 16, "target": 17}, {"source": 16, "target": 22}, {"source": 17, "target": 19}, {"source": 17, "target": 23}, {"source": 17, "target": 24}, {"source": 18, "target": 22}, {"source": 19, "target": 23}, {"source": 20, "target": 24}, {"source": 20, "target": 22}, {"source": 20, "target": 23}, {"source": 21, "target": 24}, {"source": 21, "target": 23}, {"source": 21, "target": 22}, {"source": 22, "target": 24}, {"source": 22, "target": 23}, {"source": 23, "target": 24}]}',
+        'Geo': '{"nodes": [{"name": 0, "x": 0.6888437030500962, "y": 0.515908805880605, "betweenness": 0.07608695652173914, "degree": 5, "closeness": 0.23300970873786409, "eigenvector": 0.0017992299612714453, "Game of Thieves": 23.12121212121212, "harmonic": 9.130952380952381, "pagerank": 0.04887779034199796}, {"name": 1, "x": -0.15885683833831, "y": -0.4821664994140733, "betweenness": 0.01992753623188406, "degree": 3, "closeness": 0.3116883116883117, "eigenvector": 0.02662692658438998, "Game of Thieves": 25.0, "harmonic": 9.816666666666668, "pagerank": 0.03136976347002213}, {"name": 2, "x": 0.02254944273721704, "y": -0.19013172509917142, "betweenness": 0.5175120772946861, "degree": 5, "closeness": 0.4, "eigenvector": 0.09234083413171133, "Game of Thieves": 25.0, "harmonic": 12.233333333333336, "pagerank": 0.0462729068396947}, {"name": 3, "x": 0.5675971780695452, "y": -0.3933745478421451, "betweenness": 0.05917874396135264, "degree": 4, "closeness": 0.3287671232876712, "eigenvector": 0.017976335023702588, "Game of Thieves": 24.939393939393938, "harmonic": 10.58333333333333, "pagerank": 0.039114135335217945}, {"name": 4, "x": -0.04680609169528838, "y": 0.1667640789100624, "betweenness": 0.09510869565217392, "degree": 3, "closeness": 0.34782608695652173, "eigenvector": 0.14664485474520814, "Game of Thieves": 27.363636363636363, "harmonic": 10.733333333333334, "pagerank": 0.02790163732702852}, {"name": 5, "x": 0.8162257703906703, "y": 0.009373711634780513, "betweenness": 0.391304347826087, "degree": 4, "closeness": 0.3333333333333333, "eigenvector": 0.010433007712850826, "Game of Thieves": 26.575757575757574, "harmonic": 10.58333333333333, "pagerank": 0.03902946960909182}, {"name": 6, "x": -0.43632431120059234, "y": 0.5116084083144479, "betweenness": 0.0827294685990338, "degree": 7, "closeness": 0.3076923076923077, "eigenvector": 0.423867511163454, "Game of Thieves": 21.90909090909091, "harmonic": 11.769047619047619, "pagerank": 0.05549567105986359}, {"name": 7, "x": 0.23673799335066326, "y": -0.4989873172751189, "betweenness": 0.1998792270531401, "degree": 7, "closeness": 0.36363636363636365, "eigenvector": 0.038491226250721364, "Game of Thieves": 13.969696969696969, "harmonic": 12.316666666666666, "pagerank": 0.06708647972036469}, {"name": 8, "x": 0.8194925119364802, "y": 0.9655709520753062, "betweenness": 0.0, "degree": 3, "closeness": 0.1935483870967742, "eigenvector": 0.0008132953398082757, "Game of Thieves": 24.03030303030303, "harmonic": 7.320238095238097, "pagerank": 0.03156123843752889}, {"name": 9, "x": 0.6204344719931791, "y": 0.8043319008791654, "betweenness": 0.07608695652173914, "degree": 5, "closeness": 0.23300970873786409, "eigenvector": 0.0017992299612714453, "Game of Thieves": 22.333333333333332, "harmonic": 9.13095238095238, "pagerank": 0.04887779034199796}, {"name": 10, "x": -0.37970486136133474, "y": 0.4596634965202573, "betweenness": 0.17059178743961353, "degree": 8, "closeness": 0.3116883116883117, "eigenvector": 0.4466715420685069, "Game of Thieves": 14.151515151515152, "harmonic": 12.269047619047619, "pagerank": 0.06340320171129807}, {"name": 11, "x": 0.797676575935987, "y": 0.36796786383088254, "betweenness": 0.13768115942028986, "degree": 4, "closeness": 0.27906976744186046, "eigenvector": 0.0031686294070837314, "Game of Thieves": 23.303030303030305, "harmonic": 9.683333333333334, "pagerank": 0.03925439262446359}, {"name": 12, "x": -0.055714569094573285, "y": -0.7985975838632684, "betweenness": 0.0018115942028985507, "degree": 3, "closeness": 0.27586206896551724, "eigenvector": 0.013763799912892302, "Game of Thieves": 23.90909090909091, "harmonic": 8.983333333333334, "pagerank": 0.03302374722757893}, {"name": 13, "x": -0.13165632909243263, "y": 0.2217739468876032, "betweenness": 0.3451086956521739, "degree": 5, "closeness": 0.36363636363636365, "eigenvector": 0.2573657380923385, "Game of Thieves": 25.060606060606062, "harmonic": 11.900000000000002, "pagerank": 0.04293481817803517}, {"name": 14, "x": 0.8260221064757964, "y": 0.9332127355415176, "betweenness": 0.0, "degree": 3, "closeness": 0.1935483870967742, "eigenvector": 0.0008132953398082757, "Game of Thieves": 26.87878787878788, "harmonic": 7.320238095238097, "pagerank": 0.03156123843752889}, {"name": 15, "x": -0.04598044689456593, "y": 0.7306198555432801, "betweenness": 0.0, "degree": 4, "closeness": 0.24742268041237114, "eigenvector": 0.29341151101696145, "Game of Thieves": 25.96969696969697, "harmonic": 9.285714285714286, "pagerank": 0.03315637169384943}, {"name": 16, "x": -0.47901537921608117, "y": 0.6100556540260447, "betweenness": 0.008152173913043478, "degree": 6, "closeness": 0.2553191489361702, "eigenvector": 0.38384587115703, "Game of Thieves": 23.848484848484848, "harmonic": 10.452380952380953, "pagerank": 0.048118820460334305}, {"name": 17, "x": 0.09739860767117858, "y": -0.9719165996719621, "betweenness": 0.0, "degree": 2, "closeness": 0.2727272727272727, "eigenvector": 0.009622999535892187, "Game of Thieves": 30.09090909090909, "harmonic": 8.483333333333333, "pagerank": 0.023503308047291678}, {"name": 18, "x": 0.43940937280790826, "y": -0.2023529155514625, "betweenness": 0.3864734299516908, "degree": 5, "closeness": 0.3870967741935484, "eigenvector": 0.03233601332545091, "Game of Thieves": 23.060606060606062, "harmonic": 11.916666666666666, "pagerank": 0.047258430780244026}, {"name": 19, "x": 0.649689954296466, "y": 0.3363064024637017, "betweenness": 0.13768115942028986, "degree": 4, "closeness": 0.27906976744186046, "eigenvector": 0.0031686294070837314, "Game of Thieves": 28.696969696969695, "harmonic": 9.683333333333334, "pagerank": 0.03925439262446359}, {"name": 20, "x": -0.9977143613711434, "y": -0.012844267069350712, "betweenness": 0.0, "degree": 1, "closeness": 0.23300970873786409, "eigenvector": 0.053058343432876756, "Game of Thieves": 30.757575757575758, "harmonic": 7.285714285714286, "pagerank": 0.013688045022067215}, {"name": 21, "x": 0.7352055509855617, "y": -0.512178246225736, "betweenness": 0.0, "degree": 3, "closeness": 0.3, "eigenvector": 0.016353694209541136, "Game of Thieves": 29.12121212121212, "harmonic": 9.483333333333333, "pagerank": 0.030492431135744447}, {"name": 22, "x": -0.3495912745052199, "y": 0.7409424642173092, "betweenness": 0.0009057971014492754, "degree": 5, "closeness": 0.25, "eigenvector": 0.3390383466280488, "Game of Thieves": 27.424242424242426, "harmonic": 9.785714285714286, "pagerank": 0.04038257294026676}, {"name": 23, "x": -0.6178658169952189, "y": 0.13502148124134372, "betweenness": 0.09812801932367149, "degree": 5, "closeness": 0.3, "eigenvector": 0.28814264250769217, "Game of Thieves": 18.515151515151516, "harmonic": 10.769047619047619, "pagerank": 0.04522497494017602}, {"name": 24, "x": -0.5227681427695596, "y": 0.9350805005802867, "betweenness": 0.0, "degree": 4, "closeness": 0.24742268041237114, "eigenvector": 0.29341151101696145, "Game of Thieves": 27.848484848484848, "harmonic": 9.285714285714286, "pagerank": 0.03315637169384943}], "links": [{"source": 0, "target": 8}, {"source": 0, "target": 9}, {"source": 0, "target": 11}, {"source": 0, "target": 14}, {"source": 0, "target": 19}, {"source": 1, "target": 2}, {"source": 1, "target": 7}, {"source": 1, "target": 12}, {"source": 2, "target": 4}, {"source": 2, "target": 7}, {"source": 2, "target": 13}, {"source": 2, "target": 18}, {"source": 3, "target": 5}, {"source": 3, "target": 7}, {"source": 3, "target": 18}, {"source": 3, "target": 21}, {"source": 4, "target": 10}, {"source": 4, "target": 13}, {"source": 5, "target": 11}, {"source": 5, "target": 18}, {"source": 5, "target": 19}, {"source": 6, "target": 10}, {"source": 6, "target": 13}, {"source": 6, "target": 15}, {"source": 6, "target": 16}, {"source": 6, "target": 22}, {"source": 6, "target": 23}, {"source": 6, "target": 24}, {"source": 7, "target": 12}, {"source": 7, "target": 17}, {"source": 7, "target": 18}, {"source": 7, "target": 21}, {"source": 8, "target": 9}, {"source": 8, "target": 14}, {"source": 9, "target": 11}, {"source": 9, "target": 14}, {"source": 9, "target": 19}, {"source": 10, "target": 13}, {"source": 10, "target": 15}, {"source": 10, "target": 16}, {"source": 10, "target": 22}, {"source": 10, "target": 23}, {"source": 10, "target": 24}, {"source": 11, "target": 19}, {"source": 12, "target": 17}, {"source": 13, "target": 23}, {"source": 15, "target": 16}, {"source": 15, "target": 22}, {"source": 16, "target": 22}, {"source": 16, "target": 23}, {"source": 16, "target": 24}, {"source": 18, "target": 21}, {"source": 20, "target": 23}, {"source": 22, "target": 24}]}',
+        'PA': '{"nodes": [{"name": 0, "x": 0.40925517318185145, "y": -0.08228650176485718, "betweenness": 0.26928053830227744, "degree": 10, "closeness": 0.6, "eigenvector": 0.40920988262364, "Game of Thieves": 5.424242424242424, "harmonic": 16.666666666666668, "pagerank": 0.10061824784608105}, {"name": 1, "x": 0.08784758654973288, "y": -0.1808290520548456, "betweenness": 0.00728088336783989, "degree": 3, "closeness": 0.5, "eigenvector": 0.22493152049258425, "Game of Thieves": 29.060606060606062, "harmonic": 13.000000000000002, "pagerank": 0.03184134603166358}, {"name": 2, "x": 0.9876343351119881, "y": -0.1289647902843339, "betweenness": 0.0016304347826086956, "degree": 2, "closeness": 0.42105263157894735, "eigenvector": 0.14371578193189405, "Game of Thieves": 29.515151515151516, "harmonic": 11.250000000000002, "pagerank": 0.023364312357056466}, {"name": 3, "x": -0.22295837171792662, "y": 0.2540503424961327, "betweenness": 0.3556935817805383, "degree": 11, "closeness": 0.631578947368421, "eigenvector": 0.45120589609786543, "Game of Thieves": 7.878787878787879, "harmonic": 17.333333333333336, "pagerank": 0.11062716395089768}, {"name": 4, "x": 0.508820945141783, "y": 0.11696106852811836, "betweenness": 0.15090579710144927, "degree": 7, "closeness": 0.5454545454545454, "eigenvector": 0.2860141060597606, "Game of Thieves": 11.212121212121213, "harmonic": 15.000000000000002, "pagerank": 0.07257059102664802}, {"name": 5, "x": 0.9872277666545872, "y": 0.1245215035578327, "betweenness": 0.0016304347826086956, "degree": 2, "closeness": 0.42105263157894735, "eigenvector": 0.14371578193189405, "Game of Thieves": 30.90909090909091, "harmonic": 11.250000000000002, "pagerank": 0.023364312357056466}, {"name": 6, "x": -0.1521038236185842, "y": -0.40087367388401113, "betweenness": 0.08262594893029676, "degree": 5, "closeness": 0.5106382978723404, "eigenvector": 0.2276847276027266, "Game of Thieves": 22.303030303030305, "harmonic": 13.833333333333336, "pagerank": 0.051412878994751214}, {"name": 7, "x": 0.8468613832307185, "y": -0.3424742383516738, "betweenness": 0.0016304347826086956, "degree": 2, "closeness": 0.42105263157894735, "eigenvector": 0.14371578193189405, "Game of Thieves": 27.545454545454547, "harmonic": 11.250000000000002, "pagerank": 0.023364312357056466}, {"name": 8, "x": 0.003733203718693683, "y": 0.5430754273726339, "betweenness": 0.025301932367149754, "degree": 4, "closeness": 0.4897959183673469, "eigenvector": 0.222943829458896, "Game of Thieves": 25.060606060606062, "harmonic": 13.16666666666667, "pagerank": 0.042206079484851444}, {"name": 9, "x": -0.39436875708870667, "y": 0.24774596759183726, "betweenness": 0.07503450655624568, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.20190960335953265, "Game of Thieves": 23.545454545454547, "harmonic": 13.5, "pagerank": 0.05206336786586646}, {"name": 10, "x": 0.05147038608511599, "y": -0.5293856789794863, "betweenness": 0.0781400966183575, "degree": 5, "closeness": 0.47058823529411764, "eigenvector": 0.1775981667923737, "Game of Thieves": 20.181818181818183, "harmonic": 13.166666666666668, "pagerank": 0.053458201621966614}, {"name": 11, "x": -0.7517190360732621, "y": -0.24229092299224292, "betweenness": 0.11187025534851623, "degree": 5, "closeness": 0.4897959183673469, "eigenvector": 0.18999023552417182, "Game of Thieves": 17.181818181818183, "harmonic": 13.500000000000002, "pagerank": 0.054584505839352294}, {"name": 12, "x": 0.27016455688259167, "y": 0.5629140154233203, "betweenness": 0.06646825396825397, "degree": 5, "closeness": 0.48, "eigenvector": 0.20110058831150507, "Game of Thieves": 22.424242424242426, "harmonic": 13.333333333333336, "pagerank": 0.05370720860978585}, {"name": 13, "x": -0.014507670603168763, "y": 0.052318732893980466, "betweenness": 0.0, "degree": 2, "closeness": 0.46153846153846156, "eigenvector": 0.17786413129775316, "Game of Thieves": 29.09090909090909, "harmonic": 12.000000000000002, "pagerank": 0.02310075448526219}, {"name": 14, "x": -0.24971814610822063, "y": 0.8542358425540497, "betweenness": 0.006038647342995169, "degree": 2, "closeness": 0.42857142857142855, "eigenvector": 0.134843868632114, "Game of Thieves": 30.272727272727273, "harmonic": 11.416666666666668, "pagerank": 0.023678737617411485}, {"name": 15, "x": -0.7238635688929871, "y": 0.595229139860208, "betweenness": 0.0028381642512077293, "degree": 2, "closeness": 0.42857142857142855, "eigenvector": 0.13501150280830151, "Game of Thieves": 30.515151515151516, "harmonic": 11.333333333333336, "pagerank": 0.02339922574648428}, {"name": 16, "x": -0.4625388370133183, "y": -0.7493966144043468, "betweenness": 0.007246376811594203, "degree": 2, "closeness": 0.39344262295081966, "eigenvector": 0.07598847851687926, "Game of Thieves": 29.666666666666668, "harmonic": 10.583333333333334, "pagerank": 0.02436645957591798}, {"name": 17, "x": 0.15665038304353074, "y": -0.8390474080411263, "betweenness": 0.036421670117322294, "degree": 3, "closeness": 0.4528301886792453, "eigenvector": 0.1394481380255031, "Game of Thieves": 27.0, "harmonic": 12.166666666666668, "pagerank": 0.033540483248147776}, {"name": 18, "x": -0.07284580019219622, "y": 0.9341681031340041, "betweenness": 0.0, "degree": 2, "closeness": 0.4067796610169492, "eigenvector": 0.13935920749173833, "Game of Thieves": 28.424242424242426, "harmonic": 10.91666666666667, "pagerank": 0.02351733528123744}, {"name": 19, "x": 0.7637689817626578, "y": 0.737250086905447, "betweenness": 0.005253623188405798, "degree": 2, "closeness": 0.4, "eigenvector": 0.10069551926625488, "Game of Thieves": 27.545454545454547, "harmonic": 10.833333333333336, "pagerank": 0.02394229548920576}, {"name": 20, "x": -0.4360515572876539, "y": -1.0, "betweenness": 0.024456521739130436, "degree": 3, "closeness": 0.375, "eigenvector": 0.0877643145387471, "Game of Thieves": 24.272727272727273, "harmonic": 10.583333333333334, "pagerank": 0.03494647754918712}, {"name": 21, "x": -0.9824228228892864, "y": -0.8580696477961831, "betweenness": 0.011809868875086267, "degree": 2, "closeness": 0.3582089552238806, "eigenvector": 0.05741819209959139, "Game of Thieves": 26.454545454545453, "harmonic": 9.916666666666666, "pagerank": 0.025179750985520846}, {"name": 22, "x": 0.7271768547126697, "y": 0.45268900906439774, "betweenness": 0.0, "degree": 2, "closeness": 0.4067796610169492, "eigenvector": 0.12616267416547675, "Game of Thieves": 27.21212121212121, "harmonic": 11.000000000000002, "pagerank": 0.023682520721739205}, {"name": 23, "x": -0.41109670592608993, "y": -0.2799632191535156, "betweenness": 0.008152173913043478, "degree": 2, "closeness": 0.43636363636363634, "eigenvector": 0.12998614089581262, "Game of Thieves": 30.545454545454547, "harmonic": 11.500000000000002, "pagerank": 0.02363594721234221}, {"name": 24, "x": -0.9264164586645235, "y": 0.15842250832465973, "betweenness": 0.0, "degree": 2, "closeness": 0.42857142857142855, "eigenvector": 0.13254766338545707, "Game of Thieves": 29.90909090909091, "harmonic": 11.333333333333336, "pagerank": 0.023827483744510235}], "links": [{"source": 0, "target": 1}, {"source": 0, "target": 2}, {"source": 0, "target": 3}, {"source": 0, "target": 5}, {"source": 0, "target": 6}, {"source": 0, "target": 7}, {"source": 0, "target": 12}, {"source": 0, "target": 13}, {"source": 0, "target": 17}, {"source": 0, "target": 22}, {"source": 1, "target": 3}, {"source": 1, "target": 6}, {"source": 2, "target": 4}, {"source": 3, "target": 4}, {"source": 3, "target": 8}, {"source": 3, "target": 11}, {"source": 3, "target": 13}, {"source": 3, "target": 14}, {"source": 3, "target": 15}, {"source": 3, "target": 18}, {"source": 3, "target": 23}, {"source": 3, "target": 24}, {"source": 4, "target": 5}, {"source": 4, "target": 7}, {"source": 4, "target": 8}, {"source": 4, "target": 10}, {"source": 4, "target": 19}, {"source": 6, "target": 9}, {"source": 6, "target": 10}, {"source": 6, "target": 20}, {"source": 8, "target": 9}, {"source": 8, "target": 18}, {"source": 9, "target": 11}, {"source": 9, "target": 12}, {"source": 9, "target": 15}, {"source": 10, "target": 16}, {"source": 10, "target": 17}, {"source": 10, "target": 23}, {"source": 11, "target": 16}, {"source": 11, "target": 21}, {"source": 11, "target": 24}, {"source": 12, "target": 14}, {"source": 12, "target": 19}, {"source": 12, "target": 22}, {"source": 17, "target": 20}, {"source": 20, "target": 21}]}',
+    };
+</script>
+<style>
+    #links line {
+        stroke: #999;
+        stroke-opacity: 0.6;
+        stroke-width: 5px;
+    }
+
+    #nodes circle {
+        stroke-width: 1.5px;
+        fill: orange;
+    }
+
+    #nodes text {
+        text-anchor: middle;
+        font-weight: 100;
+    }
+
+    #graph {
+        width: 100%;
+        aspect-ratio: 1;
+        max-height: 580px !important;
+        margin: auto;
+    }
+</style>
+
+<body onload="initialize()">
+<div class="container">
+    <div class="row">
+        <div class="col-md-12">
+            <div id="graph"></div>
+        </div>
+    </div>
+    <div class="row" id="spacing-div">
+        <div class="col-12">
+            <h5 id="result-label" style="text-align: center; height: 24px;"></h5>
+        </div>
+    </div>
+    <div class="row" id="selectionrow">
+        <div class="container col-sm-5">
+            <div class="row">
+                <label for="model" class="col-form-label col-4">Graph:</label>
+                <div class="col-8"><select id="model" class="form-select" >
+                    <option value="ER">Erdős-Rényi</option>
+                    <option value="PA">Preferential Attachment</option>
+                    <option value="Geo">Geometric</option>
+                    <option value="CM">Configuration Model</option>
+                </select></div>
+            </div>
+        </div>
+        <div class="container col-sm-5">
+            <div class="row">
+                <label for="centrality" class="col-form-label col-3">Centrality:</label>
+                <div class="col-9"><select id="centrality" class="form-select" >
+                    <option value="betweenness">Betweenness</option>
+                    <option value="closeness">Closeness</option>
+                    <option value="degree">Degree</option>
+                    <option value="eigenvector">Eigenvector</option>
+                    <option value="Game of Thieves">Game of Thieves</option>
+                    <option value="harmonic">Harmonic</option>
+                    <option value="pagerank">Pagerank</option>
+                </select></div>
+            </div>
+        </div>
+        <div class="container col-sm-2">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="restart()" id="restartButton">Reload</button>
+            </div>
+        </div>
+    </div>
+    <div class="row" id="eliminationrow">
+        <div class="container col-sm-10">
+            <div class="row">
+                <label for="to_eliminate" class="col-form-label col-2">Fraction to eliminate:</label>
+                <div class="col-4"><input type="range" value=0.2 min=0 max=1 step=0.04 class="form-control" id="to_eliminate" /></div>
+                <label class="col-6 col-form-label" id="to_eliminateDisplay">0.2</label>
+            </div>
+        </div>
+        <div class="container col-sm-2">
+            <div class="row">
+                <button type="button" class="col-12 btn btn-primary" onclick="eliminate()" id="eliminateButton">Eliminate</button>
+            </div>
+        </div>
+    </div>
+</div>
+</div>
+<script src="https://d3js.org/d3.v5.js"></script>
+<script>
+    // OPTIONS:
+    graph_name = "ER";
+    centrality = 'degree'
+    fraction2eliminate = 0.2;
+
+
+
+    var id = "graph";
+    var container = document.getElementById(id);
+    var width = container.offsetWidth;
+    var height = container.offsetHeight;
+    var maxHeight = window.innerHeight - document.getElementById("selectionrow").offsetHeight - document.getElementById("eliminationrow").offsetHeight;
+    if (height+document.getElementById('spacing-div').offsetHeight < maxHeight) {
+        console.log(height+"<"+maxHeight);
+        d3.select('#spacing-div').style('height',(maxHeight-height)/2+'px');
+    }
+    var size = width < height ? width : height;
+    var scalex = x => width/2+width*0.45*x; 
+    var scaley = y => height/2+height*0.45*y; 
+    var formatCentrality = v => Number.isInteger(v) ? v : v.toFixed(2);
+    
+
+    var nodes = [];
+    var xs = [];
+    var ys = [];
+
+
+
+    var graph = {
+        "nodes": [],
+        "links": []
+    };
+
+    // A function that gives the id of the link/edge.
+    var linkId = e => e.source.name + "-" + e.target.name;
+    var nodeId = v => "n"+v.name;
+
+    // Transforms a node pair to a link with source and target.
+    function pair2link(p) {
+        return {
+            "source": Math.min(p[0], p[1]),
+            "target": Math.max(p[0], p[1])
+        };
+    }
+
+    // Given a d3 selector, this initializes a line for each (enter-) element.
+    function initLinks(selector) {
+        var links = selector.append("line")
+            .attr("id", linkId)
+            .attr("x1", e => scalex(e.source.x))
+            .attr("y1", e => scaley(e.source.y))
+            .attr("x2", e => scalex(e.target.x))
+            .attr("y2", e => scaley(e.target.y));
+        return links;
+    }
+
+
+
+    var svg;
+
+    function initContainer() {
+        d3.select("input[id=to_eliminate]").on("change", function () {
+            fraction2eliminate=this.value;
+            document.getElementById("to_eliminateDisplay").innerHTML = fraction2eliminate;
+        });
+
+
+        if (!d3.select("#" + id + " svg").empty()) {
+            return;
+        }
+        svg = d3.select("#" + id).append("svg")
+            .attr("width", width)
+            .attr("height", height);
+    }
+
+    var d3Nodes;
+    var d3Links;
+    var colorScale;
+
+    function loadGraph(dontLoad) {
+        if (!dontLoad) {
+            graph_name = document.getElementById('model').value;
+            graph = JSON.parse(generated_graphs[graph_name]);
+            graph.links.forEach(function(e) {
+                e.source = graph.nodes[e.source];
+                e.target = graph.nodes[e.target];
+            })
+            centrality = document.getElementById('centrality').value;
+            document.getElementById('result-label').innerHTML = '';
+            // Set the colorbar
+            var cs = [];
+            var sgn = (centrality == 'Game of Thieves' ? -1 : 1);
+            var total = 0;
+            graph.nodes.forEach(v => {
+                cs.push(sgn*v[centrality]); 
+                total+=sgn*v[centrality];
+            });
+            var minCentrality = Math.min(...cs);
+            var maxCentrality = Math.max(...cs);
+            var avgCentrality = total/cs.length;
+            colorScale = d3.scaleLinear().domain([minCentrality, avgCentrality, maxCentrality]).range(["orange","red","black"]);
+        }
+        if (d3Nodes) {
+            document.getElementById('nodes').remove();
+        }
+        if (d3Links) {
+            document.getElementById('links').remove();
+        }
+        
+
+        //draw lines for the links
+        d3Links = initLinks(svg.append("g")
+            .attr("id", "links")
+            .selectAll("line")
+            .data(graph.links)
+            .enter());
+
+        //draw circles for the nodes
+        d3Nodes = svg.append("g")
+            .attr("id", "nodes")
+            .attr("stroke", "#fff")
+            .attr("stroke-width", 1.5)
+            .selectAll("g")
+            .data(graph.nodes)
+            .join("g")
+            .attr("id", nodeId)
+            .attr("transform", function (d) {
+                return 'translate('+scalex(d.x)+','+scaley(d.y)+')';
+            });
+        var circles = d3Nodes.append('circle').attr('r',20).style('fill', d => colorScale(d[centrality]*(centrality == 'Game of Thieves' ? -1 : 1)));
+        var texts = d3Nodes.append('text')
+                           .text(v=>formatCentrality(v[centrality]))
+                           .attr('y', 5);
+    }
+
+    function restart() {
+        loadGraph();
+    }
+
+    var componentSizes;
+    function eliminate() {
+        // Sort by centrality and find the threshold
+        var names = [];
+        graph.nodes.forEach(v => names.push(v.name));
+        names.sort(function(a,b) {return (graph.nodes[a][centrality]-graph.nodes[b][centrality])*(centrality == 'Game of Thieves' ? -1 : 1)});
+        names.splice(Math.round(graph.nodes.length * (1-fraction2eliminate)));
+
+        graph.nodes = graph.nodes.filter(v => names.includes(v.name));
+        graph.links = graph.links.filter(e => names.includes(e.source.name) && names.includes(e.target.name));
+
+        componentSizes = [];
+        var iComponent = 0;
+        graph.nodes.forEach(v => {v.neighbors = []; v.component = -1;});
+        graph.links.forEach(e => {
+            e.source.neighbors.push(e.target);
+            e.target.neighbors.push(e.source);
+        });
+        graph.nodes.forEach(v => {
+            if (v.component<0) {
+                componentSizes.push(0);
+                dfsVisit(v, iComponent++);
+            }
+        });
+        console.log('Component sizes:');
+        console.log(componentSizes);
+        var maxComponent = Math.max(...componentSizes);
+        
+        document.getElementById('result-label').innerHTML = (iComponent > 1 ? 'There are '+iComponent+' components left and '+Math.round(100*maxComponent/graph.nodes.length)+'% of the vertices are in the largest component.' : 'The graph remains connected');
+
+        loadGraph(true);
+    }
+
+    function dfsVisit(v, iComponent) {
+        if (v.component<0) {
+            v.component = iComponent;
+            componentSizes[iComponent]++;
+            v.neighbors.forEach(w => dfsVisit(w, iComponent));
+        }
+    }
+
+    function initialize() {
+        initContainer();
+
+        // Generate graph and draw
+        loadGraph();
+    }
+
+</script>
+</body>
